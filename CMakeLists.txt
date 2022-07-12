@@ -11,5 +11,6 @@ include_directories(${SRC_DIR}/core ${SRC_DIR}/ui)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_executable(PPPM main.cu)
 target_link_libraries(PPPM PUBLIC imgui)
+target_compile_definitions(PPPM PRIVATE IMGUI_CONFIG_FILE="${CMAKE_SOURCE_DIR}/src/ui/imgui.ini")
 
 
