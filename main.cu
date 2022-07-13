@@ -4,7 +4,7 @@
 using namespace pppm;
 
 
-__global__ void kernel(GArr3D<uchar4> data)
+__global__ void kernel(GArr3D<float> data)
 {
     for (int x = blockIdx.x; x < data.rows; x += gridDim.x)
     {
@@ -12,7 +12,7 @@ __global__ void kernel(GArr3D<uchar4> data)
         {
             for (int b = 0; b < data.batchs; b++)
             {
-                data(b, x, y) = make_uchar4(0, b, 0, 255);
+                data(b, x, y) = (float) b - 50;
             }
             
         }
@@ -22,9 +22,9 @@ __global__ void kernel(GArr3D<uchar4> data)
 int main(){
     GUI gui;
     CudaRender render;
-    GArr3D<uchar4> data;
-    data.resize(100, 512, 512);
-    cuExecuteBlock(512, 64, kernel, data);
+    GArr3D<float> data;
+    data.resize(100, 32, 32);
+    cuExecuteBlock(32, 64, kernel, data);
     render.setData(data);
     gui.append(&render);
     gui.start();

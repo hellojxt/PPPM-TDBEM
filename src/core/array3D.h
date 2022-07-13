@@ -73,7 +73,9 @@ namespace pppm
         }
 
         DYN_FUNC inline const T *begin() const { return data.begin(); }
+        DYN_FUNC inline const T *end() const { return data.end(); }
         DYN_FUNC inline T *begin() { return data.begin(); }
+        DYN_FUNC inline T *end() { return data.end(); }
 
         inline CArr3D<T> cpu()
         {

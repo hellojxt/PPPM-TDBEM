@@ -18,7 +18,7 @@ namespace pppm
         CArr<Window *> sub_windows;
 
     public:
-        void start(int height = 1280, int width = 720)
+        void start(int height = 1500, int width = 900)
         {
             glfwSetErrorCallback(glfw_error_callback);
             if (!glfwInit())
