@@ -57,7 +57,7 @@ namespace pppm
             return data[b_i * rows * cols + i * cols + j];
         }
 
-        DYN_FUNC inline int index(const uint b_i, const uint i, const uint j) const
+        CGPU_FUNC inline int index(const uint b_i, const uint i, const uint j) const
         {
             return b_i * rows * cols + i * cols + j;
         }
@@ -72,10 +72,10 @@ namespace pppm
             return GArr2D<T>(data.data() + id * rows * cols, rows, cols);
         }
 
-        DYN_FUNC inline const T *begin() const { return data.begin(); }
-        DYN_FUNC inline const T *end() const { return data.end(); }
-        DYN_FUNC inline T *begin() { return data.begin(); }
-        DYN_FUNC inline T *end() { return data.end(); }
+        CGPU_FUNC inline const T *begin() const { return data.begin(); }
+        CGPU_FUNC inline const T *end() const { return data.end(); }
+        CGPU_FUNC inline T *begin() { return data.begin(); }
+        CGPU_FUNC inline T *end() { return data.end(); }
 
         inline CArr3D<T> cpu()
         {

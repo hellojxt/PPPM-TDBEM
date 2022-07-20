@@ -3,16 +3,21 @@ project(PPPM LANGUAGES CXX CUDA)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CUDA_ARCHITECTURES 75 86)
 set(CMAKE_CXX_STANDARD 17)
-
+set(OpenGL_GL_PREFERENCE GLVND)
 # For CUDA-GDB
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
-
-add_subdirectory(libs)
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
-include_directories(${SRC_DIR}/core ${SRC_DIR}/ui)
+include_directories(
+                    ${SRC_DIR}/core 
+                    ${SRC_DIR}/ui
+                    ${SRC_DIR}/algorithm
+)
+add_subdirectory(libs)
+add_subdirectory(${SRC_DIR}/ui)
+add_subdirectory(${SRC_DIR}/algorithm)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_executable(PPPM main.cu)
-target_link_libraries(PPPM PUBLIC imgui)
-target_compile_definitions(PPPM PRIVATE IMGUI_CONFIG_FILE="${CMAKE_SOURCE_DIR}/src/ui/imgui.ini")
+target_link_libraries(PPPM uilib alglib)
+
 
 

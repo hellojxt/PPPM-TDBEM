@@ -42,7 +42,7 @@ namespace pppm
 	std::cout.precision(ss_##x);
 
 #define PI 3.14159265359
-#define DYN_FUNC __host__ __device__
+#define CGPU_FUNC __host__ __device__
 #define GPU_FUNC __device__
 #define CPU_FUNC __host__
 #define RAND_F (float)rand() / (float)RAND_MAX
@@ -52,6 +52,12 @@ namespace pppm
 	typedef float real_t;
 	const real_t EPS = 1e-8f;
 	typedef thrust::complex<real_t> cpx;
+	enum cpx_phase
+	{
+		CPX_REAL,
+		CPX_IMAG,
+		CPX_ABS,
+	};
 	typedef std::vector<real_t> RealVec;
 	typedef std::vector<cpx> ComplexVec;
 
@@ -65,17 +71,16 @@ namespace pppm
 		}
 	}
 
-#define atomicAddCpx(dst, value)								\
-    {															\
-        atomicAdd((float *)(dst), (value).real());					\
-        atomicAdd(((float *)(dst)) + 1, (value).imag());			\
-    }
-#define atomicAddCpxBlock(dst, value)							\
-    {															\
-        atomicAdd_block((float *)(dst), (value).real());			\
-        atomicAdd_block(((float *)(dst)) + 1, (value).imag());		\
-    }
-
+#define atomicAddCpx(dst, value)                         \
+	{                                                    \
+		atomicAdd((float *)(dst), (value).real());       \
+		atomicAdd(((float *)(dst)) + 1, (value).imag()); \
+	}
+#define atomicAddCpxBlock(dst, value)                          \
+	{                                                          \
+		atomicAdd_block((float *)(dst), (value).real());       \
+		atomicAdd_block(((float *)(dst)) + 1, (value).imag()); \
+	}
 
 #ifdef NDEBUG
 #define cuSafeCall(X) X

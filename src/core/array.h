@@ -52,7 +52,7 @@ namespace pppm
 
 		inline const T *begin() const { return m_data.size() == 0 ? nullptr : &m_data[0]; }
 		inline T *begin() { return m_data.size() == 0 ? nullptr : &m_data[0]; }
-				inline const T *end() const { return m_data.size() == 0 ? nullptr : &m_data[0] + m_data.size(); }
+		inline const T *end() const { return m_data.size() == 0 ? nullptr : &m_data[0] + m_data.size(); }
 		inline T *end() { return m_data.size() == 0 ? nullptr : &m_data[0] + m_data.size(); }
 
 		inline const T *data() const { return m_data.size() == 0 ? nullptr : &m_data[0]; }
@@ -125,6 +125,11 @@ namespace pppm
 			this->m_totalNum = num;
 		}
 
+		GArr(const CArr<T> &v)
+		{
+			this->assign(v);
+		}
+
 		/*!
 		 *	\brief	Do not release memory here, call clear() explicitly.
 		 */
@@ -142,14 +147,14 @@ namespace pppm
 		 */
 		void clear();
 
-		DYN_FUNC inline const T *begin() const { return m_data; }
-		DYN_FUNC inline T *begin() { return m_data; }
+		CGPU_FUNC inline const T *begin() const { return m_data; }
+		CGPU_FUNC inline T *begin() { return m_data; }
 
-		DYN_FUNC inline const T *data() const { return m_data; }
-		DYN_FUNC inline T *data() { return m_data; }
+		CGPU_FUNC inline const T *data() const { return m_data; }
+		CGPU_FUNC inline T *data() { return m_data; }
 
-		DYN_FUNC inline const T *end() const { return m_data + m_totalNum; }
-		DYN_FUNC inline T *end() { return m_data + m_totalNum; }
+		CGPU_FUNC inline const T *end() const { return m_data + m_totalNum; }
+		CGPU_FUNC inline T *end() { return m_data + m_totalNum; }
 
 		GPU_FUNC inline T &operator[](unsigned int id)
 		{
@@ -161,20 +166,17 @@ namespace pppm
 			return m_data[id];
 		}
 
-		DYN_FUNC inline uint size() const { return m_totalNum; }
-		DYN_FUNC inline bool isCPU() const { return false; }
-		DYN_FUNC inline bool isGPU() const { return true; }
-		DYN_FUNC inline bool isEmpty() const { return m_data == nullptr; }
+		CGPU_FUNC inline uint size() const { return m_totalNum; }
+		CGPU_FUNC inline bool isCPU() const { return false; }
+		CGPU_FUNC inline bool isGPU() const { return true; }
+		CGPU_FUNC inline bool isEmpty() const { return m_data == nullptr; }
 
 		void assign(const GArr<T> &src);
 		void assign(const CArr<T> &src);
 		void assign(const std::vector<T> &src);
 		// GArr &operator=(const CArr<T> &v)
 		// { this->assign(v); return *this; }
-		GArr(const CArr<T> &v)
-		{
-			this->assign(v);
-		}
+
 		inline CArr<T> cget(uint32_t idx, uint32_t count)
 		{
 			return CArr<T>(*this, idx, count);
@@ -195,6 +197,15 @@ namespace pppm
 		void assign(const GArr<T> &src, const uint count, const uint dstOffset = 0, const uint srcOffset = 0);
 		void assign(const CArr<T> &src, const uint count, const uint dstOffset = 0, const uint srcOffset = 0);
 		void assign(const std::vector<T> &src, const uint count, const uint dstOffset = 0, const uint srcOffset = 0);
+		void copy_from(const GArr<T> &src)
+		{
+			if (src.size() != m_totalNum)
+			{
+				LOG_ERROR("Error: GArr.copy_from: size not match\n");
+				return;
+			}
+			this->assign(src);
+		}
 
 		friend std::ostream &operator<<(std::ostream &out, const GArr<T> &dArray)
 		{
@@ -215,12 +226,12 @@ namespace pppm
 	class SArr
 	{
 	public:
-		DYN_FUNC SArr(){};
-		DYN_FUNC inline T &operator[](unsigned int id)
+		CGPU_FUNC SArr(){};
+		CGPU_FUNC inline T &operator[](unsigned int id)
 		{
 			return m_data[id];
 		}
-		DYN_FUNC inline const T &operator[](unsigned int id) const
+		CGPU_FUNC inline const T &operator[](unsigned int id) const
 		{
 			return m_data[id];
 		}

@@ -1,18 +1,14 @@
-Single Layer Potential
+Wavelength Sampling Criterion
 $$
-V(s, x) = \int_{\Gamma}\frac{e^{-s|x-y|}}{4 \pi|x-y|} \varphi(y) d \Gamma_{y}
-$$
-Double Layer Potential
-$$
-D(s, x) = \int_{\Gamma} \frac{\partial}{\partial \nu_{y}} \frac{e^{-s|x-y|}}{4 \pi|x-y|} \varphi(y) d \Gamma_{y}
+l < \lambda/4 = \frac {c}{4f} = 343/(4*5000) = 0.017
 $$
 
-Solve Equation
+origin time step (l = 0.005):
 $$
-\begin{aligned}
-    \frac{1}{2} G_{n}(x) &= &\sum_{j=0}^{n} \sum_{l = 0}^m \left(-W_{n-j}^{\Delta t}(\mathcal{V_l})  \Phi_{j,l}+ W_{n-j}^{\Delta t}(\mathcal{D_l}) G_{j,l}\right) \\
-& = &\sum_{j=0}^{n} \sum_{l = 0}^{m_0 - 1} \left(-W_{n-j}^{\Delta t}(\mathcal{V_l})  \Phi_{j,l}+ W_{n-j}^{\Delta t}(\mathcal{D_l}) G_{j,l}\right) \\
-&& +\sum_{j=0}^{n} \sum_{l = m_0}^m \left(-W_{n-j}^{\Delta t}(\mathcal{V_l})  \Phi_{j,l}+ W_{n-j}^{\Delta t}(\mathcal{D_l}) G_{j,l}\right)\\ 
-\end{aligned} 
+\Delta t = l / (\sqrt3 * 343) = 0.00000857485 = 116khz
+$$
 
+large time step (0.015):
+$$
+\Delta t = l / (\sqrt3 * 343) = 0.00002572455= 39khz
 $$

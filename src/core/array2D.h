@@ -42,6 +42,12 @@ namespace pppm
 			this->cols = A.cols;
 			data.assign(A.data);
 		}
+
+		void copy_from(const GArr2D<T> &A)
+		{
+			data.copy_from(A.data);
+		}
+
 		void clear(){
 			data.clear();
 		}
@@ -64,7 +70,7 @@ namespace pppm
 			return data[i * cols + j];
 		}
 
-		DYN_FUNC inline int index(const uint i, const uint j) const
+		CGPU_FUNC inline int index(const uint i, const uint j) const
 		{
 			return i * cols + j;
 		}
@@ -79,8 +85,8 @@ namespace pppm
 			return GArr<T>(begin() + id * cols, cols);
 		}
 
-		DYN_FUNC inline const T *begin() const { return data.begin(); }
-		DYN_FUNC inline T *begin() { return data.begin(); }
+		CGPU_FUNC inline const T *begin() const { return data.begin(); }
+		CGPU_FUNC inline T *begin() { return data.begin(); }
 
 		inline CArr2D<T> cpu()
 		{
