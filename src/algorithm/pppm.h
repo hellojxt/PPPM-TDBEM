@@ -1,7 +1,7 @@
 #pragma once
 #include "fdtd.h"
 #include "array3D.h"
-
+#include "particle_grid.h"
 namespace pppm{
 
     class PPPMSolver{

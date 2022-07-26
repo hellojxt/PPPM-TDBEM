@@ -33,7 +33,7 @@ namespace pppm
             this->title = "CudaRender";
         }
 
-        void setData(GArr3D<float> origin_data, float data_max = -1);
+        void setData(GArr3D<float> origin_data, float data_max = 1, float upsample_factor = 24);
         void init();
         void update();
         void clear();

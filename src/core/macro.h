@@ -7,6 +7,8 @@
 #include <bitset>
 #include <vector>
 #include <thrust/complex.h>
+#include <thrust/transform_scan.h>
+#include <thrust/execution_policy.h>
 
 namespace pppm
 {
@@ -52,6 +54,7 @@ namespace pppm
 	typedef float real_t;
 	const real_t EPS = 1e-8f;
 	typedef thrust::complex<real_t> cpx;
+
 	enum cpx_phase
 	{
 		CPX_REAL,
@@ -165,9 +168,39 @@ namespace pppm
 	{
 		return o << "(" << f.x << ", " << f.y << ", " << f.z << ")";
 	}
+	static std::ostream &operator<<(std::ostream &o, int3 const &f)
+	{
+		return o << "(" << f.x << ", " << f.y << ", " << f.z << ")";
+	}
 	static std::ostream &operator<<(std::ostream &o, int4 const &a)
 	{
 		return o << "(" << a.x << ", " << a.y << ", " << a.z << ", " << a.w << ")";
 	}
 
+	class Range
+	{
+	public:
+		uint start;
+		uint end;
+		Range(uint start, uint end) : start(start), end(end) {}
+		Range() : start(0), end(0) {}
+		friend std::ostream &operator<<(std::ostream &os, const Range &r)
+		{
+			os << "[" << r.start << "," << r.end << "]";
+			return os;
+		}
+	};
+
+	class BBox
+	{
+	public:
+		float3 min;
+		float3 max;
+		float width;
+		friend std::ostream &operator<<(std::ostream &os, const BBox &b)
+		{
+			os << "[" << b.min << "," << b.max << "]";
+			return os;
+		}
+	};
 }

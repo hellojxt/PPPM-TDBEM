@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(OpenGL_GL_PREFERENCE GLVND)
 # For CUDA-GDB
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(
                     ${SRC_DIR}/core 

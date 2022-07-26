@@ -14,6 +14,7 @@
 #include <thrust/extrema.h>
 #include <thrust/execution_policy.h>
 #include "window.h"
+#include "helper_math.h"
 
 namespace pppm
 {
@@ -55,8 +56,7 @@ namespace pppm
         return make_uchar4(c.x * 255, c.y * 255, c.z * 255, 255);
     }
 
-#define UPSAMPLE_FACTOR 24
-    __global__ void preprocess_image_data(GArr3D<float> in_data, GArr3D<uchar4> out_data, float data_max)
+    __global__ void preprocess_image_data(GArr3D<float> in_data, GArr3D<uchar4> out_data, float data_max, float upsample_factor)
     {
         for (int x = blockIdx.x; x < out_data.rows; x += gridDim.x)
         {
@@ -64,33 +64,30 @@ namespace pppm
             {
                 for (int b = 0; b < out_data.batchs; b++)
                 {
-                    float2 pos_f = make_float2(((float)x) / UPSAMPLE_FACTOR, ((float)y) / UPSAMPLE_FACTOR);
+                    float2 pos_f = make_float2(((float)x) / upsample_factor, ((float)y) / upsample_factor);
                     int2 pos = make_int2((int)pos_f.x, (int)pos_f.y);
                     float value = in_data(b, pos.x, pos.y);
-                    uchar4 line_color = make_uchar4(170, 170, 170, 255);
+                    uchar4 line_color = make_uchar4(200, 200, 200, 255);
                     uchar4 pixel_color = JetColor(value, -data_max, data_max);
                     float k = 3.5f;
                     pixel_color.x /= k;
                     pixel_color.y /= k;
                     pixel_color.z /= k;
-                    float line_width = 0.03f;
-                    float center = 0.5f - 0.5f / UPSAMPLE_FACTOR;
-                    if (abs(pos_f.x - pos.x - center) >= 0.5 - line_width || abs(pos_f.y - pos.y - center) >= 0.5 - line_width)
-                    {
-                        out_data(b, x, y) = line_color;
-                    }
-                    else
-                    {
-                        out_data(b, x, y) = pixel_color;
-                    }
+                    float line_width = 0.1f;
+                    float center = 0.5f*(1 - 1/upsample_factor);
+                    float dist = 1 - 2*max(abs(pos_f.x - pos.x - center), abs(pos_f.y - pos.y - center));
+                    float guass = exp(-dist*dist / (line_width*line_width));
+                    out_data(b, x, y) = make_uchar4(pixel_color.x * (1- guass) + line_color.x * guass,
+                                                    pixel_color.y * (1- guass) + line_color.y * guass,
+                                                    pixel_color.z * (1- guass) + line_color.z * guass, 255);
                 }
             }
         }
     }
 
-    void CudaRender::setData(GArr3D<float> origin_data, float data_max)
+    void CudaRender::setData(GArr3D<float> origin_data, float data_max, float upsample_factor)
     {
-        data.resize(origin_data.batchs, origin_data.rows * UPSAMPLE_FACTOR, origin_data.cols * UPSAMPLE_FACTOR);
+        data.resize(origin_data.batchs, origin_data.rows * upsample_factor, origin_data.cols * upsample_factor);
         if (data_max == -1)
         {
             auto min_ptr = thrust::min_element(thrust::device, origin_data.begin(), origin_data.end());
@@ -104,7 +101,7 @@ namespace pppm
                 data_max = -data_min;
             }
         }
-        cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max);
+        cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor);
         frame_num = data.batchs;
         width = data.rows;
         height = data.cols;

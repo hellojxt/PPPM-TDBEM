@@ -1,3 +1,5 @@
+# Note For PPPM
+
 Wavelength Sampling Criterion
 $$
 l < \lambda/4 = \frac {c}{4f} = 343/(4*5000) = 0.017
