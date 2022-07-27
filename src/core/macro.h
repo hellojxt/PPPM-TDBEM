@@ -61,6 +61,14 @@ namespace pppm
 		CPX_IMAG,
 		CPX_ABS,
 	};
+
+	enum PlaneType
+	{
+		XY,
+		XZ,
+		YZ,
+	};
+
 	typedef std::vector<real_t> RealVec;
 	typedef std::vector<cpx> ComplexVec;
 
@@ -197,6 +205,11 @@ namespace pppm
 		float3 min;
 		float3 max;
 		float width;
+		BBox(){}
+		BBox(float3 _min, float3 _max){
+            min = _min;
+            max = _max;
+        }
 		friend std::ostream &operator<<(std::ostream &os, const BBox &b)
 		{
 			os << "[" << b.min << "," << b.max << "]";

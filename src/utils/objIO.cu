@@ -50,7 +50,29 @@ namespace pppm
 		return BBox(min_p, max_p);
 	}
 
-	inline Mesh loadOBJ(const char *file_name, bool log = false)
+	void Mesh::normalize()
+	{
+		float3 min_pos = vertices[0];
+		float3 max_pos = vertices[0];
+		for (int i = 1; i < vertices.size(); i++)
+		{
+			min_pos.x = min(min_pos.x, vertices[i].x);
+			min_pos.y = min(min_pos.y, vertices[i].y);
+			min_pos.z = min(min_pos.z, vertices[i].z);
+			max_pos.x = max(max_pos.x, vertices[i].x);
+			max_pos.y = max(max_pos.y, vertices[i].y);
+			max_pos.z = max(max_pos.z, vertices[i].z);
+		}
+		float3 center = (min_pos + max_pos) / 2.0f;
+		float3 scale_f3 = (max_pos - min_pos) / 2.0f;
+		float scale = max(max(scale_f3.x, scale_f3.y), scale_f3.z);
+		for (int i = 0; i < vertices.size(); i++)
+		{
+			vertices[i] = (vertices[i] - center) / scale;
+		}
+	}
+
+	Mesh loadOBJ(std::string file_name, bool log)
 	{
 		CArr<float3> vertices;
 		CArr<int3> triangles;
