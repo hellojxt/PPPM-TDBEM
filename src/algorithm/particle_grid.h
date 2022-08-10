@@ -32,12 +32,22 @@ namespace pppm
         GArr<Range> particle_map;
         GArr3D<int> grid_hash_map;
 
-        ParticleGrid(float3 min_pos_, float grid_size_, int3 grid_dim_)
+        ParticleGrid(){}
+
+        void init(float3 min_pos_, float grid_size_, int3 grid_dim_)
         {
             min_pos = min_pos_;
             grid_size = grid_size_;
             grid_dim = grid_dim_;
             max_pos = min_pos + make_float3(grid_dim.x, grid_dim.y, grid_dim.z) * grid_size;
+        }
+
+        void init(float3 min_pos_, float3 max_pos_, int3 grid_dim_)
+        {
+            min_pos = min_pos_;
+            max_pos = max_pos_;
+            grid_dim = grid_dim_;
+            grid_size = (max_pos.x - min_pos.x) / grid_dim.x;
         }
 
         void set_mesh(CArr<float3> vertices_, CArr<int3> triangles_)
@@ -46,7 +56,15 @@ namespace pppm
             triangles.assign(triangles_);
         }
 
-        void construct();
+        void clear(){
+            vertices.clear();
+            triangles.clear();
+            particles.clear();
+            particle_map.clear();
+            grid_hash_map.clear();
+        }
+
+        void construct_grid();
         void validate_data();
         static void randomly_test();
     };

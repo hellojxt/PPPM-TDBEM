@@ -4,6 +4,7 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CUDA_ARCHITECTURES 75 86)
 set(CMAKE_CXX_STANDARD 17)
 set(OpenGL_GL_PREFERENCE GLVND)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For CUDA-GDB
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)

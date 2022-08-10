@@ -73,7 +73,7 @@ namespace pppm
         grid_hash_map(coord.x, coord.y, coord.z) = idx;
     }
 
-    void ParticleGrid::construct()
+    void ParticleGrid::construct_grid()
     {
         particles.resize(triangles.size());
         // extend to the 2^n resoltion and construct the grid
@@ -168,7 +168,8 @@ namespace pppm
         float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
         float grid_size = RAND_F;
         int3 grid_dim = make_int3(8, 8, 8);
-        ParticleGrid pg(min_pos, grid_size, grid_dim);
+        ParticleGrid pg;
+        pg.init(min_pos, grid_size, grid_dim);
         int triangle_count = 400;
         CArr<float3> vertices;
         CArr<int3> triangles;
@@ -186,7 +187,7 @@ namespace pppm
             triangles[i] = make_int3(i * 3 + 0, i * 3 + 1, i * 3 + 2);
         }
         pg.set_mesh(vertices, triangles);
-        pg.construct();
+        pg.construct_grid();
         // SHOW(pg.vertices)
         // SHOW(pg.triangles)
         // SHOW(pg.particles)

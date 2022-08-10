@@ -9,7 +9,7 @@ namespace pppm
     class FDTD
     {
     public:
-        GArr3D<cpx> grids[GRID_TIME_SIZE];
+        GArr3D<float> grids[GRID_TIME_SIZE];
         float c;
         int t;
         int res;
@@ -18,7 +18,10 @@ namespace pppm
 
         void init(int res_, float dl_, float dt_);
         void update();
-        void copy_clip(GArr3D<float> &data, int clip_idx = -1, cpx_phase phase = CPX_REAL);
+        void copy_clip(GArr3D<float> &data, int clip_idx = -1);
+        void clear();
     };
+
+
 
 }

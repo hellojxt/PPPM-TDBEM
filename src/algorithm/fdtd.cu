@@ -2,35 +2,23 @@
 
 namespace pppm
 {
-
-    __global__ void copy_clip_kernel(FDTD fdtd, GArr3D<float> data, cpx_phase phase, int clip_idx)
+    void FDTD::init(int res_, float dl_, float dt_)
     {
-        int x = blockIdx.x;
-        int y = threadIdx.x;
-        int n = fdtd.t % GRID_TIME_SIZE;
-        if (x < fdtd.res && y < fdtd.res)
+        res = res_;
+        for (int i = 0; i < GRID_TIME_SIZE; i++)
         {
-            int z = clip_idx;
-            float real = fdtd.grids[n](x, y, z).real();
-            float imag = fdtd.grids[n](x, y, z).imag();
-            if (phase == CPX_REAL)
-            {
-                data(fdtd.t, x, y) = real;
-            }
-            else if (phase == CPX_IMAG)
-            {
-                data(fdtd.t, x, y) = imag;
-            }
-            else if (phase == CPX_ABS)
-            {
-                data(fdtd.t, x, y) = sqrt(real * real + imag * imag);
-            }
+            grids[i].resize(res, res, res);
+            grids[i].reset();
         }
+        t = 0;
+        dl = dl_;
+        dt = dt_;
+        c = 343.2f;
     }
 
-    GPU_FUNC cpx laplacian(GArr3D<cpx> &grid, int i, int j, int k, float h)
+    GPU_FUNC float laplacian(GArr3D<float> &grid, int i, int j, int k, float h)
     {
-        cpx sum = 0;
+        float sum = 0;
         sum += grid(i - 1, j, k);
         sum += grid(i + 1, j, k);
         sum += grid(i, j - 1, k);
@@ -57,34 +45,38 @@ namespace pppm
         fdtd.grids[n2](i, j, k) = 2 * fdtd.grids[n1](i, j, k) + (c * c * dt * dt) * laplacian(fdtd.grids[n1], i, j, k, h) - fdtd.grids[n0](i, j, k);
     }
 
-    void FDTD::init(int res_, float dl_, float dt_)
-    {
-        res = res_;
-        for (int i = 0; i < GRID_TIME_SIZE; i++)
-        {
-            grids[i].resize(res, res, res);
-            grids[i].reset();
-        }
-        t = 0;
-        dl = dl_;
-        dt = dt_;
-        c = 343.2f;
-    }
-
-    
     void FDTD::update()
     {
         t++;
-        cuExecuteBlock((res - 2) * (res - 2), 64, fdtd_inner_kernel, *this);
+        cuExecuteBlock((res - 2) * (res - 2), (res - 2), fdtd_inner_kernel, *this);
     }
 
-    void FDTD::copy_clip(GArr3D<float> &data, int clip_idx, cpx_phase phase)
+    __global__ void copy_clip_kernel(FDTD fdtd, GArr3D<float> data, int clip_idx)
+    {
+        int x = blockIdx.x;
+        int y = threadIdx.x;
+        int n = fdtd.t % GRID_TIME_SIZE;
+        if (x < fdtd.res && y < fdtd.res)
+        {
+            data(fdtd.t, x, y) = fdtd.grids[n](x, y, clip_idx);
+        }
+    }
+
+    void FDTD::copy_clip(GArr3D<float> &data, int clip_idx)
     {
         if (clip_idx == -1)
         {
             clip_idx = res / 2;
         }
-        cuExecuteBlock(res, res, copy_clip_kernel, *this, data, phase, clip_idx);
+        cuExecuteBlock(res, res, copy_clip_kernel, *this, data, clip_idx);
+    }
+
+    void FDTD::clear()
+    {
+        for (int i = 0; i < GRID_TIME_SIZE; i++)
+        {
+            grids[i].clear();
+        }
     }
 
 }
