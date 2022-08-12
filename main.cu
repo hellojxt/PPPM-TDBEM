@@ -45,9 +45,8 @@ void test_fdtd()
 
 	for (int i = 0; i < step_num; i++)
 	{
-		auto cpu_data = fdtd.grids[0].cpu();
-		LOG(i << ": " << cpu_data(25, 25, 25));
-		fdtd.copy_clip(data);
+		// LOG_INFO("step" << i);
+		data[i].copy_from(fdtd.grids[fdtd.getGridIndex()][16]);
 		fdtd.update();
 	}
 
@@ -56,18 +55,10 @@ void test_fdtd()
 	gui.start();
 }
 
-// argv[1] = step number
-int main(int argc, char** argv)
+int main()
 {
-	int res = 50;
-	int step_num = argc > 1 ? atoi(argv[1]) : 32;
-	float dl = 0.005;
-	float dt = 1.0f / 120000;
 
-	PPPMSolver solver(res, dl, dt);
-	solver.precompute_p_table(step_num);
-	// test_fdtd();
-
+	test_fdtd();
 	return 0;
 }
 

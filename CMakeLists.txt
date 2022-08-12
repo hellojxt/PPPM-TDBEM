@@ -25,5 +25,9 @@ add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_executable(PPPM main.cu)
 target_link_libraries(PPPM uilib alglib utillib)
 
+find_package(Catch2 3 REQUIRED)
+add_executable(tests tests/ParticleGridTest.cu)
+target_link_libraries(tests PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+
 
 

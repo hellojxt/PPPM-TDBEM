@@ -16,12 +16,13 @@ namespace pppm
         float dl;
         float dt;
 
+        CGPU_FUNC inline int getGridIndex(int delta = 0)
+        {
+            return (t + delta + GRID_TIME_SIZE) % GRID_TIME_SIZE;
+        }
         void init(int res_, float dl_, float dt_);
         void update();
-        void copy_clip(GArr3D<float> &data, int clip_idx = -1);
         void clear();
     };
-
-
 
 }

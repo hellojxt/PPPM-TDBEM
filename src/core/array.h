@@ -1,5 +1,4 @@
 #pragma once
-#include <thrust/device_ptr.h>
 #include <cassert>
 #include <vector>
 #include <iostream>
@@ -93,6 +92,16 @@ namespace pppm
 		inline GArr<T> gpu()
 		{
 			return GArr<T>(*this);
+		}
+
+		inline T sum() const
+		{
+			T sum = 0;
+			for (uint i = 0; i < m_data.size(); i++)
+			{
+				sum += m_data[i];
+			}
+			return sum;
 		}
 
 		inline std::vector<T> vector()
@@ -201,10 +210,10 @@ namespace pppm
 		{
 			if (src.size() != m_totalNum)
 			{
-				LOG_ERROR("Error: GArr.copy_from: size not match\n");
+				LOG_ERROR("Error in GArr.copy_from: size not match, " << src.size() << " != " << m_totalNum);
 				return;
 			}
-			this->assign(src);
+			cuSafeCall(cudaMemcpy(m_data, src.begin(), m_totalNum * sizeof(T), cudaMemcpyDeviceToDevice));
 		}
 
 		friend std::ostream &operator<<(std::ostream &out, const GArr<T> &dArray)
@@ -220,33 +229,6 @@ namespace pppm
 	private:
 		T *m_data = 0;
 		uint m_totalNum = 0;
-	};
-
-	template <typename T, unsigned int N>
-	class SArr
-	{
-	public:
-		CGPU_FUNC SArr(){};
-		CGPU_FUNC inline T &operator[](unsigned int id)
-		{
-			return m_data[id];
-		}
-		CGPU_FUNC inline const T &operator[](unsigned int id) const
-		{
-			return m_data[id];
-		}
-		template <typename U, unsigned int M>
-		friend std::ostream &operator<<(std::ostream &out, const SArr<U, M> &l)
-		{
-			out << "(";
-			for (int i = 0; i < M - 1; i++)
-				out << l[i] << ",";
-			out << l[M - 1] << ")";
-			return out;
-		}
-
-	private:
-		T m_data[N];
 	};
 
 }

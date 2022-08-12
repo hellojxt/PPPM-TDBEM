@@ -36,9 +36,9 @@ namespace pppm
         int i = blockIdx.x / (fdtd.res - 2) + 1;
         int j = blockIdx.x % (fdtd.res - 2) + 1;
         int k = threadIdx.x + 1;
-        int n2 = fdtd.t % GRID_TIME_SIZE;
-        int n1 = (fdtd.t - 1 + GRID_TIME_SIZE) % GRID_TIME_SIZE;
-        int n0 = (fdtd.t - 2 + GRID_TIME_SIZE) % GRID_TIME_SIZE;
+        int n2 = fdtd.getGridIndex(0);
+        int n1 = fdtd.getGridIndex(-1);
+        int n0 = fdtd.getGridIndex(-2);
         float h = fdtd.dl;
         float dt = fdtd.dt;
         float c = fdtd.c;
@@ -49,26 +49,6 @@ namespace pppm
     {
         t++;
         cuExecuteBlock((res - 2) * (res - 2), (res - 2), fdtd_inner_kernel, *this);
-    }
-
-    __global__ void copy_clip_kernel(FDTD fdtd, GArr3D<float> data, int clip_idx)
-    {
-        int x = blockIdx.x;
-        int y = threadIdx.x;
-        int n = fdtd.t % GRID_TIME_SIZE;
-        if (x < fdtd.res && y < fdtd.res)
-        {
-            data(fdtd.t, x, y) = fdtd.grids[n](x, y, clip_idx);
-        }
-    }
-
-    void FDTD::copy_clip(GArr3D<float> &data, int clip_idx)
-    {
-        if (clip_idx == -1)
-        {
-            clip_idx = res / 2;
-        }
-        cuExecuteBlock(res, res, copy_clip_kernel, *this, data, clip_idx);
     }
 
     void FDTD::clear()
