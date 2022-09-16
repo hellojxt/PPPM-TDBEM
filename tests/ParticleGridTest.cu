@@ -31,31 +31,34 @@ TEST_CASE("Particle Grid", "[pg]")
     pg.set_mesh(vertices, triangles);
     pg.construct_grid();
     auto particles = pg.particles.cpu();
-    auto particle_map = pg.particle_map.cpu();
+    auto grid_dense_map = pg.grid_dense_map.cpu();
     auto grid_hash_map = pg.grid_hash_map.cpu();
-    CArr<int> particle_map_flag;
-    particle_map_flag.resize(particles.size());
-    particle_map_flag.reset();
-
+    CArr<int> particle_flag;
+    particle_flag.resize(particles.size());
+    particle_flag.reset();
+    int grid_num = 0;
     for (int x = 0; x < grid_dim.x; x++)
     {
         for (int y = 0; y < grid_dim.y; y++)
         {
             for (int z = 0; z < grid_dim.z; z++)
             {
-                int cell_id = grid_hash_map(x, y, z);
-                if (cell_id == -1)
-                    continue;
-                uint start = particle_map[cell_id].start;
-                uint end = particle_map[cell_id].end;
-                for (uint i = start; i < end; i++)
+                auto range = grid_hash_map(x, y, z);
+                if (range.length() == 0)
                 {
-                    SECTION("no particle in 2 cells"){
-                        REQUIRE(particle_map_flag[i] == 0);
+                    continue;
+                }
+                grid_num++;
+                for (uint i = range.start; i < range.end; i++)
+                {
+                    SECTION("no particle in 2 cells")
+                    {
+                        REQUIRE(particle_flag[i] == 0);
                     }
-                    particle_map_flag[i] = 1;
+                    particle_flag[i] = 1;
                     auto particle = particles[i];
-                    SECTION("particle in its cell"){
+                    SECTION("particle in its cell")
+                    {
                         REQUIRE(particle.pos.x >= x * grid_size + min_pos.x);
                         REQUIRE(particle.pos.x < (x + 1) * grid_size + min_pos.x);
                         REQUIRE(particle.pos.y >= y * grid_size + min_pos.y);
@@ -63,10 +66,8 @@ TEST_CASE("Particle Grid", "[pg]")
                         REQUIRE(particle.pos.z >= z * grid_size + min_pos.z);
                         REQUIRE(particle.pos.z < (z + 1) * grid_size + min_pos.z);
                     }
-                    SECTION("cell coord is morton code of cell id"){
-                        REQUIRE(particle.cell_id == encode_morton(particle.cell_coord));
-                    }
-                    SECTION("cell coord is correct"){
+                    SECTION("cell coord is correct")
+                    {
                         REQUIRE(particle.cell_coord.x == x);
                         REQUIRE(particle.cell_coord.y == y);
                         REQUIRE(particle.cell_coord.z == z);
@@ -75,8 +76,26 @@ TEST_CASE("Particle Grid", "[pg]")
             }
         }
     }
-    SECTION("all particles in grid"){
-        REQUIRE(particle_map_flag.sum() == particles.size());
+
+    for (int grid_idx = 0; grid_idx < grid_num; grid_idx++)
+    {
+        auto first_particle = particles[grid_dense_map[grid_idx].start];
+        auto cell_coord = first_particle.cell_coord;
+        auto range = grid_hash_map(cell_coord.x, cell_coord.y, cell_coord.z);
+        SECTION("Grid hash map and dense map are consistent")
+        {
+            INFO("grid index is " << grid_idx);
+            REQUIRE(grid_dense_map[grid_idx].start == range.start);
+            REQUIRE(grid_dense_map[grid_idx].end == range.end);
+        }
     }
-    particle_map_flag.clear();
+    SECTION("Grid hash map and dense map are consistent"){
+        REQUIRE(grid_num == grid_dense_map.size());
+    }
+
+    SECTION("all particles in grid")
+    {
+        REQUIRE(particle_flag.sum() == particles.size());
+    }
+    particle_flag.clear();
 }

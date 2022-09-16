@@ -16,6 +16,7 @@ include_directories(
                     ${SRC_DIR}/ui
                     ${SRC_DIR}/algorithm
                     ${SRC_DIR}/utils
+                    ${SRC_DIR}/helmholtz
 )
 add_subdirectory(libs)
 add_subdirectory(${SRC_DIR}/ui)
@@ -26,7 +27,8 @@ add_executable(PPPM main.cu)
 target_link_libraries(PPPM uilib alglib utillib)
 
 find_package(Catch2 3 REQUIRED)
-add_executable(tests tests/ParticleGridTest.cu)
+add_executable(tests tests/ParticleGridTest.cu 
+                    tests/TDBEMTest.cu)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
 

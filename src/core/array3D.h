@@ -15,11 +15,13 @@ namespace pppm
     public:
         GArr<T> data;
         int batchs, rows, cols;
+        int3 size;
         void resize(int batchs, int rows, int cols)
         {
             this->rows = rows;
             this->cols = cols;
             this->batchs = batchs;
+            size = make_int3(batchs, rows, cols);
             this->data.resize(rows * cols * batchs);
         }
         GArr3D() {}
@@ -35,6 +37,7 @@ namespace pppm
             this->rows = A.rows;
             this->cols = A.cols;
             this->batchs = A.batchs;
+            size = make_int3(batchs, rows, cols);
             data.assign(A.data);
         }
         void clear(){
@@ -95,12 +98,14 @@ namespace pppm
     public:
         CArr<T> data;
         int batchs, rows, cols;
+        int3 size;
         CArr3D() {}
         void resize(int batchs, int rows, int cols)
         {
             this->rows = rows;
             this->cols = cols;
             this->batchs = batchs;
+            size = make_int3(batchs, rows, cols);
             this->data.resize(rows * cols * batchs);
         }
         CArr3D(int batchs, int rows, int cols)
@@ -115,6 +120,7 @@ namespace pppm
             this->rows = A.rows;
             this->cols = A.cols;
             this->batchs = A.batchs;
+            size = make_int3(batchs, rows, cols);
             data.assign(A.data);
         }
         void clear(){

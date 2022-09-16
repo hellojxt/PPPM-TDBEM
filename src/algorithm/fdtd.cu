@@ -2,6 +2,7 @@
 
 namespace pppm
 {
+
     void FDTD::init(int res_, float dl_, float dt_)
     {
         res = res_;
@@ -45,7 +46,7 @@ namespace pppm
         fdtd.grids[n2](i, j, k) = 2 * fdtd.grids[n1](i, j, k) + (c * c * dt * dt) * laplacian(fdtd.grids[n1], i, j, k, h) - fdtd.grids[n0](i, j, k);
     }
 
-    void FDTD::update()
+    void FDTD::step()
     {
         t++;
         cuExecuteBlock((res - 2) * (res - 2), (res - 2), fdtd_inner_kernel, *this);

@@ -7,6 +7,28 @@
 
 namespace pppm
 {
+
+	/**
+	 * @brief Circular array
+	 */
+	template <typename T, unsigned int N>
+	class CircularArray
+	{
+	private:
+		T m_data[N];
+
+	public:
+		CGPU_FUNC CircularArray() {}
+		CGPU_FUNC inline T &operator[](int id)
+		{
+			return m_data[(id + N) % N];
+		}
+		CGPU_FUNC inline const T &operator[](int id) const
+		{
+			return m_data[(id + N) % N];
+		}
+	};
+
 	template <typename T>
 	class CArr;
 	template <typename T>

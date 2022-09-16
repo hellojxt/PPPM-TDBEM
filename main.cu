@@ -2,6 +2,7 @@
 #include "window.h"
 #include "objIO.h"
 #include "pppm.h"
+#include "integrand.h"
 
 using namespace pppm;
 
@@ -47,7 +48,7 @@ void test_fdtd()
 	{
 		// LOG_INFO("step" << i);
 		data[i].copy_from(fdtd.grids[fdtd.getGridIndex()][16]);
-		fdtd.update();
+		fdtd.step();
 	}
 
 	render.setData(data, 0.01f);

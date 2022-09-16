@@ -10,13 +10,23 @@ namespace pppm
     class BElement
     {
     public:
-        uint cell_id;
         uint3 cell_coord;
-        uint particle_id;
         float3 pos;
         float3 normal;
-        float area;
+        int3 indices;
         friend std::ostream &operator<<(std::ostream &out, const BElement &be);
+    };
+
+    class CellNeighbor
+    {
+        float3 cell_center;
+        int particle_idx;
+    };
+
+    class ParticleNeighbor
+    {
+        int trg_particle_idx;
+        int src_particle_idx;
     };
 
     class ParticleGrid
@@ -28,11 +38,10 @@ namespace pppm
         float3 max_pos;
         float grid_size;
         int3 grid_dim;
-        GArr<BElement> particles;
-        GArr<Range> particle_map;
-        GArr3D<int> grid_hash_map;
-
-        ParticleGrid(){}
+        GArr<BElement> particles;    // particles sorted by morton code
+        GArr<Range> grid_dense_map;  // grid_dense_map[i] is the index range of the elements in the i-th non-empty grid cell. Range is [start, end) and grid is sorted by morton code
+        GArr3D<Range> grid_hash_map; // grid_hash_map[i][j][k] is the index range of the elements in the grid cells. If the grid cell is empty, the range is [0,0).
+        ParticleGrid() {}
 
         void init(float3 min_pos_, float grid_size_, int3 grid_dim_)
         {
@@ -56,16 +65,15 @@ namespace pppm
             triangles.assign(triangles_);
         }
 
-        void clear(){
+        void clear()
+        {
             vertices.clear();
             triangles.clear();
             particles.clear();
-            particle_map.clear();
+            grid_dense_map.clear();
             grid_hash_map.clear();
         }
 
         void construct_grid();
-        void validate_data();
-        static void randomly_test();
     };
 }

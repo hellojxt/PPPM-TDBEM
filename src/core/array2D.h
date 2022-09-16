@@ -15,10 +15,12 @@ namespace pppm
 	public:
 		GArr<T> data;
 		int rows, cols;
+		int2 size;
 		void resize(int rows, int cols)
 		{
 			this->rows = rows;
 			this->cols = cols;
+			size = make_int2(rows, cols);
 			this->data.resize(rows * cols);
 		}
 		GArr2D() {}
@@ -31,6 +33,7 @@ namespace pppm
 		{
 			this->rows = rows;
 			this->cols = cols;
+			size = make_int2(rows, cols);
 			this->data = GArr<T>(data, rows * cols);
 		}
 		GArr2D(CArr2D<T> &A){
@@ -40,6 +43,7 @@ namespace pppm
 		{
 			this->rows = A.rows;
 			this->cols = A.cols;
+			size = make_int2(rows, cols);
 			data.assign(A.data);
 		}
 
@@ -106,11 +110,13 @@ namespace pppm
 	public:
 		CArr<T> data;
 		int rows, cols;
+		int2 size;
 		CArr2D() {}
 		void resize(int rows, int cols)
 		{
 			this->rows = rows;
 			this->cols = cols;
+			size = make_int2(rows, cols);
 			this->data.resize(rows * cols);
 		}
 		CArr2D(int rows, int cols)
@@ -122,6 +128,7 @@ namespace pppm
 		{
 			this->rows = rows;
 			this->cols = cols;
+			size = make_int2(rows, cols);
 			this->data.clear();
 			this->data = CArr<T>(data, rows * cols);
 		}
@@ -133,6 +140,7 @@ namespace pppm
 		{
 			this->rows = A.rows;
 			this->cols = A.cols;
+			size = make_int2(rows, cols);
 			data.assign(A.data);
 		}
 		void clear(){

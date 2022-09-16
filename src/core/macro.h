@@ -44,6 +44,7 @@ namespace pppm
 	std::cout.precision(ss_##x);
 
 #define PI 3.14159265359
+#define AIR_WAVE_SPEED 340.29f
 #define CGPU_FUNC __host__ __device__
 #define GPU_FUNC __device__
 #define CPU_FUNC __host__
@@ -192,9 +193,12 @@ namespace pppm
 		uint end;
 		Range(uint start, uint end) : start(start), end(end) {}
 		Range() : start(0), end(0) {}
+		inline CGPU_FUNC int length(){
+			return end - start;
+		}
 		friend std::ostream &operator<<(std::ostream &os, const Range &r)
 		{
-			os << "[" << r.start << "," << r.end << "]";
+			os << "[" << r.start << "," << r.end << ")";
 			return os;
 		}
 	};
