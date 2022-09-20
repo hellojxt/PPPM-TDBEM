@@ -16,7 +16,7 @@ namespace pppm
     class PPPMSolver
     {
     public:
-        FDTD fdtd; // fdtd grid is centered at (0,0,0)
+        FDTD fdtd; // The left corner of the fdtd grid is at (0,0,0)
         ParticleGrid pg;
         GArr<BoundaryHistory> particle_history; // history boundary data of particles
         GArr3D<cpx> far_field;  // far field potential of grid cells
@@ -29,20 +29,17 @@ namespace pppm
          *   @param dt_: time step for the FDTD solver
          */
         PPPMSolver(int res_, float dl_, float dt_);
-        void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_); // mesh is assumed to be centered at (0,0,0)
+        void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_); // set mesh for the particle grid
         void clear();
         void step();
     };
 
     PPPMSolver::PPPMSolver(int res_, float dl_, float dt_)
     {
-        far_field.resize(res_, res_, res_);
-        float3 min_pos = make_float3(-res_ * dl_ / 2, -res_ * dl_ / 2, -res_ * dl_ / 2);
-        float3 max_pos = make_float3(res_ * dl_ / 2, res_ * dl_ / 2, res_ * dl_ / 2);
-        int3 grid_dim = make_int3(res_, res_, res_);
-        pg.init(min_pos, max_pos, grid_dim);
         fdtd.init(res_, dl_, dt_);
+        pg.init(make_float3(0, 0, 0), dl_, res_);
         bem.init(dt_);
+        far_field.resize(res_, res_, res_);
     }
 
     void PPPMSolver::set_mesh(CArr<float3> &verts_, CArr<int3> &tris_)

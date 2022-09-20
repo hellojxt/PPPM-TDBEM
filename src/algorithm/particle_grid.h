@@ -17,18 +17,6 @@ namespace pppm
         friend std::ostream &operator<<(std::ostream &out, const BElement &be);
     };
 
-    class CellNeighbor
-    {
-        float3 cell_center;
-        int particle_idx;
-    };
-
-    class ParticleNeighbor
-    {
-        int trg_particle_idx;
-        int src_particle_idx;
-    };
-
     class ParticleGrid
     {
     public:
@@ -39,24 +27,15 @@ namespace pppm
         float grid_size;
         int3 grid_dim;
         GArr<BElement> particles;    // particles sorted by morton code
-        GArr<Range> grid_dense_map;  // grid_dense_map[i] is the index range of the elements in the i-th non-empty grid cell. Range is [start, end) and grid is sorted by morton code
-        GArr3D<Range> grid_hash_map; // grid_hash_map[i][j][k] is the index range of the elements in the grid cells. If the grid cell is empty, the range is [0,0).
-        ParticleGrid() {}
+        GArr<Range> grid_dense_map;  // grid_dense_map(i) is the index range of the elements in the i-th non-empty grid cell. Range is [start, end) and grid is sorted by morton code
+        GArr3D<Range> grid_hash_map; // grid_hash_map(i,j,k) is the index range of the elements in the grid cells. If the grid cell is empty, the range is [0,0).
 
-        void init(float3 min_pos_, float grid_size_, int3 grid_dim_)
+        void init(float3 min_pos_, float grid_size_, int grid_dim_)
         {
             min_pos = min_pos_;
             grid_size = grid_size_;
-            grid_dim = grid_dim_;
+            grid_dim = make_int3(grid_dim_, grid_dim_, grid_dim_);
             max_pos = min_pos + make_float3(grid_dim.x, grid_dim.y, grid_dim.z) * grid_size;
-        }
-
-        void init(float3 min_pos_, float3 max_pos_, int3 grid_dim_)
-        {
-            min_pos = min_pos_;
-            max_pos = max_pos_;
-            grid_dim = grid_dim_;
-            grid_size = (max_pos.x - min_pos.x) / grid_dim.x;
         }
 
         void set_mesh(CArr<float3> vertices_, CArr<int3> triangles_)

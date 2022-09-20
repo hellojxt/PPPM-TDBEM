@@ -17,7 +17,7 @@ namespace pppm
         c = 343.2f;
     }
 
-    GPU_FUNC float laplacian(GArr3D<float> &grid, int i, int j, int k, float h)
+    GPU_FUNC value laplacian(GArr3D<value> &grid, int i, int j, int k, float h)
     {
         float sum = 0;
         sum += grid(i - 1, j, k);
@@ -37,19 +37,17 @@ namespace pppm
         int i = blockIdx.x / (fdtd.res - 2) + 1;
         int j = blockIdx.x % (fdtd.res - 2) + 1;
         int k = threadIdx.x + 1;
-        int n2 = fdtd.getGridIndex(0);
-        int n1 = fdtd.getGridIndex(-1);
-        int n0 = fdtd.getGridIndex(-2);
+        float t = fdtd.t;
         float h = fdtd.dl;
         float dt = fdtd.dt;
         float c = fdtd.c;
-        fdtd.grids[n2](i, j, k) = 2 * fdtd.grids[n1](i, j, k) + (c * c * dt * dt) * laplacian(fdtd.grids[n1], i, j, k, h) - fdtd.grids[n0](i, j, k);
+        fdtd.grids[t](i, j, k) = 2 * fdtd.grids[t - 1](i, j, k) + (c * c * dt * dt) * laplacian(fdtd.grids[t - 1], i, j, k, h) - fdtd.grids[t - 2](i, j, k);
     }
 
     void FDTD::step()
     {
-        t++;
         cuExecuteBlock((res - 2) * (res - 2), (res - 2), fdtd_inner_kernel, *this);
+        t++;
     }
 
     void FDTD::clear()

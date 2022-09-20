@@ -60,6 +60,16 @@ namespace pppm
             return data[b_i * rows * cols + i * cols + j];
         }
 
+        GPU_FUNC inline const T &operator()(const int3 index) const
+        {
+            return data[index.x * rows * cols + index.y * cols + index.z];
+        }
+
+        GPU_FUNC inline T &operator()(const int3 index)
+        {
+            return data[index.x * rows * cols + index.y * cols + index.z];
+        }
+
         CGPU_FUNC inline int index(const uint b_i, const uint i, const uint j) const
         {
             return b_i * rows * cols + i * cols + j;
@@ -140,6 +150,16 @@ namespace pppm
         inline T &operator()(const uint b_i, const uint i, const uint j)
         {
             return data[b_i * rows * cols + i * cols + j];
+        }
+
+        inline const T &operator()(const int3 index) const
+        {
+            return data[index.x * rows * cols + index.y * cols + index.z];
+        }
+
+        inline T &operator()(const int3 index)
+        {
+            return data[index.x * rows * cols + index.y * cols + index.z];
         }
         
         inline CArr2D<T> operator[](unsigned int id)

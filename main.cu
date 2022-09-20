@@ -42,13 +42,13 @@ void test_fdtd()
 	init_grid.resize(res, res, res);
 	init_grid.reset();
 	init_grid(25, 25, 25) = 1;
-	fdtd.grids[0].assign(init_grid);
+	fdtd.grids[-1].assign(init_grid);
 
 	for (int i = 0; i < step_num; i++)
 	{
 		// LOG_INFO("step" << i);
-		data[i].copy_from(fdtd.grids[fdtd.getGridIndex()][16]);
 		fdtd.step();
+		data[i].copy_from(fdtd.grids[i][25]);
 	}
 
 	render.setData(data, 0.01f);

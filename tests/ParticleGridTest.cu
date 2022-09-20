@@ -9,9 +9,8 @@ TEST_CASE("Particle Grid", "[pg]")
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
     float grid_size = RAND_F;
     int res = GENERATE(8, 16);
-    int3 grid_dim = make_int3(res, res, res);
     ParticleGrid pg;
-    pg.init(min_pos, grid_size, grid_dim);
+    pg.init(min_pos, grid_size, res);
     int triangle_count = GENERATE(10, 100);
     CArr<float3> vertices;
     CArr<int3> triangles;
@@ -22,7 +21,7 @@ TEST_CASE("Particle Grid", "[pg]")
         float3 v0 = make_float3(0.0f, 0.0f, 1.0f);
         float3 v1 = make_float3(1.0f, 0.0f, 0.0f);
         float3 v2 = make_float3(0.0f, 1.0f, 0.0f);
-        float3 offset = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(grid_dim - 1) * grid_size;
+        float3 offset = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(res - 1) * grid_size;
         vertices[i * 3 + 0] = v0 * grid_size + offset;
         vertices[i * 3 + 1] = v1 * grid_size + offset;
         vertices[i * 3 + 2] = v2 * grid_size + offset;
@@ -37,11 +36,11 @@ TEST_CASE("Particle Grid", "[pg]")
     particle_flag.resize(particles.size());
     particle_flag.reset();
     int grid_num = 0;
-    for (int x = 0; x < grid_dim.x; x++)
+    for (int x = 0; x < res; x++)
     {
-        for (int y = 0; y < grid_dim.y; y++)
+        for (int y = 0; y < res; y++)
         {
-            for (int z = 0; z < grid_dim.z; z++)
+            for (int z = 0; z < res; z++)
             {
                 auto range = grid_hash_map(x, y, z);
                 if (range.length() == 0)
@@ -97,5 +96,5 @@ TEST_CASE("Particle Grid", "[pg]")
     {
         REQUIRE(particle_flag.sum() == particles.size());
     }
-    particle_flag.clear();
+    pg.clear();
 }

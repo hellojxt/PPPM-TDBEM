@@ -3,6 +3,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include "bem.h"
 #include "array_writer.h"
+#include "sound_source.h"
 
 TEST_CASE("TDBEM", "[bem]")
 {
@@ -37,19 +38,20 @@ TEST_CASE("TDBEM", "[bem]")
         History dirichlet;
         float neumann_amp = RAND_F;
         float dirichlet_amp = RAND_F;
+        SineSource sine(omega);
 
         for (int t = -STEP_NUM; t < 0; t++)
         {
-            neumann[t] = exp(cpx(0.0f, omega * dt * t)) * neumann_amp;
-            dirichlet[t] = exp(cpx(0.0f, omega * dt * t)) * dirichlet_amp;
+            neumann[t] = sine(t * dt).real() * neumann_amp;
+            dirichlet[t] = sine(t * dt).real() * dirichlet_amp;
         }
-        cpx laplace_result[STEP_NUM];
+        float laplace_result[STEP_NUM];
         cpx helmholtz_result[STEP_NUM];
         for (int t = 0; t < STEP_NUM; t++)
         {
             // be careful, boundary data of current time need to be set before calling laplace ！！！
-            neumann[t] = exp(cpx(0.0f, omega * dt * t)) * neumann_amp;
-            dirichlet[t] = exp(cpx(0.0f, omega * dt * t)) * dirichlet_amp;
+            neumann[t] = sine(t * dt).real() * neumann_amp;
+            dirichlet[t] = sine(t * dt).real() * dirichlet_amp;
             laplace_result[t] = bem.laplace(vertices, pair_info, neumann, dirichlet, t);
         }
 
@@ -57,13 +59,13 @@ TEST_CASE("TDBEM", "[bem]")
         float amplitude = 0;
         for (int t = 0; t < STEP_NUM; t++)
         {
-            helmholtz_result[t] = helmholtz_weight * exp(cpx(0.0f, omega * dt * t));
+            helmholtz_result[t] = helmholtz_weight * sine(t * dt);
             if (abs(helmholtz_result[t]) > amplitude)
                 amplitude = abs(helmholtz_result[t]);
         }
         for (int t = 0; t < STEP_NUM; t++)
         {
-            REQUIRE(abs(laplace_result[t] - helmholtz_result[t]) / amplitude < BEM_EPS);
+            REQUIRE(abs(laplace_result[t] - helmholtz_result[t].real()) / amplitude < BEM_EPS);
         }
         // write_to_txt("laplace_result.txt", laplace_result, STEP_NUM);
         // write_to_txt("helmholtz_result.txt", helmholtz_result, STEP_NUM);

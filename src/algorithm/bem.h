@@ -23,7 +23,7 @@ namespace pppm
         CGPU_FUNC PairInfo(int3 src, float3 dst_point) : src(src), dst_point(dst_point), pair_type(FACE_TO_POINT) {}
     };
 
-    typedef CircularArray<cpx, STEP_NUM> History;
+    typedef CircularArray<float, STEP_NUM> History;
 
     class TDBEM
     {
@@ -33,23 +33,21 @@ namespace pppm
         float dt;                   // time step
 
         TDBEM(){};
-        void init(float dt);
+        void init(float dt)
+        {
+            this->dt = dt;
+            lambda = max(pow((double)(dt * AIR_WAVE_SPEED), 3.0 / STEP_NUM), pow((double)EPS, 1.0 / (2 * STEP_NUM)));
+            for (int k = 0; k < STEP_NUM; k++)
+            {
+                cpx s_k = lambda * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k);
+                wave_numbers[k] = BDF2(s_k) / (dt * AIR_WAVE_SPEED) / cpx(0, 1);
+            }
+        }
         CGPU_FUNC inline void scaledDFT(cpx *in, cpx *out);
         CGPU_FUNC inline void laplace_weight(float3 *vertices, PairInfo pair, PotentialType potential_type, cpx *weight);
-        CGPU_FUNC inline cpx laplace(float3 *vertices, PairInfo pair, History src_neumann, History src_dirichlet, int t);
+        CGPU_FUNC inline float laplace(float3 *vertices, PairInfo pair, History src_neumann, History src_dirichlet, int t);
         CGPU_FUNC inline cpx helmholtz(float3 *vertices, PairInfo pair, cpx src_neumann, cpx src_dirichlet, cpx wave_number);
     };
-
-    void TDBEM::init(float dt)
-    {
-        this->dt = dt;
-        lambda = max(pow((double)(dt * AIR_WAVE_SPEED), 3.0 / STEP_NUM), pow((double)EPS, 1.0 / (2 * STEP_NUM)));
-        for (int k = 0; k < STEP_NUM; k++)
-        {
-            cpx s_k = lambda * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k);
-            wave_numbers[k] = BDF2(s_k) / (dt * AIR_WAVE_SPEED) / cpx(0, 1);
-        }
-    }
 
     CGPU_FUNC inline cpx pair_integrand(float3 *vertices, PairInfo pair, cpx wave_number, PotentialType potential_type)
     {
@@ -82,17 +80,17 @@ namespace pppm
         scaledDFT(v, weight);
     }
 
-    CGPU_FUNC inline cpx TDBEM::laplace(float3 *vertices, PairInfo pair, History src_neumann, History src_dirichlet, int t)
+    CGPU_FUNC inline float TDBEM::laplace(float3 *vertices, PairInfo pair, History src_neumann, History src_dirichlet, int t)
     {
 
         cpx single_layer_weight[STEP_NUM];
         laplace_weight(vertices, pair, SINGLE_LAYER, single_layer_weight);
         cpx double_layer_weight[STEP_NUM];
         laplace_weight(vertices, pair, DOUBLE_LAYER, double_layer_weight);
-        cpx result = 0;
+        float result = 0;
         for (int k = 0; k < STEP_NUM; k++)
         {
-            result += -single_layer_weight[k] * src_neumann[t - k] + double_layer_weight[k] * src_dirichlet[t - k];
+            result += -single_layer_weight[k].real() * src_neumann[t - k] + double_layer_weight[k].real() * src_dirichlet[t - k];
         }
         return result;
     }

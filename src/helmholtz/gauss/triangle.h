@@ -1,6 +1,6 @@
 #pragma once
 #ifndef TRI_GAUSS_NUM
-#define TRI_GAUSS_NUM 1
+#define TRI_GAUSS_NUM 6
 #endif
 
 #if TRI_GAUSS_NUM == 1
