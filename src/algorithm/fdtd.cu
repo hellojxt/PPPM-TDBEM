@@ -17,7 +17,7 @@ namespace pppm
         c = 343.2f;
     }
 
-    GPU_FUNC value laplacian(GArr3D<value> &grid, int i, int j, int k, float h)
+    GPU_FUNC inline value laplacian(GArr3D<value> &grid, int i, int j, int k, float h)
     {
         float sum = 0;
         sum += grid(i - 1, j, k);
