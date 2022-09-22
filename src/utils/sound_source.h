@@ -12,7 +12,7 @@ namespace pppm
         SineSource(float omega){
             this->omega = omega;
         }
-        cpx inline operator()(float t){
+        CGPU_FUNC cpx inline operator()(float t){
             return exp(cpx(0.0f, omega*t));
         }
         

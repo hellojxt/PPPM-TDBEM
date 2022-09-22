@@ -23,18 +23,19 @@ add_subdirectory(${SRC_DIR}/ui)
 add_subdirectory(${SRC_DIR}/algorithm)
 add_subdirectory(${SRC_DIR}/utils)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
-add_executable(PPPM main.cu)
-target_link_libraries(PPPM uilib alglib utillib)
 
 find_package(Catch2 3 REQUIRED)
-add_executable(test_particle_grid tests/ParticleGridTest.cu)
-target_link_libraries(test_particle_grid PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+add_executable(ParticleGridTest tests/ParticleGridTest.cu)
+target_link_libraries(ParticleGridTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
-add_executable(test_tdbem tests/TDBEMTest.cu)
-target_link_libraries(test_tdbem PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+add_executable(TDBEMTest tests/TDBEMTest.cu)
+target_link_libraries(TDBEMTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
-add_executable(test_local_correction tests/LocalCorrectionTest.cu)
-target_link_libraries(test_local_correction PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+add_executable(LocalCorrectionTest tests/LocalCorrectionTest.cu)
+target_link_libraries(LocalCorrectionTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
+add_executable(UITest tests/UITest.cu)
+target_link_libraries(UITest PRIVATE uilib alglib utillib)
 
-
+add_executable(FDTDTest tests/FDTDTest.cu)
+target_link_libraries(FDTDTest PRIVATE uilib alglib utillib)

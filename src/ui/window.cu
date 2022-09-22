@@ -100,6 +100,7 @@ namespace pppm
             {
                 data_max = -data_min;
             }
+            printf("data_max: %f, data_min: %f\n", data_max, data_min);
         }
         cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor);
         frame_num = data.batchs;

@@ -39,7 +39,7 @@ namespace pppm
 		GArr2D(CArr2D<T> &A){
 			this->assign(A);
 		}
-		void assign(CArr2D<T> &A)
+		void assign(const CArr2D<T> &A)
 		{
 			this->rows = A.rows;
 			this->cols = A.cols;
@@ -47,9 +47,12 @@ namespace pppm
 			data.assign(A.data);
 		}
 
-		void copy_from(const GArr2D<T> &A)
+		void assign(const GArr2D<T> &A)
 		{
-			data.copy_from(A.data);
+			this->rows = A.rows;
+			this->cols = A.cols;
+			size = make_int2(rows, cols);
+			data.assign(A.data);
 		}
 
 		void clear(){

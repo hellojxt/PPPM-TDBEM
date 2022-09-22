@@ -152,6 +152,17 @@ namespace pppm
 		cuSynchronize();                                        \
 	}
 
+#define CUDA_3D_BLOCK_SIZE 4
+#define cuExecute3D(size, Func, ...)                              \
+	{                                                           \
+		uint pDimx = cudaGridSize((uint)size.x, CUDA_3D_BLOCK_SIZE); \
+		uint pDimy = cudaGridSize((uint)size.y, CUDA_3D_BLOCK_SIZE); \
+		uint pDimz = cudaGridSize((uint)size.z, CUDA_3D_BLOCK_SIZE); \
+		Func<<<dim3(pDimx, pDimy, pDimz), dim3(CUDA_3D_BLOCK_SIZE, CUDA_3D_BLOCK_SIZE, CUDA_3D_BLOCK_SIZE)>>>(                       \
+			__VA_ARGS__);                                       \
+		cuSynchronize();                                        \
+	}
+
 #define cuExecuteBlock(size1, size2, Func, ...) \
 	{                                           \
 		Func<<<size1, size2>>>(                 \
@@ -159,7 +170,7 @@ namespace pppm
 		cuSynchronize();                        \
 	}
 
-#define cuExecuteBlockDym(size1, size2, size3, Func, ...) \
+#define cuExecuteDyArr(size1, size2, size3, Func, ...) \
 	{                                                     \
 		Func<<<size1, size2, size3>>>(                    \
 			__VA_ARGS__);                                 \

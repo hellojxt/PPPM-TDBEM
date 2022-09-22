@@ -23,7 +23,7 @@ namespace pppm
         CGPU_FUNC PairInfo(int3 src, float3 dst_point) : src(src), dst_point(dst_point), pair_type(FACE_TO_POINT) {}
     };
 
-    typedef CircularArray<float, STEP_NUM> History;
+    typedef CircularArray<float, STEP_NUM*2> History;
 
     class TDBEM
     {

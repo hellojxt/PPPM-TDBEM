@@ -19,7 +19,7 @@ namespace pppm
         FDTD fdtd; // The left corner of the fdtd grid is at (0,0,0)
         ParticleGrid pg;
         GArr<BoundaryHistory> particle_history; // history boundary data of particles
-        GArr3D<cpx> far_field;  // far field potential of grid cells
+        GArr3D<float> far_field;  // far field potential of grid cells
         TDBEM bem;              // boundary element method solver
 
         /**

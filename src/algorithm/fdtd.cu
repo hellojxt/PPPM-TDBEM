@@ -32,11 +32,11 @@ namespace pppm
 
     __global__ void fdtd_inner_kernel(FDTD fdtd)
     {
-        if (blockIdx.x >= (fdtd.res - 2) * (fdtd.res - 2) || threadIdx.x >= (fdtd.res - 2))
+        int i = blockIdx.x*blockDim.x + threadIdx.x + 1;
+        int j = blockIdx.y*blockDim.y + threadIdx.y + 1;
+        int k = blockIdx.z*blockDim.z + threadIdx.z + 1;
+        if (i >= fdtd.res - 1 || i <= 0 || j >= fdtd.res - 1 || j <= 0 || k >= fdtd.res - 1 || k <= 0)
             return;
-        int i = blockIdx.x / (fdtd.res - 2) + 1;
-        int j = blockIdx.x % (fdtd.res - 2) + 1;
-        int k = threadIdx.x + 1;
         float t = fdtd.t;
         float h = fdtd.dl;
         float dt = fdtd.dt;
@@ -46,7 +46,7 @@ namespace pppm
 
     void FDTD::step()
     {
-        cuExecuteBlock((res - 2) * (res - 2), (res - 2), fdtd_inner_kernel, *this);
+        cuExecute3D(dim3(res - 2, res - 2, res - 2), fdtd_inner_kernel, *this);
         t++;
     }
 
