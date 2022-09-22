@@ -9,6 +9,7 @@ namespace pppm
 
     class BoundaryHistory
     {
+    public:
         History dirichlet;
         History neumann;
     };
@@ -19,7 +20,7 @@ namespace pppm
         FDTD fdtd; // The left corner of the fdtd grid is at (0,0,0)
         ParticleGrid pg;
         GArr<BoundaryHistory> particle_history; // history boundary data of particles
-        GArr3D<float> far_field;  // far field potential of grid cells
+        GridArr far_field;  // far field potential of grid cells
         TDBEM bem;              // boundary element method solver
 
         /**
@@ -39,7 +40,11 @@ namespace pppm
         fdtd.init(res_, dl_, dt_);
         pg.init(make_float3(0, 0, 0), dl_, res_);
         bem.init(dt_);
-        far_field.resize(res_, res_, res_);
+        for (int i = 0; i < GRID_TIME_SIZE; i++)
+        {
+            far_field[i].resize(res_, res_, res_);
+            far_field[i].reset();
+        }
     }
 
     void PPPMSolver::set_mesh(CArr<float3> &verts_, CArr<int3> &tris_)
@@ -53,8 +58,11 @@ namespace pppm
     {
         fdtd.clear();
         pg.clear();
-        far_field.clear();
         particle_history.clear();
+        for (int i = 0; i < GRID_TIME_SIZE; i++)
+        {
+            far_field[i].clear();
+        }
     }
 
 }

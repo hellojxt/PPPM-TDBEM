@@ -27,8 +27,8 @@ namespace pppm
         float grid_size;
         int3 grid_dim;
         GArr<BElement> particles;    // particles sorted by morton code
-        GArr<Range> grid_dense_map;  // grid_dense_map(i) is the index range of the elements in the i-th non-empty grid cell. Range is [start, end) and grid is sorted by morton code
-        GArr3D<Range> grid_hash_map; // grid_hash_map(i,j,k) is the index range of the elements in the grid cells. If the grid cell is empty, the range is [0,0).
+        GArr<Range> grid_dense_map;  // grid_dense_map(i) is the index range (index for particles) of the elements in the i-th non-empty grid cell. Range is [start, end) and grid is sorted by morton code
+        GArr3D<Range> grid_hash_map; // grid_hash_map(i,j,k) is the index range (index for particles) of the elements in the grid cells. If the grid cell is empty, the range is [0,0).
 
         void init(float3 min_pos_, float grid_size_, int grid_dim_)
         {

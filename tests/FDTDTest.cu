@@ -8,7 +8,7 @@ using namespace pppm;
 
 __global__ void set_center_signal(FDTD fdtd, SineSource s){
     int3 center = make_int3(fdtd.res / 2, fdtd.res / 2, fdtd.res / 2);
-    fdtd.grids[fdtd.t - 1](center) = s((fdtd.t - 1) * fdtd.dt).real(); // ftdt.t is the next time step
+    fdtd.grids[fdtd.t](center) = s((fdtd.t) * fdtd.dt).real();
 }
 
 int main()

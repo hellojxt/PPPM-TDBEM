@@ -11,7 +11,7 @@ namespace pppm
             grids[i].resize(res, res, res);
             grids[i].reset();
         }
-        t = 0;
+        t = -1;
         dl = dl_;
         dt = dt_;
         c = 343.2f;
@@ -46,8 +46,8 @@ namespace pppm
 
     void FDTD::step()
     {
-        cuExecute3D(dim3(res - 2, res - 2, res - 2), fdtd_inner_kernel, *this);
         t++;
+        cuExecute3D(dim3(res - 2, res - 2, res - 2), fdtd_inner_kernel, *this);
     }
 
     void FDTD::clear()
