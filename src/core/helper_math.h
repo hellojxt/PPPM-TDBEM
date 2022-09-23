@@ -37,19 +37,19 @@
  */
 #pragma once
 #ifndef HELPER_MATH_H
-#define HELPER_MATH_H
+#    define HELPER_MATH_H
 
-#include "cuda_runtime.h"
+#    include "cuda_runtime.h"
 
 typedef unsigned int uint;
 typedef unsigned short ushort;
 
-#ifndef EXIT_WAIVED
-#define EXIT_WAIVED 2
-#endif
+#    ifndef EXIT_WAIVED
+#        define EXIT_WAIVED 2
+#    endif
 
-#ifndef __CUDACC__
-#include <math.h>
+#    ifndef __CUDACC__
+#        include <math.h>
 
 ////////////////////////////////////////////////////////////////////////////////
 // host implementations of CUDA functions
@@ -79,7 +79,7 @@ inline float rsqrtf(float x)
 {
     return 1.0f / sqrtf(x);
 }
-#endif
+#    endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // constructors
@@ -156,7 +156,7 @@ inline __host__ __device__ float3 make_float3(uint3 a)
 {
     return make_float3(float(a.x), float(a.y), float(a.z));
 }
-inline __host__ __device__ float3 make_float3(float * a)
+inline __host__ __device__ float3 make_float3(float *a)
 {
     return make_float3(a[0], a[1], a[2]);
 }
@@ -185,7 +185,7 @@ inline __host__ __device__ double3 make_double3(uint3 a)
 {
     return make_double3(double(a.x), double(a.y), double(a.z));
 }
-inline __host__ __device__ double3 make_double3(double * a)
+inline __host__ __device__ double3 make_double3(double *a)
 {
     return make_double3(a[0], a[1], a[2]);
 }
@@ -438,8 +438,6 @@ inline __host__ __device__ void operator+=(double3 &a, double b)
     a.y += b;
     a.z += b;
 }
-
-
 
 inline __host__ __device__ int3 operator+(int3 a, int3 b)
 {
@@ -952,7 +950,6 @@ inline __host__ __device__ void operator*=(double3 &a, double b)
     a.y *= b;
     a.z *= b;
 }
-
 
 inline __host__ __device__ int3 operator*(int3 a, int3 b)
 {

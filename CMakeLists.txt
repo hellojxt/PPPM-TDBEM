@@ -32,10 +32,13 @@ add_executable(TDBEMTest tests/TDBEMTest.cu)
 target_link_libraries(TDBEMTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
 add_executable(LocalCorrectionTest tests/LocalCorrectionTest.cu)
-target_link_libraries(LocalCorrectionTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+target_link_libraries(LocalCorrectionTest PRIVATE uilib alglib utillib)
 
 add_executable(UITest tests/UITest.cu)
 target_link_libraries(UITest PRIVATE uilib alglib utillib)
 
 add_executable(FDTDTest tests/FDTDTest.cu)
 target_link_libraries(FDTDTest PRIVATE uilib alglib utillib)
+
+add_executable(FarFieldTest tests/FarFieldTest.cu)
+target_link_libraries(FarFieldTest PRIVATE uilib alglib utillib)
