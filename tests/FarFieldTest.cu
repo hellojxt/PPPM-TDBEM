@@ -9,19 +9,20 @@
 #define TEST_MAX_STEP 256
 using namespace pppm;
 
-__global__ void set_boundary_sine_signal(PPPMSolver pppm)
+__global__ void set_boundary_sine_signal(PPPMSolver pppm, SineSource sine)
 {
-    int t = pppm.fdtd.t;
+    float neumann_amp = 1.0f;
+    float dirichlet_amp = 1.0f;
 }
 
 int main()
 {
-    int res  = 64;
+    int res = 64;
     float dl = 0.01;
     float dt = 1.0f / 120000;
     PPPMSolver solver(res, dl, dt);
-    FDTD &fdtd    = solver.fdtd;
-    int3 coord    = make_int3(32, 32, 32);
+    FDTD &fdtd = solver.fdtd;
+    int3 coord = make_int3(32, 32, 32);
     float3 center = fdtd.getCenter(coord);
     CArr<float3> vertices(3);
     vertices[0] = center + make_float3(0.0f, 0.0f, 0.0f) * fdtd.dl;
@@ -30,9 +31,7 @@ int main()
     CArr<int3> triangles(1);
     triangles[0] = make_int3(0, 1, 2);
     solver.set_mesh(vertices, triangles);
-    float neumann_amp   = 1.0f;
-    float dirichlet_amp = 1.0f;
-    float omega         = 2.0f * M_PI * 4000.0f;
+    float omega = 2.0f * M_PI * 4000.0f;
     SineSource sine(omega);
 
     GArr3D<float> visual_data_fdtd(TEST_MAX_STEP, res, res);

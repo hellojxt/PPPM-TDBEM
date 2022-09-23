@@ -67,19 +67,19 @@ __global__ void preprocess_image_data(GArr3D<float> in_data,
         {
             for (int b = 0; b < out_data.batchs; b++)
             {
-                float2 pos_f       = make_float2(((float)x) / upsample_factor, ((float)y) / upsample_factor);
-                int2 pos           = make_int2((int)pos_f.x, (int)pos_f.y);
-                float value        = in_data(b, pos.x, pos.y);
-                uchar4 line_color  = make_uchar4(200, 200, 200, 255);
+                float2 pos_f = make_float2(((float)x) / upsample_factor, ((float)y) / upsample_factor);
+                int2 pos = make_int2((int)pos_f.x, (int)pos_f.y);
+                float value = in_data(b, pos.x, pos.y);
+                uchar4 line_color = make_uchar4(200, 200, 200, 255);
                 uchar4 pixel_color = JetColor(value, -data_max, data_max);
-                float k            = 3.5f;
+                float k = 3.5f;
                 pixel_color.x /= k;
                 pixel_color.y /= k;
                 pixel_color.z /= k;
-                float line_width  = 0.1f;
-                float center      = 0.5f * (1 - 1 / upsample_factor);
-                float dist        = 1 - 2 * max(abs(pos_f.x - pos.x - center), abs(pos_f.y - pos.y - center));
-                float guass       = exp(-dist * dist / (line_width * line_width));
+                float line_width = 0.1f;
+                float center = 0.5f * (1 - 1 / upsample_factor);
+                float dist = 1 - 2 * max(abs(pos_f.x - pos.x - center), abs(pos_f.y - pos.y - center));
+                float guass = exp(-dist * dist / (line_width * line_width));
                 out_data(b, x, y) = make_uchar4(pixel_color.x * (1 - guass) + line_color.x * guass,
                                                 pixel_color.y * (1 - guass) + line_color.y * guass,
                                                 pixel_color.z * (1 - guass) + line_color.z * guass, 255);
@@ -106,36 +106,36 @@ void CudaRender::setData(GArr3D<float> origin_data, float data_max, float upsamp
         printf("data_max: %f, data_min: %f\n", data_max, data_min);
     }
     cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor);
-    frame_num          = data.batchs;
-    width              = data.rows;
-    height             = data.cols;
-    frame_idx          = 0;
-    frame_idx_last     = -1;
+    frame_num = data.batchs;
+    width = data.rows;
+    height = data.cols;
+    frame_idx = 0;
+    frame_idx_last = -1;
     update_frame_count = 0;
-    play_speed         = 0.5f;
+    play_speed = 0.5f;
 }
 
 // calculate interaction between a line segment and a plane
 GPU_FUNC bool linePlaneIntersection(float3 &contact, float3 start, float3 end, float3 plane_normal, float3 plane_pos)
 {
-    float3 dir            = end - start;
-    float3 normal         = normalize(plane_normal);
+    float3 dir = end - start;
+    float3 normal = normalize(plane_normal);
     float3 plane_to_start = start - plane_pos;
-    float l               = length(dir);
-    float denom           = dot(normal, dir);
+    float l = length(dir);
+    float denom = dot(normal, dir);
     if (abs(denom) < 1e-6)
     {
         return false;
     }
     float numer = dot(normal, plane_to_start);
-    float t     = -(numer / denom);
-    float eps   = 1e-4 * l;
+    float t = -(numer / denom);
+    float eps = 1e-4 * l;
     if (t <= 0 - eps || t >= 1.0f + eps)
     {
         return false;
     }
     float3 contact_pos = start + t * dir;
-    float3 delta       = contact - contact_pos;
+    float3 delta = contact - contact_pos;
     if (length(contact - (start + t * dir)) < eps)
     {
         return false;
@@ -168,9 +168,9 @@ GPU_FUNC float2 get_pixel_coord(float3 pos, float3 min_pos, float3 max_pos, int 
 
 GPU_FUNC float point_line_distance(float2 point, float2 start, float2 end)
 {
-    float2 dir  = end - start;
+    float2 dir = end - start;
     float2 diff = point - start;
-    float t     = dot(diff, dir) / dot(dir, dir);
+    float t = dot(diff, dir) / dot(dir, dir);
     if (t < 0)
     {
         t = 0;
@@ -180,7 +180,7 @@ GPU_FUNC float point_line_distance(float2 point, float2 start, float2 end)
         t = 1;
     }
     float2 closest = start + t * dir;
-    float dist     = length(point - closest);
+    float dist = length(point - closest);
     return dist;
 }
 
@@ -197,7 +197,7 @@ __global__ void add_mesh_kernel(GArr<float3> vertices,
     {
         return;
     }
-    int3 tri  = triangles[idx];
+    int3 tri = triangles[idx];
     float3 v0 = vertices[tri.x];
     float3 v1 = vertices[tri.y];
     float3 v2 = vertices[tri.z];
@@ -222,8 +222,8 @@ __global__ void add_mesh_kernel(GArr<float3> vertices,
         contact_num++;
     if (contact_num == 2)
     {
-        float2 coord1    = get_pixel_coord(contact[0], min_pos, max_pos, data.rows, data.cols, plane);
-        float2 coord2    = get_pixel_coord(contact[1], min_pos, max_pos, data.rows, data.cols, plane);
+        float2 coord1 = get_pixel_coord(contact[0], min_pos, max_pos, data.rows, data.cols, plane);
+        float2 coord2 = get_pixel_coord(contact[1], min_pos, max_pos, data.rows, data.cols, plane);
         float2 coord_min = fminf(coord1, coord2);
         float2 coord_max = fmaxf(coord1, coord2);
         for (int i = (int)coord_min.x; i <= (int)coord_max.x; i++)
@@ -231,10 +231,10 @@ __global__ void add_mesh_kernel(GArr<float3> vertices,
             for (int j = (int)coord_min.y; j <= (int)coord_max.y; j++)
             {
                 float2 pixel_center = make_float2(i + 0.5f, j + 0.5f);
-                float dist          = point_line_distance(pixel_center, coord1, coord2);
+                float dist = point_line_distance(pixel_center, coord1, coord2);
                 // anti-aliasing
                 uchar4 line_color = make_uchar4(255, 255, 255, 255);
-                float line_width  = 0.8f;
+                float line_width = 0.8f;
                 if (dist < 2.0f)
                 {
                     float alpha = exp(-dist * dist / (line_width * line_width));
@@ -284,7 +284,7 @@ void CudaRender::update()
                                        height, cudaMemcpyDeviceToDevice));
         frame_idx_last = frame_idx;
     }
-    ImVec2 wsize    = ImGui::GetWindowContentRegionMax() - ImGui::GetWindowContentRegionMin();
+    ImVec2 wsize = ImGui::GetWindowContentRegionMax() - ImGui::GetWindowContentRegionMin();
     ImVec2 img_size = ImVec2(wsize.x, wsize.y - ImGui::GetFrameHeightWithSpacing() * 2);
     if (img_size.x < img_size.y)
     {

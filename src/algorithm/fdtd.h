@@ -15,37 +15,37 @@ typedef CircularArray<GArr3D<value>, GRID_TIME_SIZE> GridArr;
  */
 class FDTD
 {
-  public:
-    GridArr grids;  // 3D grids with 3 history time steps
-    float c;        // speed of sound
-    int t;          // current time (index)
-    int res;        // resolution of the grid
-    float dl;       // grid spacing
-    float dt;       // time step
+    public:
+        GridArr grids;  // 3D grids with 3 history time steps
+        float c;        // speed of sound
+        int t;          // current time (index)
+        int res;        // resolution of the grid
+        float dl;       // grid spacing
+        float dt;       // time step
 
-    /**
-     *  This function is used to initialize the FDTD grid.
-     *  It allocates memory for the grid and sets the initial values to zero.
-     *  The left corner of the grid is at (0,0,0).
-     *  @param res the resolution of the grid
-     *  @param dl the grid spacing
-     *  @param dt the time step
-     */
-    void init(int res_, float dl_, float dt_);
+        /**
+         *  This function is used to initialize the FDTD grid.
+         *  It allocates memory for the grid and sets the initial values to zero.
+         *  The left corner of the grid is at (0,0,0).
+         *  @param res the resolution of the grid
+         *  @param dl the grid spacing
+         *  @param dt the time step
+         */
+        void init(int res_, float dl_, float dt_);
 
-    /**
-     * @brief step forward in time
-     */
-    void step();
-    void clear();
-    /**
-     * @brief get the center coordinate of the grid cell
-     */
-    CGPU_FUNC inline float3 getCenter(int i, int j, int k) const
-    {
-        return make_float3((i + 0.5f) * dl, (j + 0.5f) * dl, (k + 0.5f) * dl);
-    }
-    CGPU_FUNC inline float3 getCenter(int3 c) const { return getCenter(c.x, c.y, c.z); }
+        /**
+         * @brief step forward in time
+         */
+        void step();
+        void clear();
+        /**
+         * @brief get the center coordinate of the grid cell
+         */
+        CGPU_FUNC inline float3 getCenter(int i, int j, int k) const
+        {
+            return make_float3((i + 0.5f) * dl, (j + 0.5f) * dl, (k + 0.5f) * dl);
+        }
+        CGPU_FUNC inline float3 getCenter(int3 c) const { return getCenter(c.x, c.y, c.z); }
 };
 
 }  // namespace pppm

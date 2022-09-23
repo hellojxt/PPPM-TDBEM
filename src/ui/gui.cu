@@ -52,7 +52,7 @@ void GUI::start(int height, int width)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    io.IniFilename     = IMGUI_CONFIG_FILE;
+    io.IniFilename = IMGUI_CONFIG_FILE;
     for (int i = 0; i < sub_windows.size(); i++)
     {
         sub_windows[i]->init();

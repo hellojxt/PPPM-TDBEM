@@ -6,9 +6,9 @@
 TEST_CASE("Particle Grid", "[pg]")
 {
     using namespace pppm;
-    float3 min_pos  = make_float3(0.0f, 0.0f, 0.0f);
+    float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
     float grid_size = RAND_F;
-    int res         = GENERATE(8, 16);
+    int res = GENERATE(8, 16);
     ParticleGrid pg;
     pg.init(min_pos, grid_size, res);
     int triangle_count = GENERATE(10, 100);
@@ -18,20 +18,20 @@ TEST_CASE("Particle Grid", "[pg]")
     triangles.resize(triangle_count);
     for (int i = 0; i < triangle_count; i++)
     {
-        float3 v0           = make_float3(0.0f, 0.0f, 1.0f);
-        float3 v1           = make_float3(1.0f, 0.0f, 0.0f);
-        float3 v2           = make_float3(0.0f, 1.0f, 0.0f);
-        float3 offset       = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(res - 1) * grid_size;
+        float3 v0 = make_float3(0.0f, 0.0f, 1.0f);
+        float3 v1 = make_float3(1.0f, 0.0f, 0.0f);
+        float3 v2 = make_float3(0.0f, 1.0f, 0.0f);
+        float3 offset = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(res - 1) * grid_size;
         vertices[i * 3 + 0] = v0 * grid_size + offset;
         vertices[i * 3 + 1] = v1 * grid_size + offset;
         vertices[i * 3 + 2] = v2 * grid_size + offset;
-        triangles[i]        = make_int3(i * 3 + 0, i * 3 + 1, i * 3 + 2);
+        triangles[i] = make_int3(i * 3 + 0, i * 3 + 1, i * 3 + 2);
     }
     pg.set_mesh(vertices, triangles);
     pg.construct_grid();
-    auto particles      = pg.particles.cpu();
+    auto particles = pg.particles.cpu();
     auto grid_dense_map = pg.grid_dense_map.cpu();
-    auto grid_hash_map  = pg.grid_hash_map.cpu();
+    auto grid_hash_map = pg.grid_hash_map.cpu();
     CArr<int> particle_flag;
     particle_flag.resize(particles.size());
     particle_flag.reset();
@@ -55,7 +55,7 @@ TEST_CASE("Particle Grid", "[pg]")
                         REQUIRE(particle_flag[i] == 0);
                     }
                     particle_flag[i] = 1;
-                    auto particle    = particles[i];
+                    auto particle = particles[i];
                     SECTION("particle in its cell")
                     {
                         REQUIRE(particle.pos.x >= x * grid_size + min_pos.x);
@@ -79,8 +79,8 @@ TEST_CASE("Particle Grid", "[pg]")
     for (int grid_idx = 0; grid_idx < grid_num; grid_idx++)
     {
         auto first_particle = particles[grid_dense_map[grid_idx].start];
-        auto cell_coord     = first_particle.cell_coord;
-        auto range          = grid_hash_map(cell_coord.x, cell_coord.y, cell_coord.z);
+        auto cell_coord = first_particle.cell_coord;
+        auto range = grid_hash_map(cell_coord.x, cell_coord.y, cell_coord.z);
         SECTION("Grid hash map and dense map are consistent")
         {
             INFO("grid index is " << grid_idx);

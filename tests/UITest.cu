@@ -7,7 +7,7 @@ using namespace pppm;
 int main()
 {
     auto filename = std::string(ASSET_DIR) + std::string("/sphere.obj");
-    auto mesh     = loadOBJ(filename);
+    auto mesh = loadOBJ(filename);
     mesh.normalize();
     GArr<float3> vertice = mesh.vertices;
     GArr<int3> triangles = mesh.triangles;
@@ -15,10 +15,10 @@ int main()
     CudaRender render;
     CudaRender render2("additional render");
 
-    int res      = 51;
+    int res = 51;
     int step_num = 100;
-    float dl     = 0.005;
-    float dt     = 1.0f / 120000;
+    float dl = 0.005;
+    float dt = 1.0f / 120000;
 
     GArr3D<float> data;
     data.resize(step_num, res, res);

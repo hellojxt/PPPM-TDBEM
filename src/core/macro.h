@@ -203,35 +203,35 @@ static std::ostream &operator<<(std::ostream &o, int4 const &a)
 
 class Range
 {
-  public:
-    uint start;
-    uint end;
-    Range(uint start, uint end) : start(start), end(end) {}
-    Range() : start(0), end(0) {}
-    inline CGPU_FUNC int length() { return end - start; }
-    friend std::ostream &operator<<(std::ostream &os, const Range &r)
-    {
-        os << "[" << r.start << "," << r.end << ")";
-        return os;
-    }
+    public:
+        uint start;
+        uint end;
+        Range(uint start, uint end) : start(start), end(end) {}
+        Range() : start(0), end(0) {}
+        inline CGPU_FUNC int length() { return end - start; }
+        friend std::ostream &operator<<(std::ostream &os, const Range &r)
+        {
+            os << "[" << r.start << "," << r.end << ")";
+            return os;
+        }
 };
 
 class BBox
 {
-  public:
-    float3 min;
-    float3 max;
-    float width;
-    BBox() {}
-    BBox(float3 _min, float3 _max)
-    {
-        min = _min;
-        max = _max;
-    }
-    friend std::ostream &operator<<(std::ostream &os, const BBox &b)
-    {
-        os << "[" << b.min << "," << b.max << "]";
-        return os;
-    }
+    public:
+        float3 min;
+        float3 max;
+        float width;
+        BBox() {}
+        BBox(float3 _min, float3 _max)
+        {
+            min = _min;
+            max = _max;
+        }
+        friend std::ostream &operator<<(std::ostream &os, const BBox &b)
+        {
+            os << "[" << b.min << "," << b.max << "]";
+            return os;
+        }
 };
 }  // namespace pppm

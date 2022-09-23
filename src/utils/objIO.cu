@@ -11,7 +11,7 @@ namespace pppm
 
 Mesh::Mesh(CArr<float3> vertices_, CArr<int3> triangles_)
 {
-    vertices  = vertices_;
+    vertices = vertices_;
     triangles = triangles_;
 }
 void Mesh::print()
@@ -61,9 +61,9 @@ void Mesh::normalize()
         max_pos.y = std::max(max_pos.y, vertices[i].y);
         max_pos.z = std::max(max_pos.z, vertices[i].z);
     }
-    float3 center   = (min_pos + max_pos) / 2.0f;
+    float3 center = (min_pos + max_pos) / 2.0f;
     float3 scale_f3 = (max_pos - min_pos) / 2.0f;
-    float scale     = std::max(std::max(scale_f3.x, scale_f3.y), scale_f3.z);
+    float scale = std::max(std::max(scale_f3.x, scale_f3.y), scale_f3.z);
     for (int i = 0; i < vertices.size(); i++)
     {
         vertices[i] = (vertices[i] - center) / scale;
@@ -76,7 +76,7 @@ Mesh loadOBJ(std::string file_name, bool log)
     CArr<int3> triangles;
     std::stringstream ss;
     std::ifstream in_file(file_name);
-    std::string line   = "";
+    std::string line = "";
     std::string prefix = "";
 
     // std::cout << "Start reading\n";

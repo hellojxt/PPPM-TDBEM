@@ -11,10 +11,10 @@ void FDTD::init(int res_, float dl_, float dt_)
         grids[i].resize(res, res, res);
         grids[i].reset();
     }
-    t  = -1;
+    t = -1;
     dl = dl_;
     dt = dt_;
-    c  = 343.2f;
+    c = 343.2f;
 }
 
 GPU_FUNC inline value laplacian(GArr3D<value> &grid, int i, int j, int k, float h)
@@ -37,10 +37,10 @@ __global__ void fdtd_inner_kernel(FDTD fdtd)
     int k = blockIdx.z * blockDim.z + threadIdx.z + 1;
     if (i >= fdtd.res - 1 || i <= 0 || j >= fdtd.res - 1 || j <= 0 || k >= fdtd.res - 1 || k <= 0)
         return;
-    float t                = fdtd.t;
-    float h                = fdtd.dl;
-    float dt               = fdtd.dt;
-    float c                = fdtd.c;
+    float t = fdtd.t;
+    float h = fdtd.dl;
+    float dt = fdtd.dt;
+    float c = fdtd.c;
     fdtd.grids[t](i, j, k) = 2 * fdtd.grids[t - 1](i, j, k) +
                              (c * c * dt * dt) * laplacian(fdtd.grids[t - 1], i, j, k, h) - fdtd.grids[t - 2](i, j, k);
 }
