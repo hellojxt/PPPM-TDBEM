@@ -1,11 +1,14 @@
 #pragma once
+#include <cstdio>
 #include "array3D.h"
 #include "integrand.h"
+#include "macro.h"
 
 namespace pppm
 {
 
-#define STEP_NUM 64  // number of time steps for history of each particle
+#define STEP_NUM_POWER 5  // 2^STEP_NUM_POWER = STEP_NUM
+#define STEP_NUM 32       // number of time steps for history of each particle
 
 /**
  * @brief particle to particle calculation type
@@ -75,9 +78,13 @@ class TDBEM
                                              cpx *weight)
         {
             cpx v[STEP_NUM];
-            for (int k = 0; k < STEP_NUM; k++)
+            for (int k = 0; k <= STEP_NUM / 2; k++)
             {
                 v[k] = pair_integrand(vertices, pair, wave_numbers[k], potential_type);
+            }
+            for (int k = STEP_NUM / 2 + 1; k < STEP_NUM; k++)
+            {
+                v[k] = conj(v[STEP_NUM - k]);
             }
             scaledDFT(v, weight);
         }

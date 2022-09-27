@@ -45,6 +45,9 @@ __global__ void fdtd_inner_kernel(FDTD fdtd)
                              (c * c * dt * dt) * laplacian(fdtd.grids[t - 1], i, j, k, h) - fdtd.grids[t - 2](i, j, k);
 }
 
+/*
+ * t++ first, then compute the FDTD kernel
+ */
 void FDTD::step()
 {
     t++;

@@ -18,7 +18,7 @@ class FDTD
     public:
         GridArr grids;  // 3D grids with 3 history time steps
         float c;        // speed of sound
-        int t;          // current time (index)
+        int t;          // current time (index) initialized to -1
         int res;        // resolution of the grid
         float dl;       // grid spacing
         float dt;       // time step

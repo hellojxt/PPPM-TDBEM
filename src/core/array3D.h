@@ -27,7 +27,7 @@ class GArr3D
         GArr3D() {}
         GArr3D(int batchs, int rows, int cols) { this->resize(batchs, rows, cols); }
         GArr3D(CArr3D<T> &A) { this->assign(A); }
-        void assign(CArr3D<T> &A)
+        void assign(const CArr3D<T> &A)
         {
             this->rows = A.rows;
             this->cols = A.cols;
@@ -35,6 +35,16 @@ class GArr3D
             size = make_int3(batchs, rows, cols);
             data.assign(A.data);
         }
+
+        void assign(const GArr3D<T> &A)
+        {
+            this->rows = A.rows;
+            this->cols = A.cols;
+            this->batchs = A.batchs;
+            size = make_int3(batchs, rows, cols);
+            data.assign(A.data);
+        }
+
         void clear() { data.clear(); }
         void reset() { data.reset(); }
         void reset_minus_one() { data.reset_minus_one(); }
