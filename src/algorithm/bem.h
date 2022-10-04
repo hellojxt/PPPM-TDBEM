@@ -27,6 +27,46 @@ class PairInfo
 
 typedef CircularArray<float, STEP_NUM * 2> History;
 
+class LayerWeight
+{
+    public:
+        float single_layer[STEP_NUM];
+        float double_layer[STEP_NUM];
+        inline CGPU_FUNC LayerWeight() {}
+        inline CGPU_FUNC void add(const LayerWeight &other, float weight = 1)
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                single_layer[i] += other.single_layer[i] * weight;
+                double_layer[i] += other.double_layer[i] * weight;
+            }
+        }
+        inline CGPU_FUNC void add(float k)
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                single_layer[i] += k;
+                double_layer[i] += k;
+            }
+        }
+        inline CGPU_FUNC void divide(float k)
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                single_layer[i] /= k;
+                double_layer[i] /= k;
+            }
+        }
+        inline CGPU_FUNC void multiply(float k)
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                single_layer[i] *= k;
+                double_layer[i] *= k;
+            }
+        }
+};
+
 CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,
                                     PairInfo pair,
                                     cpx wave_number,
@@ -59,23 +99,23 @@ class TDBEM
             }
         }
 
-        CGPU_FUNC inline void scaledDFT(cpx *in, cpx *out)
+        CGPU_FUNC inline void scaledDFT(cpx *in, float *out)
         {
             for (int k = 0; k < STEP_NUM; k++)
             {
-                out[k] = 0;
+                cpx result = 0;
                 for (int i = 0; i < STEP_NUM; i++)
                 {
-                    out[k] += in[i] * exp(2 * PI * cpx(0, 1) / STEP_NUM * k * i);
+                    result += in[i] * exp(2 * PI * cpx(0, 1) / STEP_NUM * k * i);
                 }
-                out[k] = out[k] / STEP_NUM * pow(lambda, -k);
+                out[k] = result.real() / STEP_NUM * pow(lambda, -k);
             }
         }
 
         CGPU_FUNC inline void laplace_weight(const float3 *vertices,
                                              PairInfo pair,
                                              PotentialType potential_type,
-                                             cpx *weight)
+                                             float *weight)
         {
             cpx v[STEP_NUM];
             for (int k = 0; k <= STEP_NUM / 2; k++)
@@ -89,21 +129,24 @@ class TDBEM
             scaledDFT(v, weight);
         }
 
+        CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight *weight)
+        {
+            laplace_weight(vertices, pair, SINGLE_LAYER, weight->single_layer);
+            laplace_weight(vertices, pair, DOUBLE_LAYER, weight->double_layer);
+        }
+
         CGPU_FUNC inline float laplace(const float3 *vertices,
                                        PairInfo pair,
                                        History src_neumann,
                                        History src_dirichlet,
                                        int t)
         {
-            cpx single_layer_weight[STEP_NUM];
-            laplace_weight(vertices, pair, SINGLE_LAYER, single_layer_weight);
-            cpx double_layer_weight[STEP_NUM];
-            laplace_weight(vertices, pair, DOUBLE_LAYER, double_layer_weight);
+            LayerWeight weight;
+            laplace_weight(vertices, pair, &weight);
             float result = 0;
             for (int k = 0; k < STEP_NUM; k++)
             {
-                result += -single_layer_weight[k].real() * src_neumann[t - k] +
-                          double_layer_weight[k].real() * src_dirichlet[t - k];
+                result += -weight.single_layer[k] * src_neumann[t - k] + weight.double_layer[k] * src_dirichlet[t - k];
             }
             return result;
         }

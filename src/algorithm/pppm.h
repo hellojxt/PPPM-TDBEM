@@ -8,6 +8,69 @@
 namespace pppm
 {
 
+class BEMCache
+{
+    public:
+        int min_cut;
+        int max_cut;
+        int particle_id;
+        LayerWeight weight;
+        CGPU_FUNC BEMCache() {}
+        CGPU_FUNC inline void cut_off()
+        {
+            min_cut = 0;
+            max_cut = STEP_NUM - 1;
+            while (min_cut < STEP_NUM && weight.single_layer[min_cut] == 0 && weight.double_layer[min_cut] == 0)
+                min_cut++;
+            while (max_cut >= 0 && weight.single_layer[max_cut] == 0 && weight.double_layer[max_cut] == 0)
+                max_cut--;
+        }
+};
+
+class GridMap
+{
+    public:
+        int3 coord;
+        Range range;
+        CGPU_FUNC GridMap() {}
+        CGPU_FUNC GridMap(int3 coord_, Range range_) : coord(coord_), range(range_) {}
+};
+
+class ParticleMap
+{
+    public:
+        int id;
+        Range range;
+        CGPU_FUNC ParticleMap() {}
+        CGPU_FUNC ParticleMap(int id_, Range range_) : id(id_), range(range_) {}
+};
+
+class PPPMCache
+{
+    public:
+        /* data for cache */
+        GArr<GridMap> grid_map;
+        GArr<BEMCache> grid_data;       // for solving near field of BEM
+        GArr<BEMCache> grid_fdtd_data;  // for solving near field of FDTD
+        GArr<ParticleMap> particle_map;
+        GArr<BEMCache> particle_data;
+
+        /* data for precomputation of cache size */
+        GArr3D<int> grid_neighbor_nonzero;
+        GArr3D<int> grid_neighbor_num;
+        GArr<int> particle_neighbor_nonzero;
+        GArr<int> particle_neighbor_num;
+
+        void clear()
+        {
+            grid_map.clear();
+            grid_data.clear();
+            grid_fdtd_data.clear();
+            particle_map.clear();
+            particle_data.clear();
+        }
+};
+
 class BoundaryHistory
 {
     public:
@@ -23,6 +86,7 @@ class PPPMSolver
         GArr<BoundaryHistory> particle_history;  // history boundary data of particles
         GridArr far_field;                       // far field potential of grid cells
         TDBEM bem;                               // boundary element method solver
+        PPPMCache cache;                         // cache for near field computation weights
 
         /**
          *   Constructor of PPPMSolver
@@ -60,6 +124,7 @@ class PPPMSolver
             {
                 far_field[i].clear();
             }
+            cache.clear();
         }
 
         // step: solve_fdtd -> update_particle_data -> step
@@ -75,4 +140,5 @@ class PPPMSolver
         // update particle near field (using neighbor particles) + far field (interpolation from neighbor grid cells)
         void update_particle_data();
 };
+
 }  // namespace pppm

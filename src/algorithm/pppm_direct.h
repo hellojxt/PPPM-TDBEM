@@ -1,3 +1,4 @@
+#pragma once
 #include "macro.h"
 #include "pppm.h"
 
@@ -57,4 +58,8 @@ GPU_FUNC inline float laplacian_near_field(PPPMSolver &pppm, int3 src_center, in
     return result / (pppm.fdtd.dl * pppm.fdtd.dl);
 }
 
-};  // namespace pppm
+void direct_correction_fdtd_near(PPPMSolver &pppm);
+
+void direct_fdtd_far(PPPMSolver &pppm);
+
+}  // namespace pppm

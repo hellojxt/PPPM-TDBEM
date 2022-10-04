@@ -7,6 +7,7 @@ set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For CUDA-GDB
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 add_definitions(-DASSET_DIR="${CMAKE_SOURCE_DIR}/assets")
 
@@ -22,7 +23,6 @@ add_subdirectory(libs)
 add_subdirectory(${SRC_DIR}/ui)
 add_subdirectory(${SRC_DIR}/algorithm)
 add_subdirectory(${SRC_DIR}/utils)
-add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 
 find_package(Catch2 3 REQUIRED)
 add_executable(ParticleGridTest tests/ParticleGridTest.cu)
@@ -42,3 +42,6 @@ target_link_libraries(FDTDTest PRIVATE uilib alglib utillib)
 
 add_executable(FarFieldTest tests/FarFieldTest.cu)
 target_link_libraries(FarFieldTest PRIVATE uilib alglib utillib)
+
+add_executable(PPPMCacheTest tests/PPPMCacheTest.cu)
+target_link_libraries(PPPMCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)

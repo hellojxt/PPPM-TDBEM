@@ -206,14 +206,19 @@ class Range
     public:
         uint start;
         uint end;
-        Range(uint start, uint end) : start(start), end(end) {}
-        Range() : start(0), end(0) {}
+        CGPU_FUNC Range(uint start, uint end) : start(start), end(end) {}
+        CGPU_FUNC Range() : start(0), end(0) {}
         inline CGPU_FUNC int length() { return end - start; }
         friend std::ostream &operator<<(std::ostream &os, const Range &r)
         {
             os << "[" << r.start << "," << r.end << ")";
             return os;
         }
+};
+
+struct is_not_empty
+{
+        CGPU_FUNC int operator()(const int &x) const { return x != 0; }
 };
 
 class BBox

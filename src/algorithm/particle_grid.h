@@ -14,6 +14,7 @@ class BElement
         float3 pos;
         float3 normal;
         int3 indices;
+        CGPU_FUNC BElement() {}
         friend std::ostream &operator<<(std::ostream &out, const BElement &be);
 };
 
@@ -26,10 +27,10 @@ class ParticleGrid
         float3 max_pos;
         float grid_size;
         int3 grid_dim;
-        GArr<BElement> particles;  // particles sorted by morton code
-        GArr<Range>
-            grid_dense_map;  // grid_dense_map(i) is the index range (index for particles) of the elements in the
-                             // i-th non-empty grid cell. Range is [start, end) and grid is sorted by morton code
+        GArr<BElement> particles;     // particles sorted by morton code
+        GArr<Range> grid_dense_map;   // grid_dense_map(i) is the index range (index for particles) of
+                                      // the elements in the i-th non-empty grid cell. Range is [start, end) and grid is
+                                      // sorted by morton code
         GArr3D<Range> grid_hash_map;  // grid_hash_map(i,j,k) is the index range (index for particles) of the elements
                                       // in the grid cells. If the grid cell is empty, the range is [0,0).
 
