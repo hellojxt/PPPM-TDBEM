@@ -97,9 +97,6 @@ CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,
 
 class TDBEM
 {
-    private:
-        cpx FFTbuffer1[STEP_NUM];
-        cpx FFTbuffer2[STEP_NUM];
     public:
         cpx wave_numbers[STEP_NUM];  // wave number for transforming from lapalace
                                      // domain to time domain and vice versa
@@ -119,14 +116,14 @@ class TDBEM
             }
         }
 
-        CGPU_FUNC inline void scaledDFT(cpx *in, float *out)
+        CGPU_FUNC inline void scaledIDFT(cpx *in, float *out)
         {
             for (int k = 0; k < STEP_NUM; k++)
             {
                 cpx result = 0;
                 for (int i = 0; i < STEP_NUM; i++)
                 {
-                    result += in[i] * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k * i);
+                    result += in[i] * exp(2 * PI * cpx(0, 1) / STEP_NUM * k * i);
                 }
                 out[k] = result.real() / STEP_NUM * pow(lambda, -k);
             }
@@ -149,7 +146,7 @@ class TDBEM
             }
             for (int i = 0; i < STEP_NUM / 2; i += step)
             {
-                auto temp = exp(-2 * PI * i / STEP_NUM * pureImag) * buffer[i + STEP_NUM / 2];
+                auto temp = exp(2 * PI * i / STEP_NUM * pureImag) * buffer[i + STEP_NUM / 2];
                 auto temp2 = buffer[i];
                 out[i] = temp2 + temp;
                 out[i + STEP_NUM / 2] = temp2 - temp;
@@ -160,11 +157,13 @@ class TDBEM
 
         CGPU_FUNC inline void scaledFFT(cpx* in, float* out)
         {
-            FFT(in, FFTbuffer1, FFTbuffer2);
+            cpx buffer1[STEP_NUM];
+            cpx buffer2[STEP_NUM];
+            FFT(in, buffer1, buffer2);
             float temp = 1.0f;
             for(int i = 0; i < STEP_NUM; i++)
             {
-                out[i] = FFTbuffer1[i].real() / STEP_NUM * temp;
+                out[i] = buffer1[i].real() / STEP_NUM * temp;
                 temp /= lambda;
             }
             return;
@@ -184,7 +183,7 @@ class TDBEM
             {
                 v[k] = conj(v[STEP_NUM - k]);
             }
-            scaledDFT(v, weight);
+            scaledIDFT(v, weight);
         }
 
         CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight *weight)

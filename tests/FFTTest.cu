@@ -15,7 +15,7 @@ int main()
     thrust::default_random_engine engine(123);
     thrust::generate(in, in + STEP_NUM, [&](){ return thrust::complex<float>{ distribution(engine), distribution(engine)}; });
     TICK(t1);
-    obj.scaledDFT(in, out);
+    obj.scaledIDFT(in, out);
     TOCK(t1);
     TICK(t2);
     obj.scaledFFT(in, out2);
