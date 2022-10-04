@@ -9,6 +9,7 @@ namespace pppm
 
 #define STEP_NUM_POWER 5  // 2^STEP_NUM_POWER = STEP_NUM
 #define STEP_NUM 32       // number of time steps for history of each particle
+#define pureImag cpx(0, 1)
 
 /**
  * @brief particle to particle calculation type
@@ -80,6 +81,9 @@ CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,
 
 class TDBEM
 {
+    private:
+        cpx FFTbuffer1[STEP_NUM];
+        cpx FFTbuffer2[STEP_NUM];
     public:
         cpx wave_numbers[STEP_NUM];  // wave number for transforming from lapalace
                                      // domain to time domain and vice versa
@@ -106,10 +110,48 @@ class TDBEM
                 cpx result = 0;
                 for (int i = 0; i < STEP_NUM; i++)
                 {
-                    result += in[i] * exp(2 * PI * cpx(0, 1) / STEP_NUM * k * i);
+                    result += in[i] * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k * i);
                 }
                 out[k] = result.real() / STEP_NUM * pow(lambda, -k);
             }
+        }
+
+        CGPU_FUNC inline void FFT(cpx* in, cpx* out, cpx* buffer, int step = 1)
+        {
+            if (step == STEP_NUM)
+            {
+                out[0] = in[0];
+                return;
+            }
+            int newStep = step * 2;
+            FFT(in, out, buffer, newStep);
+            FFT(in + step, out + step, buffer + step, newStep);
+            for (int i = 0; i < STEP_NUM; i += step * 2)
+            {
+                buffer[i / 2] = out[i];
+                buffer[(STEP_NUM + i) / 2] = out[i + step];
+            }
+            for (int i = 0; i < STEP_NUM / 2; i += step)
+            {
+                auto temp = exp(-2 * PI * i / STEP_NUM * pureImag) * buffer[i + STEP_NUM / 2];
+                auto temp2 = buffer[i];
+                out[i] = temp2 + temp;
+                out[i + STEP_NUM / 2] = temp2 - temp;
+            }
+            return;
+        }
+        
+
+        CGPU_FUNC inline void scaledFFT(cpx* in, float* out)
+        {
+            FFT(in, FFTbuffer1, FFTbuffer2);
+            float temp = 1.0f;
+            for(int i = 0; i < STEP_NUM; i++)
+            {
+                out[i] = FFTbuffer1[i].real() / STEP_NUM * temp;
+                temp /= lambda;
+            }
+            return;
         }
 
         CGPU_FUNC inline void laplace_weight(const float3 *vertices,
