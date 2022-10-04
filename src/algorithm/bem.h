@@ -34,14 +34,28 @@ class LayerWeight
         float single_layer[STEP_NUM];
         float double_layer[STEP_NUM];
         inline CGPU_FUNC LayerWeight() {}
-        inline CGPU_FUNC void add(const LayerWeight &other, float weight = 1)
+        inline CGPU_FUNC void reset()
         {
             for (int i = 0; i < STEP_NUM; i++)
             {
-                single_layer[i] += other.single_layer[i] * weight;
-                double_layer[i] += other.double_layer[i] * weight;
+                single_layer[i] = 0;
+                double_layer[i] = 0;
             }
         }
+
+        /*
+         * offset have to be in range [-STEP_NUM, 0].
+         * some last weight will be ignored.
+         */
+        inline CGPU_FUNC void add(const LayerWeight &other, float weight = 1, int offset = 0)
+        {
+            for (int i = -offset; i < STEP_NUM; i++)
+            {
+                single_layer[i] += other.single_layer[i + offset] * weight;
+                double_layer[i] += other.double_layer[i + offset] * weight;
+            }
+        }
+
         inline CGPU_FUNC void add(float k)
         {
             for (int i = 0; i < STEP_NUM; i++)
@@ -50,6 +64,7 @@ class LayerWeight
                 double_layer[i] += k;
             }
         }
+
         inline CGPU_FUNC void divide(float k)
         {
             for (int i = 0; i < STEP_NUM; i++)
@@ -58,6 +73,7 @@ class LayerWeight
                 double_layer[i] /= k;
             }
         }
+
         inline CGPU_FUNC void multiply(float k)
         {
             for (int i = 0; i < STEP_NUM; i++)
