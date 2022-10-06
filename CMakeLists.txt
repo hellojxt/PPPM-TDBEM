@@ -18,6 +18,7 @@ include_directories(
                     ${SRC_DIR}/algorithm
                     ${SRC_DIR}/utils
                     ${SRC_DIR}/helmholtz
+                    tests
 )
 add_subdirectory(libs)
 add_subdirectory(${SRC_DIR}/ui)
@@ -43,8 +44,8 @@ target_link_libraries(FDTDTest PRIVATE uilib alglib utillib)
 add_executable(FarFieldTest tests/FarFieldTest.cu)
 target_link_libraries(FarFieldTest PRIVATE uilib alglib utillib)
 
-add_executable(PPPMCacheTest tests/PPPMCacheTest.cu)
-target_link_libraries(PPPMCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+add_executable(GridCacheTest tests/GridCacheTest.cu)
+target_link_libraries(GridCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
 add_executable(FFTTest tests/FFTTest.cu)
 target_link_libraries(FFTTest PRIVATE alglib utillib)

@@ -181,6 +181,8 @@ __global__ void solve_from_cache_kernel(PPPMSolver pppm)
 void solve_from_cache(PPPMSolver &pppm)
 {
     int total_num = pppm.cache.grid_map.size();
+    int t = pppm.fdtd.t;
+    pppm.far_field[t].assign(pppm.fdtd.grids[t]);
     cuExecute(total_num, solve_from_cache_kernel, pppm);
 }
 }  // namespace pppm

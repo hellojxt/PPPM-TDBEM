@@ -7,15 +7,15 @@ namespace pppm
 
 void PPPMSolver::solve_fdtd_simple()
 {
-    TICK(correction_fdtd)
-    direct_correction_fdtd_near(*this);
-    TOCK(correction_fdtd)
     TICK(fdtd)
     fdtd.step();
     TOCK(fdtd)
     TICK(solve_far)
     direct_fdtd_far(*this);
     TOCK(solve_far)
+    TICK(correction_fdtd)
+    direct_correction_fdtd_near(*this);
+    TOCK(correction_fdtd)
 }
 
 void PPPMSolver::precompute_grid_cache()

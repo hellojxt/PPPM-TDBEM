@@ -31,13 +31,52 @@ class FDTD
          *  @param dl the grid spacing
          *  @param dt the time step
          */
-        void init(int res_, float dl_, float dt_);
+        void init(int res_, float dl_, float dt_)
+        {
+            res = res_;
+            for (int i = 0; i < GRID_TIME_SIZE; i++)
+            {
+                grids[i].resize(res, res, res);
+                grids[i].reset();
+            }
+            t = -1;
+            dl = dl_;
+            dt = dt_;
+            c = 343.2f;
+        }
+
+        void step_inner_grid();
+
+        void step_boundary_grid();
 
         /**
-         * @brief step forward in time
+         * @brief step forward in time,
+         * t++ first, then compute the FDTD kernel
          */
-        void step();
-        void clear();
+        void step()
+        {
+            t++;
+            step_inner_grid();
+            step_boundary_grid();
+        }
+
+        void clear()
+        {
+            for (int i = 0; i < GRID_TIME_SIZE; i++)
+            {
+                grids[i].clear();
+            }
+        }
+
+        void reset()
+        {
+            for (int i = 0; i < GRID_TIME_SIZE; i++)
+            {
+                grids[i].reset();
+            }
+            t = -1;
+        }
+
         /**
          * @brief get the center coordinate of the grid cell
          */
@@ -45,6 +84,7 @@ class FDTD
         {
             return make_float3((i + 0.5f) * dl, (j + 0.5f) * dl, (k + 0.5f) * dl);
         }
+
         CGPU_FUNC inline float3 getCenter(int3 c) const { return getCenter(c.x, c.y, c.z); }
 };
 

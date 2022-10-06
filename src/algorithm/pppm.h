@@ -69,6 +69,15 @@ class PPPMCache
             particle_map.clear();
             particle_data.clear();
         }
+
+        void reset()
+        {
+            grid_map.reset();
+            grid_data.reset();
+            grid_fdtd_data.reset();
+            particle_map.reset();
+            particle_data.reset();
+        }
 };
 
 class BoundaryHistory
@@ -127,10 +136,22 @@ class PPPMSolver
             cache.clear();
         }
 
+        void reset()
+        {
+            fdtd.reset();
+            pg.reset();
+            particle_history.reset();
+            for (int i = 0; i < GRID_TIME_SIZE; i++)
+            {
+                far_field[i].reset();
+            }
+            cache.reset();
+        }
+
         /*
-            1. update fdtd near field
-            2. solve fdtd
-            3. update far field
+            1. solve fdtd
+            2. update far field
+            3. update fdtd near field
         */
         void solve_fdtd_simple();
 
