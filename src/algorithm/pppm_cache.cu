@@ -143,4 +143,44 @@ void cache_grid_data(PPPMSolver &pppm)
     cuExecute(total_num, precompute_grid_data, pppm);
 }
 
+__global__ void solve_from_cache_kernel(PPPMSolver pppm)
+{
+    int grid_id = blockIdx.x;
+    PPPMCache &cache = pppm.cache;
+    if (grid_id >= cache.grid_map.size())
+        return;
+    GridMap grid_map = cache.grid_map[grid_id];
+    int3 coord = grid_map.coord;
+    Range r = grid_map.range;
+    int t = pppm.fdtd.t;
+    __shared__ float fdtd_near_field;
+    __shared__ float accurate_near_field;
+    if (threadIdx.x == 0)
+    {
+        fdtd_near_field = 0;
+        accurate_near_field = 0;
+    }
+    __syncthreads();
+    for (int i = threadIdx.x; i < r.end - r.start; i += blockDim.x)
+    {
+        BEMCache e = cache.grid_fdtd_data[r.start + i];
+        BoundaryHistory &history = pppm.particle_history[e.particle_id];
+        atomicAdd_block(&fdtd_near_field, e.weight.convolution(history.neumann, history.dirichlet, t));
+        e = cache.grid_data[r.start + i];
+        atomicAdd_block(&accurate_near_field, e.weight.convolution(history.neumann, history.dirichlet, t));
+    }
+    __syncthreads();
+    if (threadIdx.x == 0)
+    {
+        float far_field = pppm.fdtd.grids[t](coord) - fdtd_near_field;
+        pppm.far_field[t](coord) = far_field;  // far field of empty grid need to be initialized with FDTD solution
+        pppm.fdtd.grids[t](coord) = far_field + accurate_near_field;
+    }
+}
+
+void solve_from_cache(PPPMSolver &pppm)
+{
+    int total_num = pppm.cache.grid_map.size();
+    cuExecute(total_num, solve_from_cache_kernel, pppm);
+}
 }  // namespace pppm

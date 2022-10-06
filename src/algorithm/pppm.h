@@ -50,8 +50,8 @@ class PPPMCache
     public:
         /* data for cache */
         GArr<GridMap> grid_map;
-        GArr<BEMCache> grid_data;       // for solving near field of BEM
-        GArr<BEMCache> grid_fdtd_data;  // for solving near field of FDTD
+        GArr<BEMCache> grid_data;       // for solving accurate near field of BEM
+        GArr<BEMCache> grid_fdtd_data;  // for solving inaccurate near field of FDTD
         GArr<ParticleMap> particle_map;
         GArr<BEMCache> particle_data;
 
@@ -127,9 +127,6 @@ class PPPMSolver
             cache.clear();
         }
 
-        // step: solve_fdtd -> update_particle_data -> step
-        void step();
-
         /*
             1. update fdtd near field
             2. solve fdtd
@@ -137,8 +134,12 @@ class PPPMSolver
         */
         void solve_fdtd_simple();
 
+        void precompute_grid_cache();
+        void solve_fdtd_with_cache();
+
+        void precompute_particle_cache();
         // update particle near field (using neighbor particles) + far field (interpolation from neighbor grid cells)
-        void update_particle_data();
+        void update_particle_dirichlet();
 };
 
 }  // namespace pppm
