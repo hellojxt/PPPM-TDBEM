@@ -47,4 +47,4 @@ add_executable(PPPMCacheTest tests/PPPMCacheTest.cu)
 target_link_libraries(PPPMCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
 add_executable(FFTTest tests/FFTTest.cu)
-target_link_libraries(FFTTest PRIVATE alglib utillib)
+target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
