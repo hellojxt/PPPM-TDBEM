@@ -57,6 +57,8 @@ class ParticleGrid
             grid_hash_map.clear();
         }
 
+        void reset() { clear(); }
+
         void construct_grid();
 };
 }  // namespace pppm

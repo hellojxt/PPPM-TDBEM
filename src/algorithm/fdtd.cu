@@ -3,20 +3,6 @@
 namespace pppm
 {
 
-void FDTD::init(int res_, float dl_, float dt_)
-{
-    res = res_;
-    for (int i = 0; i < GRID_TIME_SIZE; i++)
-    {
-        grids[i].resize(res, res, res);
-        grids[i].reset();
-    }
-    t = -1;
-    dl = dl_;
-    dt = dt_;
-    c = 343.2f;
-}
-
 GPU_FUNC inline value laplacian(GArr3D<value> &grid, int i, int j, int k, float h)
 {
     float sum = 0;
@@ -45,21 +31,11 @@ __global__ void fdtd_inner_kernel(FDTD fdtd)
                              (c * c * dt * dt) * laplacian(fdtd.grids[t - 1], i, j, k, h) - fdtd.grids[t - 2](i, j, k);
 }
 
-/*
- * t++ first, then compute the FDTD kernel
- */
-void FDTD::step()
+void FDTD::step_inner_grid()
 {
-    t++;
     cuExecute3D(dim3(res - 2, res - 2, res - 2), fdtd_inner_kernel, *this);
 }
 
-void FDTD::clear()
-{
-    for (int i = 0; i < GRID_TIME_SIZE; i++)
-    {
-        grids[i].clear();
-    }
-}
+void FDTD::step_boundary_grid() {}
 
 }  // namespace pppm

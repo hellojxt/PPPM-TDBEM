@@ -82,6 +82,16 @@ class LayerWeight
                 double_layer[i] *= k;
             }
         }
+
+        inline CGPU_FUNC float convolution(History &neumann, History &dirichlet, int t)
+        {
+            float result = 0;
+            for (int k = 0; k < STEP_NUM; k++)
+            {
+                result += -single_layer[k] * neumann[t - k] + double_layer[k] * dirichlet[t - k];
+            }
+            return result;
+        }
 };
 
 CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,
@@ -129,7 +139,7 @@ class TDBEM
             }
         }
 
-        CGPU_FUNC inline void FFT(cpx* in, cpx* out, cpx* buffer, int step = 1)
+        CGPU_FUNC inline void FFT(cpx *in, cpx *out, cpx *buffer, int step = 1)
         {
             if (step == STEP_NUM)
             {
@@ -153,15 +163,14 @@ class TDBEM
             }
             return;
         }
-        
 
-        CGPU_FUNC inline void scaledFFT(cpx* in, float* out)
+        CGPU_FUNC inline void scaledFFT(cpx *in, float *out)
         {
             cpx buffer1[STEP_NUM];
             cpx buffer2[STEP_NUM];
             FFT(in, buffer1, buffer2);
             float temp = 1.0f;
-            for(int i = 0; i < STEP_NUM; i++)
+            for (int i = 0; i < STEP_NUM; i++)
             {
                 out[i] = buffer1[i].real() / STEP_NUM * temp;
                 temp /= lambda;
@@ -200,12 +209,7 @@ class TDBEM
         {
             LayerWeight weight;
             laplace_weight(vertices, pair, &weight);
-            float result = 0;
-            for (int k = 0; k < STEP_NUM; k++)
-            {
-                result += -weight.single_layer[k] * src_neumann[t - k] + weight.double_layer[k] * src_dirichlet[t - k];
-            }
-            return result;
+            return weight.convolution(src_neumann, src_dirichlet, t);
         }
 
         CGPU_FUNC inline cpx helmholtz(const float3 *vertices,

@@ -50,8 +50,8 @@ class PPPMCache
     public:
         /* data for cache */
         GArr<GridMap> grid_map;
-        GArr<BEMCache> grid_data;       // for solving near field of BEM
-        GArr<BEMCache> grid_fdtd_data;  // for solving near field of FDTD
+        GArr<BEMCache> grid_data;       // for solving accurate near field of BEM
+        GArr<BEMCache> grid_fdtd_data;  // for solving inaccurate near field of FDTD
         GArr<ParticleMap> particle_map;
         GArr<BEMCache> particle_data;
 
@@ -68,6 +68,15 @@ class PPPMCache
             grid_fdtd_data.clear();
             particle_map.clear();
             particle_data.clear();
+        }
+
+        void reset()
+        {
+            grid_map.reset();
+            grid_data.reset();
+            grid_fdtd_data.reset();
+            particle_map.reset();
+            particle_data.reset();
         }
 };
 
@@ -127,18 +136,31 @@ class PPPMSolver
             cache.clear();
         }
 
-        // step: solve_fdtd -> update_particle_data -> step
-        void step();
+        void reset()
+        {
+            fdtd.reset();
+            pg.reset();
+            particle_history.reset();
+            for (int i = 0; i < GRID_TIME_SIZE; i++)
+            {
+                far_field[i].reset();
+            }
+            cache.reset();
+        }
 
         /*
-            1. update fdtd near field
-            2. solve fdtd
-            3. update far field
+            1. solve fdtd
+            2. update far field
+            3. update fdtd near field
         */
         void solve_fdtd_simple();
 
+        void precompute_grid_cache();
+        void solve_fdtd_with_cache();
+
+        void precompute_particle_cache();
         // update particle near field (using neighbor particles) + far field (interpolation from neighbor grid cells)
-        void update_particle_data();
+        void update_particle_dirichlet();
 };
 
 }  // namespace pppm
