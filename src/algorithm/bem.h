@@ -7,9 +7,36 @@
 namespace pppm
 {
 
-#define STEP_NUM_POWER 5  // 2^STEP_NUM_POWER = STEP_NUM
-#define STEP_NUM 32       // number of time steps for history of each particle
+#define STEP_NUM 32  // number of time steps for history of each particle
 #define pureImag cpx(0, 1)
+
+template <int step = 1>
+CGPU_FUNC inline void FFT(cpx *in, cpx *out, cpx *buffer)
+{
+    const int newStep = step * 2;
+    FFT<newStep>(in, out, buffer);
+    FFT<newStep>(in + step, out + step, buffer + step);
+    for (int i = 0; i < STEP_NUM; i += newStep)
+    {
+        buffer[i / 2] = out[i];
+        buffer[(STEP_NUM + i) / 2] = out[i + step];
+    }
+    for (int i = 0; i < STEP_NUM / 2; i += step)
+    {
+        auto temp = exp(2 * PI * i / STEP_NUM * pureImag) * buffer[i + STEP_NUM / 2];
+        auto temp2 = buffer[i];
+        out[i] = temp2 + temp;
+        out[i + STEP_NUM / 2] = temp2 - temp;
+    }
+    return;
+}
+
+template <>
+CGPU_FUNC inline void FFT<STEP_NUM>(cpx *in, cpx *out, cpx *buffer)
+{
+    out[0] = in[0];
+    return;
+}
 
 /**
  * @brief particle to particle calculation type
@@ -139,31 +166,6 @@ class TDBEM
             }
         }
 
-        CGPU_FUNC inline void FFT(cpx *in, cpx *out, cpx *buffer, int step = 1)
-        {
-            if (step == STEP_NUM)
-            {
-                out[0] = in[0];
-                return;
-            }
-            int newStep = step * 2;
-            FFT(in, out, buffer, newStep);
-            FFT(in + step, out + step, buffer + step, newStep);
-            for (int i = 0; i < STEP_NUM; i += step * 2)
-            {
-                buffer[i / 2] = out[i];
-                buffer[(STEP_NUM + i) / 2] = out[i + step];
-            }
-            for (int i = 0; i < STEP_NUM / 2; i += step)
-            {
-                auto temp = exp(2 * PI * i / STEP_NUM * pureImag) * buffer[i + STEP_NUM / 2];
-                auto temp2 = buffer[i];
-                out[i] = temp2 + temp;
-                out[i + STEP_NUM / 2] = temp2 - temp;
-            }
-            return;
-        }
-
         CGPU_FUNC inline void scaledFFT(cpx *in, float *out)
         {
             cpx buffer1[STEP_NUM];
@@ -192,7 +194,7 @@ class TDBEM
             {
                 v[k] = conj(v[STEP_NUM - k]);
             }
-            scaledIDFT(v, weight);
+            scaledFFT(v, weight);
         }
 
         CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight *weight)
