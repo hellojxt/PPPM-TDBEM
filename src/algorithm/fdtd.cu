@@ -213,8 +213,7 @@ __device__ void fdtd_fill_matrix(FDTD& fdtd, int i, int j, int k)
 
 __global__ void fdtd_boundary_kernel(FDTD fdtd)
 {
-    int offsetx = threadIdx.x + blockIdx.x * blockDim.x,
-        offsety = threadIdx.y + blockIdx.y * blockDim.y;
+    int offsetx = threadIdx.x, offsety = blockIdx.x;
     int last = fdtd.res - 1;
     fdtd_fill_matrix(fdtd, 0, offsetx, offsety);
     fdtd_fill_matrix(fdtd, last, offsetx, offsety);
