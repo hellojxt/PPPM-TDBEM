@@ -20,6 +20,7 @@ CGPU_FUNC inline cpx single_layer_potential(float3 src_coord, float3 trg_coord, 
     {
         real_t r = sqrt(r2);
         potential += exp(-cpx(0, 1) * r * k) / (4 * PI * r);
+        // printf("r = %f, k = %f, potential = %f + %f i\n", r, k.real(), potential.real(), potential.imag());
     }
     return potential;
 }

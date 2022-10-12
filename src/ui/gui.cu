@@ -103,4 +103,5 @@ void GUI::append(Window *window)
 {
     sub_windows.pushBack(window);
 }
+
 }  // namespace pppm

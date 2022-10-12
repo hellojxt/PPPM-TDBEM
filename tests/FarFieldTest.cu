@@ -54,9 +54,5 @@ int main()
     }
 
     // visualizer
-    GUI gui;
-    CudaRender render_far_field("far field visualizer");
-    render_far_field.setData(visual_data_far_field, 0.005f);
-    gui.append(&render_far_field);
-    gui.start();
+    renderArray(RenderElement(visual_data_far_field, 0.005f, "far_field"));
 }

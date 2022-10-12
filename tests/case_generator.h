@@ -4,19 +4,19 @@
 
 using namespace pppm;
 
-static PPPMSolver *random_empty_pppm()
+static PPPMSolver *empty_pppm()
 {
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    float grid_size = 0.005 * (RAND_F + 1);
-    int res = RAND_I(16, 32) * 2;
-    int dt = RAND_I(100, 200) * 1e-7f;
+    float grid_size = 0.005;
+    int res = 64;
+    float dt = 8e-6f;
     PPPMSolver *pppm = new PPPMSolver(res, grid_size, dt);
     return pppm;
 }
 
 static PPPMSolver *random_pppm()
 {
-    PPPMSolver *pppm = random_empty_pppm();
+    PPPMSolver *pppm = empty_pppm();
     int triangle_count = GENERATE(10, 100);
     CArr<float3> vertices;
     CArr<int3> triangles;
@@ -39,7 +39,7 @@ static PPPMSolver *random_pppm()
 
 static PPPMSolver *point_pppm()
 {
-    PPPMSolver *pppm = random_empty_pppm();
+    PPPMSolver *pppm = empty_pppm();
     int center_idx = pppm->fdtd.res / 2;
     int3 coord = make_int3(center_idx, center_idx, center_idx);
     float3 center = pppm->fdtd.getCenter(coord);

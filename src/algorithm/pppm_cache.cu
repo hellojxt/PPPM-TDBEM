@@ -87,7 +87,7 @@ void set_cache_grid_size(PPPMSolver &pppm)
     cuExecute3D(dim3(res, res, res), fill_grid_info, pppm);
 }
 
-GPU_FUNC inline void add_grid_near_field(PPPMSolver &pppm, BEMCache &e, int3 dst, float scale = 1, int offset = 0)
+GPU_FUNC inline void add_grid_near_field(PPPMSolver &pppm, BEMCache &e, int3 dst, float scale, int offset)
 {
     BElement &particle = pppm.pg.particles[e.particle_id];
     uint3 src_uint = particle.cell_coord;
@@ -128,11 +128,13 @@ __global__ void precompute_grid_data(PPPMSolver pppm)
         e.particle_id = cache.grid_data[i].particle_id;
         e.weight.reset();
         add_grid_near_field(pppm, e, coord, 2, -1);
-        add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
-        add_grid_near_field(pppm, e, coord, -1, -2);
-        pppm.cache.grid_fdtd_data[i] = e;
-        e.weight.reset();
-        add_grid_near_field(pppm, e, coord, 1, 0);
+        printf("coord: (%d, %d, %d), double: %e, single: %e\n", coord.x, coord.y, coord.z, e.weight.double_layer[1],
+               e.weight.single_layer[1]);
+        // add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
+        // add_grid_near_field(pppm, e, coord, -1, -2);
+        // pppm.cache.grid_fdtd_data[i] = e;
+        // e.weight.reset();
+        // add_grid_near_field(pppm, e, coord, 1, 0);
         pppm.cache.grid_data[i] = e;
     }
 }

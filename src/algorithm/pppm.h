@@ -85,6 +85,12 @@ class BoundaryHistory
     public:
         History dirichlet;
         History neumann;
+        friend std::ostream &operator<<(std::ostream &out, const BoundaryHistory &h)
+        {
+            out << "dirichlet: " << h.dirichlet << std::endl;
+            out << "neumann: " << h.neumann << std::endl;
+            return out;
+        }
 };
 
 class PPPMSolver

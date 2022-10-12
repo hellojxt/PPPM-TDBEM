@@ -14,8 +14,6 @@ __global__ void set_center_signal(FDTD fdtd, SineSource s)
 
 int main()
 {
-    GUI gui;
-    CudaRender render;
 
     int res = 51;
     int step_num = 300;
@@ -34,7 +32,5 @@ int main()
         cuExecuteBlock(1, 1, set_center_signal, fdtd, s);
         data[i].assign(fdtd.grids[i][25]);
     }
-    render.setData(data, 0.02f);
-    gui.append(&render);
-    gui.start();
+    renderArray(RenderElement(data, 0.02f, "fdtd"));
 }

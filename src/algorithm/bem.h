@@ -119,6 +119,14 @@ class LayerWeight
             }
             return result;
         }
+
+        inline CGPU_FUNC void print()
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                printf("weight.single[%d]:%e, .double[%d]:%e\n", i, single_layer[i], i, double_layer[i]);
+            }
+        }
 };
 
 CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,
@@ -150,6 +158,8 @@ class TDBEM
             {
                 cpx s_k = lambda * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k);
                 wave_numbers[k] = BDF2(s_k) / (dt * AIR_WAVE_SPEED) / cpx(0, 1);
+                // printf("%f %f\n", BDF2(s_k).imag(), BDF2(s_k).real());
+                // printf("wave number %d: %f %f\n", k, wave_numbers[k].real(), wave_numbers[k].imag());
             }
         }
 
@@ -194,7 +204,7 @@ class TDBEM
             {
                 v[k] = conj(v[STEP_NUM - k]);
             }
-            scaledFFT(v, weight);
+            scaledIDFT(v, weight);
         }
 
         CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight *weight)

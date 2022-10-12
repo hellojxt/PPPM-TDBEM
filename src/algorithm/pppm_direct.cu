@@ -36,14 +36,15 @@ __global__ void solve_far_field_kernel(PPPMSolver pppm)
     float c = pppm.fdtd.c, dt = pppm.fdtd.dt;
     float fdtd_near_field = 0;
     fdtd_near_field += 2 * near_field(pppm, coord, coord, t - 1);
-    fdtd_near_field += (c * c * dt * dt) * laplacian_near_field(pppm, coord, coord, t - 1);
-    fdtd_near_field -= near_field(pppm, coord, coord, t - 2);
+    // fdtd_near_field += (c * c * dt * dt) * laplacian_near_field(pppm, coord, coord, t - 1);
+    // fdtd_near_field -= near_field(pppm, coord, coord, t - 2);
     pppm.far_field[t](coord) = pppm.fdtd.grids[t](coord) - fdtd_near_field;
 }
 
 void direct_fdtd_far(PPPMSolver &pppm)
 {
     int res = pppm.fdtd.res;
+    auto his = pppm.particle_history;
     cuExecute3D(dim3(res, res, res), solve_far_field_kernel, pppm);
 }
 

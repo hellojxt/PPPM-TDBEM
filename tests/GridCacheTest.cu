@@ -88,6 +88,45 @@ void sub_test(PPPMSolver *solver)
     SECTION("check cache weight")
     {
         CArr<BoundaryHistory> particle_history = solver->particle_history.cpu();
+        int test_idx = 0;
+        for (int i = 0; i < particle_history.size(); i++)
+        {
+            particle_history[i].dirichlet[test_idx - 1] = 1;
+        }
+        solver->particle_history.assign(particle_history);
+
+        solver->solve_fdtd_simple();
+        CArr3D<float> far_field_simple = solver->far_field[0].cpu();
+        CArr3D<float> fdtd_grid_simple = solver->fdtd.grids[0].cpu();
+
+        solver->fdtd.reset();
+        solver->solve_fdtd_with_cache();
+        CArr3D<float> far_field = solver->far_field[0].cpu();
+        CArr3D<float> fdtd_grid = solver->fdtd.grids[0].cpu();
+        // renderArray(RenderElement(far_field_simple, 0.04f, "simple"), RenderElement(far_field, 0.04f, "cache"));
+        for (int x = solver->fdtd.res / 2 - 1; x <= solver->fdtd.res / 2 + 1; x++)
+        {
+            for (int y = solver->fdtd.res / 2 - 1; y <= solver->fdtd.res / 2 + 1; y++)
+            {
+                for (int z = solver->fdtd.res / 2 - 1; z <= solver->fdtd.res / 2 + 1; z++)
+                {
+                    printf("(%d, %d, %d): simple: %e, cache: %e\n", x, y, z, far_field_simple(x, y, z),
+                           far_field(x, y, z));
+                }
+            }
+        }
+
+        // for (int x = 0; x < solver->fdtd.res; x++)
+        // {
+        //     for (int y = 0; y < solver->fdtd.res; y++)
+        //     {
+        //         for (int z = 0; z < solver->fdtd.res; z++)
+        //         {
+        //             REQUIRE(far_field_simple(x, y, z) == far_field(x, y, z));
+        //             REQUIRE(fdtd_grid_simple(x, y, z) == fdtd_grid(x, y, z));
+        //         }
+        //     }
+        // }
     }
 }
 TEST_CASE("GridCache", "[gc]")

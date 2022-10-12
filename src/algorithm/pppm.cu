@@ -29,6 +29,9 @@ void PPPMSolver::precompute_grid_cache()
 }
 void PPPMSolver::solve_fdtd_with_cache()
 {
+    TICK(fdtd)
+    fdtd.step();
+    TOCK(fdtd)
     TICK(solve_from_cache)
     solve_from_cache(*this);
     TOCK(solve_from_cache)
