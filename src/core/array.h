@@ -160,9 +160,41 @@ class GArr
         CGPU_FUNC inline const T *end() const { return m_data + m_totalNum; }
         CGPU_FUNC inline T *end() { return m_data + m_totalNum; }
 
-        GPU_FUNC inline T &operator[](unsigned int id) { return m_data[id]; }
+        GPU_FUNC inline T &operator[](unsigned int id)
+        {
+#ifdef MEMORY_CHECK
+            if (id >= m_totalNum)
+            {
+                printf("Error: GArr::operator[]: id = %d, m_totalNum = %d\n in (Block %d, Thread %d)", id, m_totalNum,
+                       blockIdx.x, threadIdx.x);
+                return m_data[0];
+            }
+            else
+            {
+                return m_data[id];
+            }
+#else
+            return m_data[id];
+#endif
+        }
 
-        GPU_FUNC inline T &operator[](unsigned int id) const { return m_data[id]; }
+        GPU_FUNC inline T &operator[](unsigned int id) const
+        {
+#ifdef MEMORY_CHECK
+            if (id >= m_totalNum)
+            {
+                printf("Error: GArr::operator[]: id = %d, m_totalNum = %d\n in (Block %d, Thread %d)", id, m_totalNum,
+                       blockIdx.x, threadIdx.x);
+                return m_data[0];
+            }
+            else
+            {
+                return m_data[id];
+            }
+#else
+            return m_data[id];
+#endif
+        }
 
         CGPU_FUNC inline uint size() const { return m_totalNum; }
         CGPU_FUNC inline bool isCPU() const { return false; }

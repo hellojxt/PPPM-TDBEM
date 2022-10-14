@@ -7,6 +7,7 @@ set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For CUDA-GDB
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 add_definitions(-DASSET_DIR="${CMAKE_SOURCE_DIR}/assets")
