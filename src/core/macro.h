@@ -170,6 +170,15 @@ static uint cudaGridSize(uint totalSize, uint blockSize)
         cuSynchronize();                                                                                       \
     }
 
+#define CUDA_2D_BLOCK_SIZE 8
+#define cuExecute2D(size, Func, ...)                                                                   \
+    {                                                                                                  \
+        uint pDimx = cudaGridSize((uint)size.x, CUDA_2D_BLOCK_SIZE);                                   \
+        uint pDimy = cudaGridSize((uint)size.y, CUDA_2D_BLOCK_SIZE);                                   \
+        Func<<<dim3(pDimx, pDimy, 1), dim3(CUDA_2D_BLOCK_SIZE, CUDA_2D_BLOCK_SIZE, 1)>>>(__VA_ARGS__); \
+        cuSynchronize();                                                                               \
+    }
+
 #define cuExecuteBlock(size1, size2, Func, ...) \
     {                                           \
         Func<<<size1, size2>>>(__VA_ARGS__);    \
@@ -213,6 +222,17 @@ class Range
         {
             os << "[" << r.start << "," << r.end << ")";
             return os;
+        }
+};
+
+class dim2
+{
+    public:
+        int x, y;
+        dim2(int x_, int y_)
+        {
+            x = x_;
+            y = y_;
         }
 };
 

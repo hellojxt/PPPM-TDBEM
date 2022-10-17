@@ -135,14 +135,16 @@ __device__ void ab_condition_solve(FDTD &fdtd, int i, int j, int k)
 
 __global__ void fdtd_boundary_kernel(FDTD fdtd)
 {
-    int i = blockIdx.x + 1, j = threadIdx.x + 1;
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+    if (i >= fdtd.res - 1 || j >= fdtd.res - 1)
+        return;
     ab_condition_solve(fdtd, fdtd.res - 2, i, j);
     ab_condition_solve(fdtd, 1, i, j);
     ab_condition_solve(fdtd, i, fdtd.res - 2, j);
     ab_condition_solve(fdtd, i, 1, j);
     ab_condition_solve(fdtd, i, j, fdtd.res - 2);
     ab_condition_solve(fdtd, i, j, 1);
-    return;
 }
 
 void FDTD::step_inner_grid()
@@ -152,7 +154,7 @@ void FDTD::step_inner_grid()
 
 void FDTD::step_boundary_grid()
 {
-    cuExecuteBlock(res - 2, res - 2, fdtd_boundary_kernel, *this);
+    cuExecute2D(dim2(res - 2, res - 2), fdtd_boundary_kernel, *this);
 }
 
 }  // namespace pppm
