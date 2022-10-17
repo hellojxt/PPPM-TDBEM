@@ -17,10 +17,10 @@ class FDTD
 {
     public:
         GridArr grids;  // 3D grids with 3 history time steps
-        CircularArray<GArr3D<float>, 2> absorbingLayer; // absorbing layer, with one history info.
         float c;        // speed of sound
         int t;          // current time (index) initialized to -1
         int res;        // resolution of the grid
+        int res_bound;  // resolution of the boundary
         float dl;       // grid spacing
         float dt;       // time step
 
@@ -40,13 +40,6 @@ class FDTD
                 grids[i].resize(res, res, res);
                 grids[i].reset();
             }
-            // xpos-ypos-zpos-xneg-yneg-zneg
-            for (int i = 0; i < 2; i++)
-            {
-                absorbingLayer[i].resize(6, res, res);
-                absorbingLayer[i].reset();
-            }
-
             t = -1;
             dl = dl_;
             dt = dt_;
@@ -63,9 +56,9 @@ class FDTD
          */
         void step()
         {
-            t++;
             step_inner_grid();
             step_boundary_grid();
+            t++;
         }
 
         void clear()

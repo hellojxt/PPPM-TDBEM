@@ -50,3 +50,5 @@ target_link_libraries(GridCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib 
 
 add_executable(FFTTest tests/FFTTest.cu)
 target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
+
+
