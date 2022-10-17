@@ -137,14 +137,13 @@ __global__ void fdtd_boundary_kernel(FDTD fdtd)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int offset = i % 6;
+    i = i / 6;
     if (i >= fdtd.res - 1 || i == 0 || j >= fdtd.res - 1 || j == 0)
         return;
-    ab_condition_solve(fdtd, fdtd.res - 2, i, j);
-    ab_condition_solve(fdtd, 1, i, j);
-    ab_condition_solve(fdtd, i, fdtd.res - 2, j);
-    ab_condition_solve(fdtd, i, 1, j);
-    ab_condition_solve(fdtd, i, j, fdtd.res - 2);
-    ab_condition_solve(fdtd, i, j, 1);
+    int params[6][3] = {{i, j, 1}, {i, j, fdtd.res - 2}, {i, 1, j}, {i, fdtd.res - 2, j},
+                        {1, i, j}, {fdtd.res - 2, i, j}};
+    ab_condition_solve(fdtd, params[offset][0], params[offset][1], params[offset][2]);
 }
 
 void FDTD::step_inner_grid()
@@ -154,7 +153,7 @@ void FDTD::step_inner_grid()
 
 void FDTD::step_boundary_grid()
 {
-    cuExecute2D(dim2(res, res), fdtd_boundary_kernel, *this);
+    cuExecute2D(dim2(6 * res, res), fdtd_boundary_kernel, *this);
 }
 
 }  // namespace pppm
