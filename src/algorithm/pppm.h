@@ -31,7 +31,7 @@ class GridMap
 {
     public:
         int3 coord;
-        Range range;
+        Range range;  // index range in grid data
         CGPU_FUNC GridMap() {}
         CGPU_FUNC GridMap(int3 coord_, Range range_) : coord(coord_), range(range_) {}
 };

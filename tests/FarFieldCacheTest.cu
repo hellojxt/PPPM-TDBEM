@@ -42,14 +42,14 @@ int main()
     solver.set_mesh(vertices, triangles);
     float omega = 2.0f * M_PI * 4000.0f;
     SineSource sine(omega);
-
-    GArr3D<float> visual_data_far_field(TEST_MAX_STEP, res, res);
     TICK(all_time)
+    GArr3D<float> visual_data_far_field(TEST_MAX_STEP, res, res);
+    solver.precompute_grid_cache();
     while (fdtd.t < TEST_MAX_STEP - 1)
     {
         printf("t = %d\n", fdtd.t);
         cuExecuteBlock(1, 1, set_boundary_value, solver, sine);
-        solver.solve_fdtd_simple();
+        solver.solve_fdtd_with_cache();
         visual_data_far_field[fdtd.t].assign(solver.far_field[fdtd.t][16]);
     }
     TOCK(all_time)

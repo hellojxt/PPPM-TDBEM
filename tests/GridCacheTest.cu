@@ -10,16 +10,17 @@
 #include "sound_source.h"
 #include "window.h"
 
-void sub_test(PPPMSolver *solver)
+void test_precompute_grid_cache(PPPMSolver *solver)
 {
-    PPPMCache &cache = solver->cache;
+    int pair_num = 0;
+    int involved_grid_num = 0;
     int res = solver->fdtd.res;
     float grid_size = solver->pg.grid_size;
     auto grid_hash_map = solver->pg.grid_hash_map.cpu();
-    int pair_num = 0;
-    int involved_grid_num = 0;
+    PPPMCache &cache = solver->cache;
     SECTION("check size of grid_map and grid_data")
     {
+
         for (int x = 1; x < res - 1; x++)
         {
             for (int y = 1; y < res - 1; y++)
@@ -54,15 +55,12 @@ void sub_test(PPPMSolver *solver)
         REQUIRE(pair_num == solver->cache.grid_fdtd_data.size());
         REQUIRE(involved_grid_num == solver->cache.grid_map.size());
     }
-
     SECTION("check particle id")
     {
         auto grid_map = cache.grid_map.cpu();
         auto grid_data = cache.grid_data.cpu();
         auto grid_fdtd_data = cache.grid_fdtd_data.cpu();
         auto particles = solver->pg.particles.cpu();
-        CArr<int> particle_flag(particles.size());
-        particle_flag.reset();
         for (int grid_id = 0; grid_id < grid_map.size(); grid_id++)
         {
             GridMap m = grid_map[grid_id];
@@ -74,8 +72,6 @@ void sub_test(PPPMSolver *solver)
                 BEMCache e1 = grid_data[i];
                 BEMCache e2 = grid_fdtd_data[i];
                 REQUIRE(e1.particle_id == e2.particle_id);
-                REQUIRE(particle_flag[e1.particle_id] == 0);
-                particle_flag[e1.particle_id] = 1;
                 BElement b = particles[e1.particle_id];
                 float3 dist = fabs(b.pos - center);
                 REQUIRE(dist.x < 1.5 * grid_size);
@@ -84,6 +80,10 @@ void sub_test(PPPMSolver *solver)
             }
         }
     }
+}
+
+void test_cache_weight(PPPMSolver *solver)
+{
 
     SECTION("check cache weight")
     {
@@ -99,50 +99,38 @@ void sub_test(PPPMSolver *solver)
         CArr3D<float> far_field_simple = solver->far_field[0].cpu();
         CArr3D<float> fdtd_grid_simple = solver->fdtd.grids[0].cpu();
 
+        solver->precompute_grid_cache();
+
         solver->fdtd.reset();
         solver->solve_fdtd_with_cache();
         CArr3D<float> far_field = solver->far_field[0].cpu();
         CArr3D<float> fdtd_grid = solver->fdtd.grids[0].cpu();
-        // renderArray(RenderElement(far_field_simple, 0.04f, "simple"), RenderElement(far_field, 0.04f, "cache"));
-        for (int x = solver->fdtd.res / 2 - 1; x <= solver->fdtd.res / 2 + 1; x++)
+        for (int x = solver->fdtd.res / 2 - 2; x <= solver->fdtd.res / 2 + 2; x++)
         {
-            for (int y = solver->fdtd.res / 2 - 1; y <= solver->fdtd.res / 2 + 1; y++)
+            for (int y = solver->fdtd.res / 2 - 2; y <= solver->fdtd.res / 2 + 2; y++)
             {
-                for (int z = solver->fdtd.res / 2 - 1; z <= solver->fdtd.res / 2 + 1; z++)
+                for (int z = solver->fdtd.res / 2 - 2; z <= solver->fdtd.res / 2 + 2; z++)
                 {
-                    printf("(%d, %d, %d): simple: %e, cache: %e\n", x, y, z, far_field_simple(x, y, z),
-                           far_field(x, y, z));
+                    if (far_field_simple(x, y, z) > 0)
+                    {
+                        REQUIRE(abs(far_field(x, y, z) - far_field_simple(x, y, z)) <
+                                abs(far_field_simple(x, y, z)) * 1e-3);
+                    }
                 }
             }
         }
-
-        // for (int x = 0; x < solver->fdtd.res; x++)
-        // {
-        //     for (int y = 0; y < solver->fdtd.res; y++)
-        //     {
-        //         for (int z = 0; z < solver->fdtd.res; z++)
-        //         {
-        //             REQUIRE(far_field_simple(x, y, z) == far_field(x, y, z));
-        //             REQUIRE(fdtd_grid_simple(x, y, z) == fdtd_grid(x, y, z));
-        //         }
-        //     }
-        // }
     }
 }
 TEST_CASE("GridCache", "[gc]")
 {
     using namespace pppm;
-    PPPMSolver *solver;
-    SECTION("point PPPM")
+    PPPMSolver *solver[2] = {point_pppm(), random_pppm()};
+
+    for (int i = 0; i < 2; i++)
     {
-        solver = point_pppm();
-        sub_test(solver);
-        solver->clear();
+        test_precompute_grid_cache(solver[i]);
+        test_cache_weight(solver[i]);
+        solver[i]->clear();
+        delete solver[i];
     }
-    // SECTION("random PPPM")
-    // {
-    //     solver = random_pppm();
-    //     sub_test(solver);
-    //     solver->clear();
-    // }
 }

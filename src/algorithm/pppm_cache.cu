@@ -128,13 +128,16 @@ __global__ void precompute_grid_data(PPPMSolver pppm)
         e.particle_id = cache.grid_data[i].particle_id;
         e.weight.reset();
         add_grid_near_field(pppm, e, coord, 2, -1);
-        printf("coord: (%d, %d, %d), double: %e, single: %e\n", coord.x, coord.y, coord.z, e.weight.double_layer[1],
-               e.weight.single_layer[1]);
-        // add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
-        // add_grid_near_field(pppm, e, coord, -1, -2);
-        // pppm.cache.grid_fdtd_data[i] = e;
-        // e.weight.reset();
-        // add_grid_near_field(pppm, e, coord, 1, 0);
+        add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
+        add_grid_near_field(pppm, e, coord, -1, -2);
+        auto simple = pppm.far_field[0](coord);
+        // if ((e.weight.double_layer[1] - simple) / simple > 1e-3)
+        // printf("coord: (%d, %d, %d), double: %e, simple: %e\n", coord.x, coord.y, coord.z, e.weight.double_layer[1],
+        //        simple);
+
+        pppm.cache.grid_fdtd_data[i] = e;
+        e.weight.reset();
+        add_grid_near_field(pppm, e, coord, 1, 0);
         pppm.cache.grid_data[i] = e;
     }
 }
@@ -185,6 +188,6 @@ void solve_from_cache(PPPMSolver &pppm)
     int total_num = pppm.cache.grid_map.size();
     int t = pppm.fdtd.t;
     pppm.far_field[t].assign(pppm.fdtd.grids[t]);
-    cuExecute(total_num, solve_from_cache_kernel, pppm);
+    cuExecuteBlock(total_num, 64, solve_from_cache_kernel, pppm);
 }
 }  // namespace pppm
