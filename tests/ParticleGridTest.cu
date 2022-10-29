@@ -7,7 +7,7 @@
 TEST_CASE("Particle Grid", "[pg]")
 {
     using namespace pppm;
-    PPPMSolver *solver = random_pppm();
+    PPPMSolver *solver = random_pppm(256);
     auto &pg = solver->pg;
     int res = solver->fdtd.res;
     float3 min_pos = solver->pg.min_pos;

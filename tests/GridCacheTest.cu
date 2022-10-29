@@ -72,7 +72,7 @@ void test_precompute_grid_cache(PPPMSolver *solver)
                 BEMCache e1 = grid_data[i];
                 BEMCache e2 = grid_fdtd_data[i];
                 REQUIRE(e1.particle_id == e2.particle_id);
-                BElement b = particles[e1.particle_id];
+                Particle b = particles[e1.particle_id];
                 float3 dist = fabs(b.pos - center);
                 REQUIRE(dist.x < 1.5 * grid_size);
                 REQUIRE(dist.y < 1.5 * grid_size);
@@ -124,7 +124,7 @@ void test_cache_weight(PPPMSolver *solver)
 TEST_CASE("GridCache", "[gc]")
 {
     using namespace pppm;
-    PPPMSolver *solver[2] = {point_pppm(), random_pppm()};
+    PPPMSolver *solver[2] = {point_pppm(), random_pppm(256)};
 
     for (int i = 0; i < 2; i++)
     {

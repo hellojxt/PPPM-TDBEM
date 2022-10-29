@@ -2,7 +2,7 @@
 
 namespace pppm
 {
-std::ostream &operator<<(std::ostream &out, const BElement &be)
+std::ostream &operator<<(std::ostream &out, const Particle &be)
 {
     out << " cell_coord: " << be.cell_coord << " pos: " << be.pos << " normal: " << be.normal << std::endl;
     return out;
@@ -12,7 +12,7 @@ __global__ void construct_kernel(GArr<float3> vertices,
                                  GArr<int3> triangles,
                                  BBox bbox,
                                  int level,
-                                 GArr<BElement> particles)
+                                 GArr<Particle> particles)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx >= triangles.size())
@@ -22,7 +22,7 @@ __global__ void construct_kernel(GArr<float3> vertices,
     float3 v2 = vertices[triangles[idx].z];
     float3 normal = normalize(cross(v1 - v0, v2 - v0));
     float3 center = (v0 + v1 + v2) / 3.0f;
-    BElement particle;
+    Particle particle;
     particle.normal = normal;
     particle.pos = center;
     particle.indices = triangles[idx];
@@ -34,7 +34,7 @@ __global__ void construct_kernel(GArr<float3> vertices,
     particles[idx] = particle;
 }
 
-__global__ void calculate_differ_kernel(GArr<BElement> particles, GArr<int> differ)
+__global__ void calculate_differ_kernel(GArr<Particle> particles, GArr<int> differ)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx >= particles.size() - 1)
@@ -51,7 +51,7 @@ __global__ void grid_dense_map_kernel(GArr<int> differ, GArr<Range> grid_dense_m
         grid_dense_map[differ[idx]].start = idx;
 }
 
-__global__ void grid_dense_map_post_kernel(GArr<BElement> particles,
+__global__ void grid_dense_map_post_kernel(GArr<Particle> particles,
                                            GArr<Range> grid_dense_map,
                                            GArr3D<Range> grid_hash_map)
 {
@@ -63,7 +63,7 @@ __global__ void grid_dense_map_post_kernel(GArr<BElement> particles,
     else
         grid_dense_map[idx].end = grid_dense_map[idx + 1].start;
 
-    BElement particle = particles[grid_dense_map[idx].start];
+    Particle particle = particles[grid_dense_map[idx].start];
     uint3 coord = particle.cell_coord;
     grid_hash_map(coord.x, coord.y, coord.z) = grid_dense_map[idx];
 }
@@ -81,7 +81,7 @@ void ParticleGrid::construct_grid()
     bbox.max = bbox.min + bbox.width;
     cuExecute(particles.size(), construct_kernel, vertices, triangles, bbox, n, particles);
     // sort the particles by the morton code
-    thrust::sort(thrust::device, particles.begin(), particles.end(), [] GPU_FUNC(const BElement &a, const BElement &b) {
+    thrust::sort(thrust::device, particles.begin(), particles.end(), [] GPU_FUNC(const Particle &a, const Particle &b) {
         return encode_morton(a.cell_coord) < encode_morton(b.cell_coord);
     });
     // calculate differ and prefix sum of differ

@@ -87,6 +87,7 @@ class FDTD
         }
 
         CGPU_FUNC inline float3 getCenter(int3 c) const { return getCenter(c.x, c.y, c.z); }
+        CGPU_FUNC inline float3 getCenter(uint3 c) const { return getCenter(c.x, c.y, c.z); }
 };
 
 }  // namespace pppm

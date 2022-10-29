@@ -11,20 +11,9 @@ namespace pppm
 class BEMCache
 {
     public:
-        int min_cut;
-        int max_cut;
         int particle_id;
         LayerWeight weight;
         CGPU_FUNC BEMCache() {}
-        CGPU_FUNC inline void cut_off()
-        {
-            min_cut = 0;
-            max_cut = STEP_NUM - 1;
-            while (min_cut < STEP_NUM && weight.single_layer[min_cut] == 0 && weight.double_layer[min_cut] == 0)
-                min_cut++;
-            while (max_cut >= 0 && weight.single_layer[max_cut] == 0 && weight.double_layer[max_cut] == 0)
-                max_cut--;
-        }
 };
 
 class GridMap
@@ -39,10 +28,10 @@ class GridMap
 class ParticleMap
 {
     public:
-        int id;
-        Range range;
+        int3 base_coord;  // lowest coordinate of the 2*2*2 grid cell
+        float weight[8];  // weight of the 8 grid cells
+        Range range;      // index range in particle data
         CGPU_FUNC ParticleMap() {}
-        CGPU_FUNC ParticleMap(int id_, Range range_) : id(id_), range(range_) {}
 };
 
 class PPPMCache
@@ -52,13 +41,16 @@ class PPPMCache
         GArr<GridMap> grid_map;
         GArr<BEMCache> grid_data;       // for solving accurate near field of BEM
         GArr<BEMCache> grid_fdtd_data;  // for solving inaccurate near field of FDTD
-        GArr<ParticleMap> particle_map;
-        GArr<BEMCache> particle_data;
+
+        GArr<ParticleMap> particle_map;  // mapping particle id to index range in particle data
+                                         // (first index is the data of particle self)
+        GArr<BEMCache> particle_data;    // for solving accurate near field of BEM
 
         /* data for precomputation of cache size */
+        // some grid cells have no neighbors
         GArr3D<int> grid_neighbor_nonzero;
         GArr3D<int> grid_neighbor_num;
-        GArr<int> particle_neighbor_nonzero;
+        // All particles have neighbors
         GArr<int> particle_neighbor_num;
 
         void clear()

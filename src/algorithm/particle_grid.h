@@ -7,15 +7,16 @@
 namespace pppm
 {
 
-class BElement
+class Particle
 {
     public:
         uint3 cell_coord;
         float3 pos;
         float3 normal;
         int3 indices;
-        CGPU_FUNC BElement() {}
-        friend std::ostream &operator<<(std::ostream &out, const BElement &be);
+        int4 __only_for_align__;  // align to 64 bytes
+        CGPU_FUNC Particle() {}
+        friend std::ostream &operator<<(std::ostream &out, const Particle &be);
 };
 
 class ParticleGrid
@@ -27,7 +28,7 @@ class ParticleGrid
         float3 max_pos;
         float grid_size;
         int3 grid_dim;
-        GArr<BElement> particles;     // particles sorted by morton code
+        GArr<Particle> particles;     // particles sorted by morton code
         GArr<Range> grid_dense_map;   // grid_dense_map(i) is the index range (index for particles) of
                                       // the elements in the i-th non-empty grid cell. Range is [start, end) and grid is
                                       // sorted by morton code

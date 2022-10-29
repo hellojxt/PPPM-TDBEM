@@ -8,8 +8,11 @@
 namespace pppm
 {
 
-void set_cache_grid_size(PPPMSolver &pppm);
+void set_grid_cache_size(PPPMSolver &pppm);
+void set_particle_cache_size(PPPMSolver &pppm);
 void cache_grid_data(PPPMSolver &pppm);
-void solve_from_cache(PPPMSolver &pppm);
+void cache_particle_data(PPPMSolver &pppm);
+void solve_grid_from_cache(PPPMSolver &pppm);
+void solve_particle_from_cache(PPPMSolver &pppm);
 
 }  // namespace pppm

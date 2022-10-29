@@ -1104,6 +1104,7 @@ inline __host__ __device__ void operator/=(float2 &a, float b)
     a.x /= b;
     a.y /= b;
 }
+
 inline __host__ __device__ float2 operator/(float b, float2 a)
 {
     return make_float2(b / a.x, b / a.y);

@@ -7,6 +7,8 @@ set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For CUDA-GDB
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+# For nsight compute
+# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
@@ -50,6 +52,9 @@ target_link_libraries(FarFieldCacheTest PRIVATE uilib alglib utillib)
 
 add_executable(GridCacheTest tests/GridCacheTest.cu)
 target_link_libraries(GridCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+
+add_executable(ParticleCacheTest tests/ParticleCacheTest.cu)
+target_link_libraries(ParticleCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
 add_executable(FFTTest tests/FFTTest.cu)
 target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
