@@ -13,6 +13,16 @@
 
 using Catch::Approx;
 
+__global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine, int t)
+{
+    int particle_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    float neumann_amp = 1e2;
+    float dirichlet_amp = 1e2;
+    float dt = pppm.fdtd.dt;
+    pppm.particle_history[particle_idx].neumann[t] = neumann_amp * sine(dt * t).real();
+    pppm.particle_history[particle_idx].dirichlet[t] = dirichlet_amp * sine(dt * t).imag();
+}
+
 TEST_CASE("ParticleCache", "[pc]")
 {
     using namespace pppm;
@@ -103,9 +113,15 @@ TEST_CASE("ParticleCache", "[pc]")
 
     solver->clear();
     solver = empty_pppm(32);
+
+#define PRECOMPUTE_STEP 128
     SECTION("test far point for particle cache")
     {
         add_small_triangles(solver, {center, far_test}, 0.1);
+        solver->precompute_grid_cache();
+        solver->precompute_particle_cache();
+        for (int i = 0; i < PRECOMPUTE_STEP; i++)
+        {}
     }
     solver->clear();
     solver = empty_pppm(32);

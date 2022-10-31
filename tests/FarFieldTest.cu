@@ -18,7 +18,7 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine)
 {
     float neumann_amp = 1e2;
     float dirichlet_amp = 1e2;
-    int t = pppm.fdtd.t + 1;
+    int t = pppm.fdtd.t;
     float dt = pppm.fdtd.dt;
     pppm.particle_history[0].neumann[t] = neumann_amp * sine(dt * t).imag();
     pppm.particle_history[0].dirichlet[t] = dirichlet_amp * sine(dt * t).imag();
@@ -48,8 +48,9 @@ int main()
     while (fdtd.t < TEST_MAX_STEP - 1)
     {
         printf("t = %d\n", fdtd.t);
+        solver.solve_fdtd_far_simple();
         cuExecuteBlock(1, 1, set_boundary_value, solver, sine);
-        solver.solve_fdtd_simple();
+        solver.solve_fdtd_near_simple();
         visual_data_far_field[fdtd.t].assign(solver.far_field[fdtd.t][16]);
     }
     TOCK(all_time)

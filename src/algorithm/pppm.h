@@ -149,12 +149,16 @@ class PPPMSolver
         /*
             1. solve fdtd
             2. update far field
-            3. update fdtd near field
         */
-        void solve_fdtd_simple();
+        void solve_fdtd_far_simple();
+
+        void solve_fdtd_near_simple();
 
         void precompute_grid_cache();
-        void solve_fdtd_with_cache();
+
+        void solve_fdtd_far_with_cache();
+
+        void solve_fdtd_near_with_cache();
 
         void precompute_particle_cache();
         // update particle near field (using neighbor particles) + far field (interpolation from neighbor grid cells)
