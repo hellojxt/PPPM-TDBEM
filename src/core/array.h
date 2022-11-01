@@ -21,6 +21,13 @@ class CircularArray
         CGPU_FUNC CircularArray() {}
         CGPU_FUNC inline T &operator[](int id) { return m_data[(id + N) % N]; }
         CGPU_FUNC inline const T &operator[](int id) const { return m_data[(id + N) % N]; }
+        void reset()
+        {
+            for (int i = 0; i < N; i++)
+            {
+                m_data[i] = 0;
+            }
+        }
         friend std::ostream &operator<<(std::ostream &out, const CircularArray &h)
         {
             for (int i = 0; i < N; i++)

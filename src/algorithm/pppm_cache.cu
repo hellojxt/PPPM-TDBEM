@@ -1,3 +1,4 @@
+#include "gauss/triangle.h"
 #include "macro.h"
 #include "pppm_cache.h"
 
@@ -17,8 +18,6 @@ __global__ void get_involved_grid(PPPMSolver pppm)
         for (int dy = -1; dy <= 1; dy++)
             for (int dz = -1; dz <= 1; dz++)  // iterate over all the 3x3x3 grids
             {
-                if (dx == 0 && dy == 0 && dz == 0)
-                    continue;
                 int3 coord = make_int3(x + dx, y + dy, z + dz);
                 Range r = pppm.pg.grid_hash_map(coord);
                 neighbor_particle_num += r.length();
@@ -45,8 +44,6 @@ __global__ void fill_grid_info(PPPMSolver pppm)
         for (int dy = -1; dy <= 1; dy++)
             for (int dz = -1; dz <= 1; dz++)  // iterate over all the 3x3x3 grids
             {
-                if (dx == 0 && dy == 0 && dz == 0)
-                    continue;
                 int3 coord = make_int3(x + dx, y + dy, z + dz);
                 Range r = pppm.pg.grid_hash_map(coord);
                 for (int i = r.start; i < r.end; i++)
@@ -129,11 +126,10 @@ __global__ void precompute_grid_data(PPPMSolver pppm)
         add_grid_near_field(pppm, e, coord, 2, -1);
         add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
         add_grid_near_field(pppm, e, coord, -1, -2);
-        auto simple = pppm.far_field[0](coord);
+        // auto simple = pppm.far_field[0](coord);
         // if ((e.weight.double_layer[1] - simple) / simple > 1e-3)
         // printf("coord: (%d, %d, %d), double: %e, simple: %e\n", coord.x, coord.y, coord.z, e.weight.double_layer[1],
         //        simple);
-
         pppm.cache.grid_fdtd_data[i] = e;
         e.weight.reset();
         add_grid_near_field(pppm, e, coord, 1, 0);
@@ -269,6 +265,7 @@ __global__ void get_particle_neighbor_sum(PPPMSolver pppm)
         float3 d = (v - pppm.fdtd.getCenter(base_coord)) / pppm.pg.grid_size;
         trilinear_interpolation(d, w_temp);
         weight_add(w_temp, 0.5 * guass_w[i] * trg_jacobian, pm.weight);
+        // weight_add(w_temp, 1.0f / TRI_GAUSS_NUM, pm.weight);
     }
 
     pppm.cache.particle_map[particle_id] = pm;
@@ -313,13 +310,11 @@ void set_particle_cache_size(PPPMSolver &pppm)
     PPPMCache &cache = pppm.cache;
     cache.particle_map.resize(pppm.pg.particles.size());
     cache.particle_neighbor_num.resize(particle_num);
-    printf("particle num: %d\n", particle_num);
     cuExecute(particle_num, get_particle_neighbor_sum, pppm);
     thrust::inclusive_scan(thrust::device, cache.particle_neighbor_num.begin(), cache.particle_neighbor_num.end(),
                            cache.particle_neighbor_num.begin(),
                            thrust::plus<int>());  // calculate the prefix sum of neighbor_nums
     int total_num = cache.particle_neighbor_num.last_item();
-    printf("total_num: %d\n", total_num);
     cache.particle_data.resize(total_num);
     cuExecute(particle_num, fill_particle_info, pppm);
 }
@@ -348,9 +343,11 @@ __global__ void precompute_cache_data(PPPMSolver pppm)
     for (int i = r.start; i < r.end; i++)
     {
         LayerWeight w;
+        w.reset();
         auto neighbor_particle_id = pppm.cache.particle_data[i].particle_id;
         Particle &neighbor_particle = pppm.pg.particles[neighbor_particle_id];
         add_particle_near_field(pppm, w, neighbor_particle.indices, current_particle.indices, 1, 0);
+
         for (int dx = 0; dx < 2; dx++)
             for (int dy = 0; dy < 2; dy++)
                 for (int dz = 0; dz < 2; dz++)
@@ -400,9 +397,9 @@ __global__ void solve_particle_from_cache_kernel(PPPMSolver pppm)
     {
         auto &data = pppm.cache.particle_data[i];
         sum += data.weight.convolution(history.neumann, history.dirichlet, t);
-        factor += data.weight.double_layer[0];  // "lumped mass" for G_t
+        factor +=
+            data.weight.double_layer[0];  // "lumped mass" for G_t, however, the factor is very small compared to 0.5
     }
-
     // Equation (2.12) in Paper:https://epubs.siam.org/doi/pdf/10.1137/090775981
     history.dirichlet[pppm.fdtd.t] = sum / (0.5 - factor);
 }
