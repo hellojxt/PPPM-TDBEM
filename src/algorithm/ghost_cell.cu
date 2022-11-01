@@ -1,6 +1,6 @@
 #include "ghost_cell.h"
 
-namespace pppm
+namespace ghost_cell
 {
     __device__ float2 get_min_edge02(float a11, float b1)
     {
@@ -153,7 +153,7 @@ namespace pppm
         return v0 + p.x * edge0 + p.y * edge1;
     }
 
-    __global__ void fill_in_nearest_kernel(GArr3D<float3> &cells_nearest_facet, ParticleGrid &grid)
+    __global__ void fill_in_nearest_kernel(GArr3D<float3> cells_nearest_facet, pppm::ParticleGrid grid)
     {
         int x = blockIdx.x * blockDim.x + threadIdx.x;
         int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -161,46 +161,46 @@ namespace pppm
 
         // here we assume grid_dim is (a, a, a).
         int grid_dim = grid.grid_dim.x;
-        if (x < 0 || x >= grid_dim - 1 || y < 0 || y >= grid_dim - 1 || z < 0 || z >= grid_dim - 1)
+        if (x < 0 || x >= grid_dim || y < 0 || y >= grid_dim || z < 0 || z >= grid_dim)
             return;
-        printf("%d, %d, %d\n", x, y, z);
-        // float3 grid_center = (make_float3(x, y, z) + make_float3(0.5f, 0.5f, 0.5f)) * grid.grid_size + grid.min_pos;
 
-        // float min_len = 1e5f;
-        // float3 result = {1e5f, 1e5f, 1e5f};
-        // for (int dx = -1; dx <= 1; dx++)
-        //     for (int dy = -1; dy <= 1; dy++)
-        //         for (int dz = -1; dz <= 1; dz++) // iterate over all the 3x3x3 grids
-        //         {
-        //             int3 coord = make_int3(x + dx, y + dy, z + dz);
-        //             if (coord.x < 0 || coord.x >= grid_dim ||
-        //                 coord.y < 0 || coord.y >= grid_dim ||
-        //                 coord.z < 0 || coord.z >= grid_dim)
-        //                 continue;
+        float3 grid_center = (make_float3(x, y, z) + make_float3(0.5f, 0.5f, 0.5f)) * grid.grid_size + grid.min_pos;
 
-        //             // Range &neighbors = grid.grid_hash_map(coord);
-        //             // for (int i = neighbors.start; i < neighbors.end; i++)
-        //             // {
-        //             //     int3 triID = make_int3(0);                // grid.particles[i].indices;
-        //             //     float3 nearest_point = make_float3(0.0f); // get_nearest_triangle_point(grid_center, grid.vertices[triID.x],
-        //             //                                               //  grid.vertices[triID.y], grid.vertices[triID.z]);
-        //             //     float curr_len = length(grid_center - nearest_point);
-        //             //     if (curr_len < min_len)
-        //             //     {
-        //             //         result = nearest_point;
-        //             //         min_len = curr_len;
-        //             //     }
-        //             // }
-        //         }
+        float min_len = 1e5f;
+        float3 result = {1e5f, 1e5f, 1e5f};
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dz = -1; dz <= 1; dz++) // iterate over all the 3x3x3 grids
+                {
+                    int3 coord = make_int3(x + dx, y + dy, z + dz);
+                    if (coord.x < 0 || coord.x >= grid_dim ||
+                        coord.y < 0 || coord.y >= grid_dim ||
+                        coord.z < 0 || coord.z >= grid_dim)
+                        continue;
 
-        // // cells_nearest_facet(grid_cell_id) = result;
-        // return;
+                    pppm::Range &neighbors = grid.grid_hash_map(coord);
+                    for (int i = neighbors.start; i < neighbors.end; i++)
+                    {
+                        int3 triID = grid.particles[i].indices;
+                        float3 nearest_point =
+                            get_nearest_triangle_point(grid_center, grid.vertices[triID.x],
+                                                       grid.vertices[triID.y], grid.vertices[triID.z]);
+                        float curr_len = length(grid_center - nearest_point);
+                        if (curr_len < min_len)
+                        {
+                            result = nearest_point;
+                            min_len = curr_len;
+                        }
+                    }
+                }
+
+        cells_nearest_facet(x, y, z) = result;
+        return;
     }
 
-    void GhostCells::fill_in_nearest()
+    void GhostCellSolver::fill_in_nearest()
     {
-        LOG(grid.grid_hash_map.size);
-        LOG(cells_nearest_facet.size);
+        using namespace pppm;
         int3 size = grid.grid_dim;
         cuExecute3D(size, fill_in_nearest_kernel, cells_nearest_facet, grid);
         return;

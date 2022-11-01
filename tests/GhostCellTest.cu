@@ -285,30 +285,28 @@ void GetCorrectAnswer(pppm::ParticleGrid &grid, pppm::CArr<pppm::Particle> parti
 
 TEST_CASE("Ghost cell", "[gc]")
 {
-    using namespace pppm;
-    PPPMSolver *solver = random_pppm(256);
+    using namespace ghost_cell;
+
+    GhostCellSolver *solver = random_ghost_cell(1024);
+    solver->fill_in_nearest();
+
     int res = solver->fdtd.res;
-    float3 min_pos = solver->pg.min_pos;
-    float grid_size = solver->pg.grid_size;
+    auto cVerts = solver->grid.vertices.cpu();
+    auto cTris = solver->grid.triangles.cpu();
 
-    auto cVerts = solver->pg.vertices.cpu();
-    auto cTris = solver->pg.triangles.cpu();
-    GhostCells cells(min_pos, grid_size, res, cVerts, cTris);
-    cells.fill_in_nearest();
-
-    auto myResult = cells.cells_nearest_facet.cpu();
+    auto myResult = solver->cells_nearest_facet.cpu();
     CArr3D<CorrectAnswer::DCPQuery::Result> correctResult;
     correctResult.resize(res, res, res);
 
-    auto cParticles = solver->pg.particles.cpu();
-    auto cHashMap = solver->pg.grid_hash_map.cpu();
+    auto cParticles = solver->grid.particles.cpu();
+    auto cHashMap = solver->grid.grid_hash_map.cpu();
     for (int i = 0; i < res; i++)
     {
         for (int j = 0; j < res; j++)
         {
             for (int k = 0; k < res; k++)
             {
-                GetCorrectAnswer(solver->pg, cParticles, cVerts, cHashMap, make_int3(i, j, k), correctResult);
+                GetCorrectAnswer(solver->grid, cParticles, cVerts, cHashMap, make_int3(i, j, k), correctResult);
             }
         }
     }
@@ -322,6 +320,7 @@ TEST_CASE("Ghost cell", "[gc]")
                 auto tempCorrectResult = correctResult(i, j, k);
                 if (tempCorrectResult.distance < 0) // not detected
                     continue;
+
                 REQUIRE(length(tempCorrectResult.closest[1] - myResult(i, j, k)) < 1e-3f);
             }
         }
