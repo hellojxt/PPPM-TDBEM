@@ -6,6 +6,17 @@
 
 namespace pppm
 {
+
+void static inline write_to_txt(const char *filename, CArr<float> data)
+{
+    FILE *fp = fopen(filename, "w");
+    for (int i = 0; i < data.size(); i++)
+    {
+        fprintf(fp, "%e\n", data[i]);
+    }
+    fclose(fp);
+}
+
 void static inline write_to_txt(const char *filename, cpx *data, int num)
 {
     FILE *fp = fopen(filename, "w");

@@ -4,7 +4,8 @@ namespace pppm
 {
 std::ostream &operator<<(std::ostream &out, const Particle &be)
 {
-    out << " cell_coord: " << be.cell_coord << " pos: " << be.pos << " normal: " << be.normal << std::endl;
+    out << " cell_coord: " << be.cell_coord << " pos: " << be.pos << " normal: " << be.normal << " indices: ("
+        << be.indices.x << "," << be.indices.y << "," << be.indices.z << ")";
     return out;
 }
 

@@ -44,9 +44,6 @@ target_link_libraries(UITest PRIVATE uilib alglib utillib)
 add_executable(FDTDTest tests/FDTDTest.cu)
 target_link_libraries(FDTDTest PRIVATE uilib alglib utillib)
 
-add_executable(FarFieldTest tests/FarFieldTest.cu)
-target_link_libraries(FarFieldTest PRIVATE uilib alglib utillib)
-
 add_executable(FarFieldCacheTest tests/FarFieldCacheTest.cu)
 target_link_libraries(FarFieldCacheTest PRIVATE uilib alglib utillib)
 

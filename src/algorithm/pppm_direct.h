@@ -21,8 +21,7 @@ GPU_FUNC inline float near_field(PPPMSolver &pppm, int3 src_center, int3 dst_gri
             for (int dz = -1; dz <= 1; dz++)  // iterate over all the 3x3x3 grids around src_center
             {
                 int3 src = src_center + make_int3(dx, dy, dz);
-                if ((src.x == src_center.x) && (src.y == src_center.y) && (src.z == src_center.z) ||
-                    (src.x == dst_grid.x) && (src.y == dst_grid.y) && (src.z == dst_grid.z))
+                if ((src.x == dst_grid.x) && (src.y == dst_grid.y) && (src.z == dst_grid.z))
                     continue;  // skip the center grid and the destination grid
                 Range r = pppm.pg.grid_hash_map(src);
                 for (int i = r.start; i < r.end; i++)

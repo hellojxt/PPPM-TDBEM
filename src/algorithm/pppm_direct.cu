@@ -36,8 +36,23 @@ __global__ void solve_far_field_kernel(PPPMSolver pppm)
     float c = pppm.fdtd.c, dt = pppm.fdtd.dt;
     float fdtd_near_field = 0;
     fdtd_near_field += 2 * near_field(pppm, coord, coord, t - 1);
+    if (x == 16 && y == 16 && z == 16)
+    {
+        printf("fdtd_near_field = %e, all field = %e\n", fdtd_near_field, pppm.fdtd.grids[t](coord));
+    }
+
     fdtd_near_field += (c * c * dt * dt) * laplacian_near_field(pppm, coord, coord, t - 1);
+    if (x == 16 && y == 16 && z == 16)
+    {
+        printf("fdtd_near_field = %e, all field = %e\n", fdtd_near_field, pppm.fdtd.grids[t](coord));
+    }
+
     fdtd_near_field -= near_field(pppm, coord, coord, t - 2);
+    if (x == 16 && y == 16 && z == 16)
+    {
+        printf("fdtd_near_field = %e, all field = %e\n", fdtd_near_field, pppm.fdtd.grids[t](coord));
+    }
+
     pppm.far_field[t](coord) = pppm.fdtd.grids[t](coord) - fdtd_near_field;
 }
 

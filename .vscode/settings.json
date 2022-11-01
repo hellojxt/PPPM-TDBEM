@@ -1,3 +1,6 @@
 {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "clangd.path": "/home/jxt/.config/Code/User/globalStorage/llvm-vs-code-extensions.vscode-clangd/install/15.0.1/clangd_15.0.1/bin/clangd",
+    "editor.inlayHints.enabled": "off",
+    "cmake.configureOnOpen": false,
 }

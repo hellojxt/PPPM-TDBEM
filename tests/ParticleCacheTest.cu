@@ -13,14 +13,15 @@
 
 using Catch::Approx;
 
-__global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine, int t)
+__global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine)
 {
     int particle_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    float neumann_amp = 1e2;
-    float dirichlet_amp = 1e2;
+    float neumann_amp = 1e10;
+    float dirichlet_amp = 1e10;
     float dt = pppm.fdtd.dt;
-    pppm.particle_history[particle_idx].neumann[t] = neumann_amp * sine(dt * t).real();
-    pppm.particle_history[particle_idx].dirichlet[t] = dirichlet_amp * sine(dt * t).imag();
+    float t = pppm.fdtd.t;
+    pppm.particle_history[particle_idx].neumann[t] = neumann_amp * sine(dt * t, (particle_idx + 1)).real();
+    pppm.particle_history[particle_idx].dirichlet[t] = dirichlet_amp * sine(dt * t, (particle_idx + 1)).imag();
 }
 
 TEST_CASE("ParticleCache", "[pc]")
@@ -105,28 +106,94 @@ TEST_CASE("ParticleCache", "[pc]")
 
     float3 center_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * 0.3;
     float3 center = make_float3(16, 16, 16) + center_offset;
-    float radius = 0.1;
-    float3 near_test_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * (1.3 + RAND_F * 0.5);
+    float3 near_test_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * (1.4 + RAND_F * 0.5);
     float3 near_test = make_float3(16, 16, 16) + near_test_offset;
-    float3 far_test_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * (3.3 + RAND_F * 0.5);
+    float3 far_test_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * (4.3 + RAND_F * 0.5);
     float3 far_test = make_float3(16, 16, 16) + far_test_offset;
-
+    LOG("center:" << center);
+    LOG("near_test:" << near_test);
+    LOG("far_test:" << far_test);
     solver->clear();
     solver = empty_pppm(32);
+    float frequency = 3000;
+    float omega = 2 * M_PI * frequency;
+    SineSource source(omega);
 
 #define PRECOMPUTE_STEP 128
-    SECTION("test far point for particle cache")
+    CArr<float> particle_far_field(PRECOMPUTE_STEP);
+    CArr<float> particle_far_field_from_solver(PRECOMPUTE_STEP);
+    GArr3D<float> visual_data_far_field(PRECOMPUTE_STEP, 32, 32);
+
+    add_small_triangles(solver, {center, far_test}, 0.1);
+    vertices = solver->pg.vertices.cpu();
+    particles = solver->pg.particles.cpu();
+    solver->precompute_grid_cache();
+    solver->precompute_particle_cache();
+    particle_far_field.reset();
+    particle_far_field_from_solver.reset();
+    for (int i = 0; i < PRECOMPUTE_STEP; i++)
     {
-        add_small_triangles(solver, {center, far_test}, 0.1);
-        solver->precompute_grid_cache();
-        solver->precompute_particle_cache();
-        for (int i = 0; i < PRECOMPUTE_STEP; i++)
-        {}
+        solver->solve_fdtd_far_with_cache();
+        cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
+        solver->update_particle_dirichlet();
+        auto far_history = solver->particle_history.cpu();
+        particle_far_field_from_solver[i] = far_history[0].dirichlet[solver->fdtd.t];
+        far_history[0].dirichlet[solver->fdtd.t] = 0;
+        particle_far_field[i] =
+            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices),
+                                far_history[1].neumann, far_history[1].dirichlet, solver->fdtd.t) +
+            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
+                                far_history[0].neumann, far_history[0].dirichlet, solver->fdtd.t);
+        far_history.reset();
+        far_history[0].dirichlet[solver->fdtd.t] = 1;
+        float factor =
+            1.0f / 2 - solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
+                                           far_history[0].neumann, far_history[0].dirichlet, solver->fdtd.t);
+        particle_far_field[i] = particle_far_field[i] / factor;
+        cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
+        solver->solve_fdtd_near_with_cache();
+        visual_data_far_field[i].assign(solver->far_field[i][15]);
+        // printf("%d: far field: %e, %e\n", i, particle_far_field[i], particle_far_field_from_solver[i]);
     }
+    write_to_txt("particle_far_field.txt", particle_far_field);
+    write_to_txt("particle_far_field_from_solver.txt", particle_far_field_from_solver);
+    // renderArray(RenderElement(visual_data_far_field, 2e10f, "far_field"));
+
     solver->clear();
     solver = empty_pppm(32);
-    SECTION("test near point for particle cache")
+    CArr<float> particle_near_field(PRECOMPUTE_STEP);
+    CArr<float> particle_near_field_from_solver(PRECOMPUTE_STEP);
+
+    add_small_triangles(solver, {center, near_test}, 0.1);
+    vertices = solver->pg.vertices.cpu();
+    particles = solver->pg.particles.cpu();
+    solver->precompute_grid_cache();
+    solver->precompute_particle_cache();
+    particle_near_field.reset();
+    particle_near_field_from_solver.reset();
+    for (int i = 0; i < PRECOMPUTE_STEP; i++)
     {
-        add_small_triangles(solver, {center, near_test}, 0.1);
+        solver->solve_fdtd_far_with_cache();
+        cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
+        solver->update_particle_dirichlet();
+        auto near_history = solver->particle_history.cpu();
+        particle_near_field_from_solver[i] = near_history[0].dirichlet[solver->fdtd.t];
+        near_history[0].dirichlet[solver->fdtd.t] = 0;
+        particle_near_field[i] =
+            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices),
+                                near_history[1].neumann, near_history[1].dirichlet, solver->fdtd.t) +
+            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
+                                near_history[0].neumann, near_history[0].dirichlet, solver->fdtd.t);
+        near_history.reset();
+        near_history[0].dirichlet[solver->fdtd.t] = 1;
+        float factor =
+            1.0f / 2 - solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
+                                           near_history[0].neumann, near_history[0].dirichlet, solver->fdtd.t);
+        particle_near_field[i] = particle_near_field[i] / factor;
+        cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
+        solver->solve_fdtd_near_with_cache();
+        // printf("%d: near field: %e, %e\n", i, particle_near_field[i], particle_near_field_from_solver[i]);
     }
+    write_to_txt("particle_near_field.txt", particle_near_field);
+    write_to_txt("particle_near_field_from_solver.txt", particle_near_field_from_solver);
 }

@@ -211,6 +211,9 @@ class TDBEM
         {
             laplace_weight(vertices, pair, SINGLE_LAYER, weight->single_layer);
             laplace_weight(vertices, pair, DOUBLE_LAYER, weight->double_layer);
+            // printf("weight[0]: %e %e, pair: %d %d %d, %d %d %d, %e %e %e\n", weight->single_layer[0],
+            //        weight->double_layer[0], pair.src.x, pair.src.y, pair.src.z, pair.dst_face.x, pair.dst_face.y,
+            //        pair.dst_face.z, pair.dst_point.x, pair.dst_point.y, pair.dst_point.z);
         }
 
         CGPU_FUNC inline float laplace(const float3 *vertices,
