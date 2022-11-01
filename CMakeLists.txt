@@ -59,4 +59,5 @@ target_link_libraries(ParticleCacheTest PRIVATE Catch2::Catch2WithMain uilib alg
 add_executable(FFTTest tests/FFTTest.cu)
 target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
 
-
+add_executable(GhostCellTest tests/GhostCellTest.cu)
+target_link_libraries(GhostCellTest PRIVATE Catch2::Catch2WithMain alglib utillib)

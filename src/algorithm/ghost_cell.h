@@ -16,12 +16,13 @@ namespace pppm
             grid.init(min_pos_, grid_size_, grid_dim_);
             grid.set_mesh(vertices_, triangles_);
             grid.construct_grid();
-            center2Indices.resize(grid.grid_dense_map.size());
+            cells_nearest_facet.resize(grid_dim_, grid_dim_, grid_dim_);
+            return;
         };
 
         void fill_in_nearest();
 
-        GArr<int3> center2Indices;
+        GArr3D<float3> cells_nearest_facet;
         ParticleGrid grid;
     };
 
