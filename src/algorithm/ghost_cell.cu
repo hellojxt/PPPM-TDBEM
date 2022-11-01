@@ -49,6 +49,11 @@ namespace ghost_cell
                 dt1 = p1.y - p0.y;
                 h0 = dt1 * (a11 * p0.y + b1);
 
+                // h1 = dt1 * (a01 * p1.x + a11 * p1.y + b1);
+                // int a = h0 >= 0, b = h1 <= 0;
+                // p = a * get_min_edge02(a11, b1) +
+                //     (1 - a) * (b * get_min_edge12(a01, a11, b1, f10, f01) +
+                //                (1 - b) * get_min_interior(p0, h0, p1, h1));
                 if (h0 >= 0)
                 {
                     p = get_min_edge02(a11, b1);
@@ -81,6 +86,10 @@ namespace ghost_cell
                 p1.x = f01 / (f01 - f10);
                 p1.y = 1 - p1.x;
                 h0 = p1.y * (a01 * p0.x + b1);
+
+                // h1 = p1.y * (a01 * p1.x + a11 * p1.y + b1);
+                // int a = h0 >= 0, b = h1 <= 0;
+                // p = a * p0 + (1 - a) * (b * get_min_edge12(a01, a11, b1, f10, f01) + (1 - b) * get_min_interior(p0, h0, p1, h1));
                 if (h0 >= 0)
                 {
                     p = p0; // GetMinEdge01
@@ -108,6 +117,12 @@ namespace ghost_cell
             p1.y = 1 - p1.x;
             dt1 = p1.y - p0.y;
             h0 = dt1 * (a11 * p0.y + b1);
+
+            // h1 = dt1 * (a01 * p1.x + a11 * p1.y + b1);
+            // int a = h0 >= 0, b = h1 <= 0;
+            // p = a * get_min_edge02(a11, b1) +
+            //     (1 - a) * (b * get_min_edge12(a01, a11, b1, f10, f01) +
+            //                (1 - b) * get_min_interior(p0, h0, p1, h1));
             if (h0 >= 0)
             {
                 p = get_min_edge02(a11, b1);
@@ -132,6 +147,11 @@ namespace ghost_cell
             p1.x = 0.0f;
             p1.y = f00 / (f00 - f01);
             h0 = p1.y * (a01 * p0.x + b1);
+
+            // h1 = p1.y * (a11 * p1.y + b1);
+            // int a = h0 >= 0, b = h1 <= 0;
+            // p = a * p0 + (1 - a) * (b * get_min_edge02(a11, b1) + (1 - b) * get_min_interior(p0, h0, p1, h1));
+
             if (h0 >= 0)
             {
                 p = p0; // GetMinEdge01

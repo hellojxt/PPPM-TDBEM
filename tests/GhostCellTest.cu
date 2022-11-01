@@ -288,7 +288,10 @@ TEST_CASE("Ghost cell", "[gc]")
     using namespace ghost_cell;
 
     GhostCellSolver *solver = random_ghost_cell(1024);
+
+    TICK(solver_fill_time);
     solver->fill_in_nearest();
+    TOCK(solver_fill_time);
 
     int res = solver->fdtd.res;
     auto cVerts = solver->grid.vertices.cpu();
