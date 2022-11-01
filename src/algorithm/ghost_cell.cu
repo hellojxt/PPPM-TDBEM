@@ -16,6 +16,7 @@ namespace pppm
         float3 pos = gridParticle.pos;
         int3 gridCellID = make_int3((pos - grid.min_pos) / grid.grid_size);
         int3 gridLimit = grid.grid_dim;
+        float3 gridCenterPos = (make_float3(gridCellID) + make_float3(0.5f, 0.5f, 0.5f)) * grid.grid_size + grid.min_pos;
 
         float minMagnitude = 1e5f;
         int3 result;
@@ -35,7 +36,7 @@ namespace pppm
                     for (int i = neighbors.start; i < neighbors.end; i++)
                     {
                         auto currParticlePos = grid.particles[i].pos;
-                        auto currMagnitude = GetMagnitude(currParticlePos - pos);
+                        auto currMagnitude = GetMagnitude(currParticlePos - gridCenterPos);
                         if (currMagnitude < minMagnitude)
                         {
                             result = grid.particles[i].indices;
