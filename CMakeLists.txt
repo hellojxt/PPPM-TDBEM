@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For CUDA-GDB
-# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
 # For nsight compute
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
@@ -55,6 +55,9 @@ target_link_libraries(ParticleCacheTest PRIVATE Catch2::Catch2WithMain uilib alg
 
 add_executable(FFTTest tests/FFTTest.cu)
 target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
+
+add_executable(PPPMTest tests/PPPMTest.cu)
+target_link_libraries(PPPMTest PRIVATE alglib utillib)
 
 add_executable(GhostCellTest tests/GhostCellTest.cu)
 target_link_libraries(GhostCellTest PRIVATE Catch2::Catch2WithMain alglib utillib)

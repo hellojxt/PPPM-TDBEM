@@ -16,10 +16,13 @@ class Mesh
         void print();
         void writeOBJ(std::string filename);
         void move(float3 offset);
+        void move_to(float3 pos);
+        float3 get_center();
+        void stretch(float scale);
+        void stretch_to(float scale);
         void normalize();
         BBox bbox();
+        static Mesh loadOBJ(std::string file_name, bool log = false);
 };
-
-Mesh loadOBJ(std::string file_name, bool log = false);
 
 }  // namespace pppm

@@ -95,14 +95,16 @@ void test_cache_weight(PPPMSolver *solver)
         }
         solver->particle_history.assign(particle_history);
 
-        solver->solve_fdtd_simple();
+        solver->solve_fdtd_far_simple();
+        solver->solve_fdtd_near_simple();
         CArr3D<float> far_field_simple = solver->far_field[0].cpu();
         CArr3D<float> fdtd_grid_simple = solver->fdtd.grids[0].cpu();
 
         solver->precompute_grid_cache();
 
         solver->fdtd.reset();
-        solver->solve_fdtd_with_cache();
+        solver->solve_fdtd_far_with_cache();
+        solver->solve_fdtd_near_with_cache();
         CArr3D<float> far_field = solver->far_field[0].cpu();
         CArr3D<float> fdtd_grid = solver->fdtd.grids[0].cpu();
         for (int x = solver->fdtd.res / 2 - 2; x <= solver->fdtd.res / 2 + 2; x++)

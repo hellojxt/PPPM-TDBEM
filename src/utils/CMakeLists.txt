@@ -1,1 +1,1 @@
-add_library(utillib objIO.cu)
+add_library(utillib objIO.cu visualize.cu)

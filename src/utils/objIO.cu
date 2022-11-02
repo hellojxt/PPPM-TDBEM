@@ -26,10 +26,37 @@ void Mesh::print()
 
 void Mesh::writeOBJ(std::string filename) {}
 
+void Mesh::stretch(float scale)
+{
+    for (auto &v : vertices.m_data)
+        v *= scale;
+}
+
+void Mesh::stretch_to(float scale)
+{
+    float3 min = vertices[0];
+    float3 max = vertices[0];
+    for (auto &v : vertices.m_data)
+    {
+        min = fminf(min, v);
+        max = fmaxf(max, v);
+    }
+    float3 size = max - min;
+    float max_size = fmaxf(size.x, fmaxf(size.y, size.z));
+    stretch(scale / max_size);
+}
+
 void Mesh::move(float3 offset)
 {
     for (auto &v : vertices.m_data)
         v += offset;
+}
+
+void Mesh::move_to(float3 pos)
+{
+    float3 center = get_center();
+    for (auto &v : vertices.m_data)
+        v += pos - center;
 }
 
 BBox Mesh::bbox()
@@ -48,7 +75,7 @@ BBox Mesh::bbox()
     return BBox(min_p, max_p);
 }
 
-void Mesh::normalize()
+float3 Mesh::get_center()
 {
     float3 min_pos = vertices[0];
     float3 max_pos = vertices[0];
@@ -62,15 +89,16 @@ void Mesh::normalize()
         max_pos.z = std::max(max_pos.z, vertices[i].z);
     }
     float3 center = (min_pos + max_pos) / 2.0f;
-    float3 scale_f3 = (max_pos - min_pos) / 2.0f;
-    float scale = std::max(std::max(scale_f3.x, scale_f3.y), scale_f3.z);
-    for (int i = 0; i < vertices.size(); i++)
-    {
-        vertices[i] = (vertices[i] - center) / scale;
-    }
+    return center;
 }
 
-Mesh loadOBJ(std::string file_name, bool log)
+void Mesh::normalize()
+{
+    stretch_to(1.0f);
+    move_to(make_float3(0.0f));
+}
+
+Mesh Mesh::loadOBJ(std::string file_name, bool log)
 {
     CArr<float3> vertices;
     CArr<int3> triangles;

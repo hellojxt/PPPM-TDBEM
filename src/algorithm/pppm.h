@@ -113,6 +113,22 @@ class PPPMSolver
             }
         }
 
+        CGPU_FUNC float inline dt() { return fdtd.dt; }
+
+        CGPU_FUNC float inline dl() { return fdtd.dl; }
+
+        CGPU_FUNC float inline grid_size() { return pg.grid_size; }
+
+        CGPU_FUNC int inline res() { return fdtd.res; }
+
+        CGPU_FUNC float3 inline min_coord() { return pg.min_pos; }
+
+        CGPU_FUNC float3 inline max_coord() { return pg.max_pos; }
+
+        CGPU_FUNC float3 inline center() { return (pg.max_pos + pg.min_pos) / 2; }
+
+        CGPU_FUNC float3 inline size() { return pg.max_pos - pg.min_pos; }
+
         // set mesh for the particle grid
         void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_)
         {
@@ -161,6 +177,7 @@ class PPPMSolver
         void solve_fdtd_near_with_cache();
 
         void precompute_particle_cache();
+
         // update particle near field (using neighbor particles) + far field (interpolation from neighbor grid cells)
         void update_particle_dirichlet();
 };

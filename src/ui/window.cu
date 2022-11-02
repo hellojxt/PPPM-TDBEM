@@ -59,7 +59,8 @@ inline __device__ uchar4 JetColor(float v, float vmin, float vmax)
 __global__ void preprocess_image_data(GArr3D<float> in_data,
                                       GArr3D<uchar4> out_data,
                                       float data_max,
-                                      float upsample_factor)
+                                      int upsample_factor,
+                                      float line_width)
 {
     for (int x = blockIdx.x; x < out_data.rows; x += gridDim.x)
     {
@@ -67,29 +68,41 @@ __global__ void preprocess_image_data(GArr3D<float> in_data,
         {
             for (int b = 0; b < out_data.batchs; b++)
             {
-                float2 pos_f = make_float2(((float)x) / upsample_factor, ((float)y) / upsample_factor);
-                int2 pos = make_int2((int)pos_f.x, (int)pos_f.y);
-                float value = in_data(b, pos.x, pos.y);
-                uchar4 line_color = make_uchar4(200, 200, 200, 255);
+                float2 pos = make_float2(x + 0.5f, y + 0.5f);
+                int x_data_idx = (x / upsample_factor);
+                int y_data_idx = (y / upsample_factor);
+                float2 pos_center = make_float2(x_data_idx * upsample_factor + upsample_factor / 2.0f,
+                                                y_data_idx * upsample_factor + upsample_factor / 2.0f);
+                float value = in_data(b, x / upsample_factor, y / upsample_factor);
+                uchar4 line_color = make_uchar4(255, 255, 255, 255);
                 uchar4 pixel_color = JetColor(value, -data_max, data_max);
                 float k = 3.5f;
                 pixel_color.x /= k;
                 pixel_color.y /= k;
                 pixel_color.z /= k;
-                float line_width = 0.1f;
-                float center = 0.5f * (1 - 1 / upsample_factor);
-                float dist = 1 - 2 * max(abs(pos_f.x - pos.x - center), abs(pos_f.y - pos.y - center));
-                float guass = exp(-dist * dist / (line_width * line_width));
-                out_data(b, x, y) = make_uchar4(pixel_color.x * (1 - guass) + line_color.x * guass,
-                                                pixel_color.y * (1 - guass) + line_color.y * guass,
-                                                pixel_color.z * (1 - guass) + line_color.z * guass, 255);
+
+                float dist = upsample_factor / 2.0f - max(abs(pos.x - pos_center.x), abs(pos.y - pos_center.y));
+                float gauss;
+                if (dist <= line_width)
+                {
+                    gauss = 0.4f;
+                }
+                else
+                {
+                    gauss = 0.0f;
+                }
+                // float gauss = exp(-dist * dist / (line_width * line_width));
+                out_data(b, x, y) = make_uchar4(pixel_color.x * (1 - gauss) + line_color.x * gauss,
+                                                pixel_color.y * (1 - gauss) + line_color.y * gauss,
+                                                pixel_color.z * (1 - gauss) + line_color.z * gauss, 255);
             }
         }
     }
 }
 
-void CudaRender::setData(GArr3D<float> origin_data, float data_max, float upsample_factor)
+void CudaRender::setData(GArr3D<float> origin_data, float data_max, float line_width)
 {
+    int upsample_factor = 1080 / origin_data.rows;
     data.resize(origin_data.batchs, origin_data.rows * upsample_factor, origin_data.cols * upsample_factor);
     if (data_max == -1)
     {
@@ -105,7 +118,7 @@ void CudaRender::setData(GArr3D<float> origin_data, float data_max, float upsamp
         }
         printf("data_max: %f, data_min: %f\n", data_max, data_min);
     }
-    cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor);
+    cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor, line_width);
     frame_num = data.batchs;
     width = data.rows;
     height = data.cols;
@@ -168,6 +181,10 @@ GPU_FUNC float2 get_pixel_coord(float3 pos, float3 min_pos, float3 max_pos, int 
 
 GPU_FUNC float point_line_distance(float2 point, float2 start, float2 end)
 {
+    if (length(end - start) < 1e-6)
+    {
+        return length(point - start);
+    }
     float2 dir = end - start;
     float2 diff = point - start;
     float t = dot(diff, dir) / dot(dir, dir);
@@ -189,14 +206,18 @@ __global__ void add_mesh_kernel(GArr<float3> vertices,
                                 float3 min_pos,
                                 float3 max_pos,
                                 GArr3D<uchar4> data,
+                                GArr2D<int> gauss,
+                                GArr2D<int> gauss_num,
                                 PlaneType plane,
-                                float3 plane_pos)
+                                float3 plane_pos,
+                                float line_width)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx >= triangles.size())
     {
         return;
     }
+
     int3 tri = triangles[idx];
     float3 v0 = vertices[tri.x];
     float3 v1 = vertices[tri.y];
@@ -220,32 +241,58 @@ __global__ void add_mesh_kernel(GArr<float3> vertices,
         contact_num++;
     if (linePlaneIntersection(contact[contact_num], v2, v0, plane_normal, plane_pos))
         contact_num++;
-    if (contact_num == 2)
+    if (contact_num >= 2)
     {
+        if (length(contact[0] - contact[1]) < 1e-4 && contact_num > 2)
+        {
+            contact[1] = contact[2];
+        }
         float2 coord1 = get_pixel_coord(contact[0], min_pos, max_pos, data.rows, data.cols, plane);
         float2 coord2 = get_pixel_coord(contact[1], min_pos, max_pos, data.rows, data.cols, plane);
         float2 coord_min = fminf(coord1, coord2);
         float2 coord_max = fmaxf(coord1, coord2);
-        for (int i = (int)coord_min.x; i <= (int)coord_max.x; i++)
+        float extra_width = line_width * 4;
+        int x_min = max(0, (int)(coord_min.x - extra_width));
+        int x_max = min(data.rows - 1, (int)(coord_max.x + extra_width));
+        int y_min = max(0, (int)(coord_min.y - extra_width));
+        int y_max = min(data.cols - 1, (int)(coord_max.y + extra_width));
+        for (int i = x_min; i <= x_max; i++)
         {
-            for (int j = (int)coord_min.y; j <= (int)coord_max.y; j++)
+            for (int j = y_min; j <= y_max; j++)
             {
                 float2 pixel_center = make_float2(i + 0.5f, j + 0.5f);
                 float dist = point_line_distance(pixel_center, coord1, coord2);
                 // anti-aliasing
-                uchar4 line_color = make_uchar4(255, 255, 255, 255);
-                float line_width = 0.8f;
-                if (dist < 2.0f)
+                float alpha = 1.0f;
+                if (dist > line_width)
                 {
-                    float alpha = exp(-dist * dist / (line_width * line_width));
-                    for (int b = 0; b < data.batchs; b++)
-                        data(b, i, j) = make_uchar4((u_char)(data(b, i, j).x * (1.0f - alpha) + line_color.x * alpha),
-                                                    (u_char)(data(b, i, j).y * (1.0f - alpha) + line_color.y * alpha),
-                                                    (u_char)(data(b, i, j).z * (1.0f - alpha) + line_color.z * alpha),
-                                                    (u_char)(data(b, i, j).w * (1.0f - alpha) + line_color.w * alpha));
+                    alpha = exp(-0.5 * pow((dist - line_width) * 3, 2));
                 }
+                // printf("dist: %f, alpha: %f\n", dist, alpha);
+                atomicMax(&gauss(i, j), alpha * 255);
+                atomicAdd(&gauss_num(i, j), 1);
             }
         }
+    }
+}
+
+void __global__ add_mesh_post_kernel(GArr3D<uchar4> data, GArr2D<int> gauss, GArr2D<int> gauss_num)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    if (i >= data.rows || j >= data.cols)
+    {
+        return;
+    }
+    uchar4 line_color = make_uchar4(255, 255, 255, 255);
+    if (gauss_num(i, j) > 0)
+    {
+        float alpha = gauss(i, j) / 255.0f;
+        for (int b = 0; b < data.batchs; b++)
+            data(b, i, j) = make_uchar4((u_char)(data(b, i, j).x * (1.0f - alpha) + line_color.x * alpha),
+                                        (u_char)(data(b, i, j).y * (1.0f - alpha) + line_color.y * alpha),
+                                        (u_char)(data(b, i, j).z * (1.0f - alpha) + line_color.z * alpha),
+                                        (u_char)(data(b, i, j).w * (1.0f - alpha) + line_color.w * alpha));
     }
 }
 
@@ -254,9 +301,20 @@ void CudaRender::add_mesh_to_images(GArr<float3> vertices,
                                     float3 min_pos,
                                     float3 max_pos,
                                     PlaneType plane,
-                                    float3 plane_pos)
+                                    float3 plane_pos,
+                                    float line_width)
 {
-    cuExecute(triangles.size(), add_mesh_kernel, vertices, triangles, min_pos, max_pos, data, plane, plane_pos);
+    GArr2D<int> gauss;
+    GArr2D<int> gauss_num;
+    gauss.resize(data.rows, data.cols);
+    gauss_num.resize(data.rows, data.cols);
+    gauss.reset();
+    gauss_num.reset();
+    cuExecute(triangles.size(), add_mesh_kernel, vertices, triangles, min_pos, max_pos, data, gauss, gauss_num, plane,
+              plane_pos, line_width);
+    cuExecute2D(dim2(data.rows, data.cols), add_mesh_post_kernel, data, gauss, gauss_num);
+    gauss.clear();
+    gauss_num.clear();
 }
 
 void CudaRender::init()
