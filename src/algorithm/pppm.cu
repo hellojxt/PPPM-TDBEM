@@ -7,19 +7,13 @@ namespace pppm
 
 void PPPMSolver::solve_fdtd_far_simple()
 {
-    TICK(fdtd)
     fdtd.step();
-    TOCK(fdtd)
-    TICK(solve_far)
     direct_fdtd_far(*this);
-    TOCK(solve_far)
 }
 
 void PPPMSolver::solve_fdtd_near_simple()
 {
-    TICK(correction_fdtd)
     direct_correction_fdtd_near(*this);
-    TOCK(correction_fdtd)
 }
 
 void PPPMSolver::precompute_grid_cache()
@@ -34,19 +28,13 @@ void PPPMSolver::precompute_grid_cache()
 
 void PPPMSolver::solve_fdtd_far_with_cache()
 {
-    TICK(fdtd)
     fdtd.step();
-    TOCK(fdtd)
-    TICK(solve_far)
     solve_fdtd_far_field_from_cache(*this);
-    TOCK(solve_far)
 }
 
 void PPPMSolver::solve_fdtd_near_with_cache()
 {
-    TICK(correction_fdtd)
     solve_fdtd_near_field_from_cache(*this);
-    TOCK(correction_fdtd)
 }
 
 void PPPMSolver::precompute_particle_cache()
@@ -61,9 +49,7 @@ void PPPMSolver::precompute_particle_cache()
 
 void PPPMSolver::update_particle_dirichlet()
 {
-    TICK(update_particle_dirichlet)
     solve_particle_from_cache(*this);
-    TOCK(update_particle_dirichlet)
 }
 
 }  // namespace pppm
