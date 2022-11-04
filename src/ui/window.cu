@@ -118,6 +118,8 @@ void CudaRender::setData(GArr3D<float> origin_data, float data_max, float line_w
         }
         printf("data_max: %f, data_min: %f\n", data_max, data_min);
     }
+    LOG(origin_data.size)
+    LOG(data.size)
     cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor, line_width);
     frame_num = data.batchs;
     width = data.rows;

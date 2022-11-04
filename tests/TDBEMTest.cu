@@ -64,7 +64,7 @@ TEST_CASE("TDBEM", "[bem]")
         {
             REQUIRE(abs(laplace_result[t] - helmholtz_result[t].real()) / amplitude < BEM_EPS);
         }
-        // write_to_txt("laplace_result.txt", laplace_result, STEP_NUM);
-        // write_to_txt("helmholtz_result.txt", helmholtz_result, STEP_NUM);
+        write_to_txt("laplace_result.txt", laplace_result, STEP_NUM);
+        write_to_txt("helmholtz_result.txt", helmholtz_result, STEP_NUM);
     }
 }

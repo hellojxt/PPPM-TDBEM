@@ -31,11 +31,11 @@ class MonoPole
             return exp(-cpx(0, 1) * wave_number * r) / (4 * PI * r);
         }
 
-        CGPU_FUNC cpx inline neumann(float3 pos)
+        CGPU_FUNC cpx inline neumann(float3 pos, float3 normal)
         {
             float r = length(pos - center);
-            cpx ikr = cpx(0, 1) * wave_number * r;
-            return -exp(-ikr) / (4 * PI * r * r) * (1 + ikr);
+            cpx ikr = cpx(0, 1) * r * wave_number;
+            return -exp(-ikr) / (4 * PI * r * r * r) * (1 + ikr) * dot(normal, pos - center);
         }
 };
 }  // namespace pppm

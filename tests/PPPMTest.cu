@@ -10,8 +10,8 @@
 #include "visualize.h"
 #include "window.h"
 
-#define ALL_STEP 4096
-#define SET_DIRICHLET false
+#define ALL_STEP 512
+#define SET_DIRICHLET true
 
 using namespace pppm;
 
@@ -25,14 +25,14 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp
     float dt = pppm.fdtd.dt;
     if (SET_DIRICHLET)
         pppm.particle_history[particle_id].dirichlet[t] = (mp.dirichlet(p.pos) * sine(dt * t)).real();
-    pppm.particle_history[particle_id].neumann[t] = (mp.neumann(p.pos) * sine(dt * t)).real();
+    pppm.particle_history[particle_id].neumann[t] = (mp.neumann(p.pos, p.normal) * sine(dt * t)).real();
 }
 
 int main()
 {
     int res = 64;
     PPPMSolver *solver = empty_pppm(res);
-    auto mesh = Mesh::loadOBJ("../assets/sphere4.obj");
+    auto mesh = Mesh::loadOBJ("../assets/bunny.obj");
     mesh.stretch_to(solver->size().x / 3.0f);
     LOG("stretch to " << solver->size().x / 3.0f)
     mesh.move_to(solver->center());
@@ -40,16 +40,17 @@ int main()
     solver->set_mesh(mesh.vertices, mesh.triangles);
     RenderElement re(solver->pg, "PPPM");
 
-    auto sine = SineSource(2 * PI * 1000);
+    int x_idx = res / 6;
+    int y_idx = res / 2;
+    int z_idx = res / 2;
+
+    re.set_params(make_int3(0, 0, z_idx), ALL_STEP, 1.0f);
+
+    auto sine = SineSource(2 * PI * 3000);
     float wave_number = sine.omega / AIR_WAVE_SPEED;
     LOG("wave number: " << wave_number)
     auto mp = MonoPole(solver->center(), wave_number);
 
-    int x_idx = res / 2;
-    int y_idx = res / 2;
-    int z_idx = res / 6;
-
-    re.set_params(make_int3(x_idx, 0, 0), ALL_STEP, 1.0f);
     solver->precompute_grid_cache();
     solver->precompute_particle_cache();
     TICK(solve_with_cache)
@@ -73,10 +74,11 @@ int main()
     {
         auto &p = paticles[p_id];
         auto pair_info = PairInfo(p.indices, trg_pos);
-        bem_sum += bem.helmholtz(vertices.data(), pair_info, mp.neumann(p.pos), mp.dirichlet(p.pos), wave_number);
+        bem_sum += bem.helmholtz(vertices.data(), pair_info, mp.neumann(p.pos, p.normal).real(),
+                                 mp.dirichlet(p.pos).real(), wave_number);
     }
 
-    auto solver_signal = re.get_time_siganl(y_idx, z_idx).cpu();
+    auto solver_signal = re.get_time_siganl(y_idx, x_idx).cpu();
     CArr<float> helmholtz_result(ALL_STEP);
     for (int i = 0; i < ALL_STEP; i++)
         helmholtz_result[i] = (bem_sum * sine(solver->fdtd.dt * i)).real();
@@ -89,5 +91,5 @@ int main()
     write_to_txt("pppm_signal.txt", solver_signal);
     write_to_txt("helmholtz_signal.txt", helmholtz_result);
     write_to_txt("analytic_signal.txt", analytic_result);
-    // renderArray(re);
+    renderArray(re);
 }
