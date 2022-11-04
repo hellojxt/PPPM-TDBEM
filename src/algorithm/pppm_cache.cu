@@ -367,7 +367,6 @@ __global__ void precompute_cache_data(PPPMSolver pppm)
 void cache_particle_data(PPPMSolver &pppm)
 {
     int particle_num = pppm.pg.particles.size();
-    printf("particle num: %d\n", particle_num);
     cuExecute(particle_num, precompute_cache_data, pppm);
 }
 

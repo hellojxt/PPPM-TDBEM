@@ -30,23 +30,22 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp
 
 int main()
 {
-    int res = 64;
+    int res = 50;
     PPPMSolver *solver = empty_pppm(res);
-    auto mesh = Mesh::loadOBJ("../assets/bunny.obj");
-    mesh.stretch_to(solver->size().x / 3.0f);
-    LOG("stretch to " << solver->size().x / 3.0f)
+    auto mesh = Mesh::loadOBJ("../assets/bunny.obj", true);
+    mesh.stretch_to(solver->size().x / 2.0f);
+    LOG("stretch to " << solver->size().x / 2.0f)
     mesh.move_to(solver->center());
 
     solver->set_mesh(mesh.vertices, mesh.triangles);
     RenderElement re(solver->pg, "PPPM");
-
     int x_idx = res / 6;
     int y_idx = res / 2;
     int z_idx = res / 2;
 
     re.set_params(make_int3(0, 0, z_idx), ALL_STEP, 1.0f);
 
-    auto sine = SineSource(2 * PI * 3000);
+    auto sine = SineSource(2 * PI * 5000);
     float wave_number = sine.omega / AIR_WAVE_SPEED;
     LOG("wave number: " << wave_number)
     auto mp = MonoPole(solver->center(), wave_number);
@@ -87,7 +86,7 @@ int main()
         analytic_result[i] = (mp.dirichlet(trg_pos) * sine(solver->fdtd.dt * i)).real();
 
     LOG("bem sum: " << bem_sum)
-    LOG("anlytic weight: " << mp.dirichlet(trg_pos))
+    LOG("analytic weight: " << mp.dirichlet(trg_pos))
     write_to_txt("pppm_signal.txt", solver_signal);
     write_to_txt("helmholtz_signal.txt", helmholtz_result);
     write_to_txt("analytic_signal.txt", analytic_result);

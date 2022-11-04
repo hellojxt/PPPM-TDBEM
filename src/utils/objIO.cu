@@ -6,6 +6,10 @@
 #include <vector>
 #include "helper_math.h"
 #include "objIO.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 namespace pppm
 {
 
@@ -100,87 +104,53 @@ void Mesh::normalize()
 
 Mesh Mesh::loadOBJ(std::string file_name, bool log)
 {
-    CArr<float3> vertices;
-    CArr<int3> triangles;
-    std::stringstream ss;
-    std::ifstream in_file(file_name);
-    std::string line = "";
-    std::string prefix = "";
 
-    // std::cout << "Start reading\n";
-    // File open error check
-    if (!in_file.is_open())
+    tinyobj::ObjReader reader;
+    if (!reader.ParseFromFile(file_name))
     {
-        std::cout << "Error opening file: " << file_name << "\n";
+        std::cerr << "Failed to load " << file_name << std::endl;
         exit(1);
     }
-
-    // Read one line at a time
-    while (std::getline(in_file, line))
+    if (log)
     {
-        // Get the prefix of the line
-        ss.clear();
-        ss.str(line);
-        ss >> prefix;
-
-        if (prefix == "#")
-        {}
-        else if (prefix == "o")
-        {}
-        else if (prefix == "s")
-        {}
-        else if (prefix == "use_mtl")
-        {}
-        else if (prefix == "v")  // Vertex position
+        if (!reader.Warning().empty())
         {
-            float3 tmp;
-            ss >> tmp.x >> tmp.y >> tmp.z;
-            vertices.pushBack(tmp);
-        }
-        else if (prefix == "vt")
-        {
-            // ss >> temp_vec2.x >> temp_vec2.y;
-            // vertex_texcoords.push_back(temp_vec2);
-        }
-        else if (prefix == "vn")
-        {
-            // ss >> temp_vec3.x >> temp_vec3.y >> temp_vec3.z;
-            // vertex_normals.push_back(temp_vec3);
-        }
-        else if (prefix == "f")
-        {
-            int tmp;
-            int counter = 0;
-            std::vector<int> tmp_inds;
-            while (ss >> tmp)
-            {
-                // Pushing indices into correct arrays
-                if (counter == 0)
-                    tmp_inds.push_back(tmp - 1);
-                // else if (counter == 1)
-                // 	vertex_texcoord_indicies.push_back(temp_glint);
-                // else if (counter == 2)
-                // 	vertex_normal_indicies.push_back(temp_glint);
-
-                // Handling characters
-                if (ss.peek() == '/')
-                {
-                    ++counter;
-                    ss.ignore(1, '/');
-                }
-                else if (ss.peek() == ' ')
-                {
-                    counter = 0;
-                    ss.ignore(1, ' ');
-                }
-
-                // Reset the counter
-                if (counter > 2)
-                    counter = 0;
-            }
-            triangles.pushBack(make_int3(tmp_inds[0], tmp_inds[1], tmp_inds[2]));
+            std::cout << "WARN: " << reader.Warning() << std::endl;
         }
     }
+
+    const auto &attrib = reader.GetAttrib();
+    const auto &shapes = reader.GetShapes();
+
+    auto vertices = CArr<float3>(attrib.vertices.size() / 3);
+    for (size_t v = 0; v < attrib.vertices.size() / 3; v++)
+    {
+        vertices[v] = make_float3(attrib.vertices[3 * v + 0], attrib.vertices[3 * v + 1], attrib.vertices[3 * v + 2]);
+    }
+
+    int triangle_num = 0;
+    for (auto &shape : shapes)
+    {
+        triangle_num += shape.mesh.num_face_vertices.size();
+    }
+
+    auto triangles = CArr<int3>(triangle_num);
+
+    for (auto &shape : shapes)
+    {
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++)
+        {
+            int vertice_num_per_face = shape.mesh.num_face_vertices[f];
+            assert(vertice_num_per_face == 3);
+            tinyobj::index_t idx0 = shape.mesh.indices[f * 3 + 0];
+            tinyobj::index_t idx1 = shape.mesh.indices[f * 3 + 1];
+            tinyobj::index_t idx2 = shape.mesh.indices[f * 3 + 2];
+            triangles[f + index_offset] = make_int3(idx0.vertex_index, idx1.vertex_index, idx2.vertex_index);
+        }
+        index_offset += shape.mesh.num_face_vertices.size();
+    }
+
     if (log)
     {
         // LOG
