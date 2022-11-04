@@ -379,9 +379,8 @@ __global__ void solve_particle_from_cache_kernel(PPPMSolver pppm)
     ParticleMap &pm = pppm.cache.particle_map[particle_id];
     BoundaryHistory &history = pppm.particle_history[particle_id];
     Range r = pm.range;
-    float sum = 0;
     int t = pppm.fdtd.t;
-    history.dirichlet[t] = 0;
+    float far_sum = 0;
     // caculate the far field from interpolation
     for (int dx = 0; dx < 2; dx++)
         for (int dy = 0; dy < 2; dy++)
@@ -389,20 +388,23 @@ __global__ void solve_particle_from_cache_kernel(PPPMSolver pppm)
             {
                 int weight_idx = dx * 4 + dy * 2 + dz;
                 int3 coord = pm.base_coord + make_int3(dx, dy, dz);
-                sum += pm.weight[weight_idx] * pppm.far_field[t](coord);
+                far_sum += pm.weight[weight_idx] * pppm.far_field[t](coord);
             }
 
     // caculate the near field from cache
+    float near_sum = 0;
     float factor = 0;  // the factor of G_t
     for (int i = r.start; i < r.end; i++)
     {
         auto &data = pppm.cache.particle_data[i];
-        sum += data.weight.convolution(history.neumann, history.dirichlet, t);
-        factor +=
-            data.weight.double_layer[0];  // "lumped mass" for G_t, however, the factor is very small compared to 0.5
+        auto &neighbor_history = pppm.particle_history[data.particle_id];
+        near_sum += data.weight.convolution<1>(neighbor_history.neumann, neighbor_history.dirichlet, t);
+        factor += data.weight.double_layer[0];  // "lumped mass" for G_t, the factor is small compared to 0.5
     }
+    Particle &p = pppm.pg.particles[particle_id];
+    auto particle_area = 0.5 * jacobian(pppm.pg.vertices.data(), p.indices);
     // Equation (2.12) in Paper:https://epubs.siam.org/doi/pdf/10.1137/090775981
-    history.dirichlet[pppm.fdtd.t] = sum / (0.5 - factor);
+    history.dirichlet[pppm.fdtd.t] = (far_sum * 0.84 + near_sum) / (0.5 * particle_area - factor);
 }
 
 void solve_particle_from_cache(PPPMSolver &pppm)

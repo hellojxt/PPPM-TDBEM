@@ -27,6 +27,8 @@ class RenderElement
         }
 
         void assign(int idx, GArr3D<float> src);
+
+        GArr<float> get_time_siganl(int x, int y);
 };
 
 static inline PlaneType normal2plane(float3 normal)

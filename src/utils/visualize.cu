@@ -28,4 +28,19 @@ void RenderElement::assign(int idx, GArr3D<float> src)
     cuExecute2D(dim2(data.rows, data.cols), copy_kernel, src, data, idx, plane);
 }
 
+__global__ void get_time_signal_kernel(GArr3D<float> data, GArr<float> signal, int x, int y)
+{
+    int t_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (t_idx >= data.size.x)
+        return;
+    signal[t_idx] = data(t_idx, x, y);
+}
+
+GArr<float> RenderElement::get_time_siganl(int x, int y)
+{
+    GArr<float> signal(data.size.x);
+    cuExecute(data.size.x, get_time_signal_kernel, data, signal, x, y);
+    return signal;
+}
+
 }  // namespace pppm

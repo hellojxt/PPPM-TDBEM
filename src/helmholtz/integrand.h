@@ -26,6 +26,16 @@ inline CGPU_FUNC float jacobian(float3 *v)
     return length(cross(v[1] - v[0], v[2] - v[0]));
 }
 
+inline CGPU_FUNC float jacobian(float3 v1, float3 v2, float3 v3)
+{
+    return length(cross(v2 - v1, v3 - v1));
+}
+
+inline CGPU_FUNC float jacobian(float3 *verts, int3 ind)
+{
+    return jacobian(verts[ind.x], verts[ind.y], verts[ind.z]);
+}
+
 // unit triangle (0, 0), (1, 0), (0, 1)
 inline CGPU_FUNC float3 local_to_global(float x1, float x2, float3 *v)
 {

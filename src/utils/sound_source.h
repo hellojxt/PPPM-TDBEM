@@ -1,6 +1,6 @@
 #pragma once
+#include "helper_math.h"
 #include "macro.h"
-
 namespace pppm
 {
 /**
@@ -13,5 +13,29 @@ class SineSource
         SineSource(float omega) { this->omega = omega; }
         CGPU_FUNC cpx inline operator()(float t) { return exp(cpx(0.0f, omega * t)); }
         CGPU_FUNC cpx inline operator()(float t, int freq_factor) { return exp(cpx(0.0f, omega * freq_factor * t)); }
+};
+
+class MonoPole
+{
+    public:
+        float3 center;
+        cpx wave_number;
+        MonoPole(float3 center, cpx wave_number)
+        {
+            this->center = center;
+            this->wave_number = wave_number;
+        }
+        CGPU_FUNC cpx inline dirichlet(float3 pos)
+        {
+            float r = length(pos - center);
+            return exp(-cpx(0, 1) * wave_number * r) / (4 * PI * r);
+        }
+
+        CGPU_FUNC cpx inline neumann(float3 pos)
+        {
+            float r = length(pos - center);
+            cpx ikr = cpx(0, 1) * wave_number * r;
+            return -exp(-ikr) / (4 * PI * r * r) * (1 + ikr);
+        }
 };
 }  // namespace pppm

@@ -110,10 +110,15 @@ class LayerWeight
             }
         }
 
+        template <int SKIP = 0>
         inline CGPU_FUNC float convolution(History &neumann, History &dirichlet, int t)
         {
             float result = 0;
-            for (int k = 0; k < STEP_NUM; k++)
+            for (int k = 0; k < SKIP; k++)
+            {
+                result += -single_layer[k] * neumann[t - k];
+            }
+            for (int k = SKIP; k < STEP_NUM; k++)
             {
                 result += -single_layer[k] * neumann[t - k] + double_layer[k] * dirichlet[t - k];
             }
@@ -157,7 +162,7 @@ class TDBEM
             for (int k = 0; k < STEP_NUM; k++)
             {
                 cpx s_k = lambda * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k);
-                wave_numbers[k] = BDF2(s_k) / (dt * AIR_WAVE_SPEED) / cpx(0, 1);
+                wave_numbers[k] = -BDF2(s_k) / (dt * AIR_WAVE_SPEED) / cpx(0, 1);
                 // printf("%f %f\n", BDF2(s_k).imag(), BDF2(s_k).real());
                 // printf("wave number %d: %f %f\n", k, wave_numbers[k].real(), wave_numbers[k].imag());
             }
