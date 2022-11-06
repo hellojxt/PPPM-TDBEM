@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.12.0)
 project(PPPM LANGUAGES CXX CUDA)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CUDA_ARCHITECTURES 75 86)
@@ -13,6 +13,14 @@ add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 add_definitions(-DASSET_DIR="${CMAKE_SOURCE_DIR}/assets")
+
+################################
+# For Config
+add_compile_definitions(LINE_GAUSS_NUM=1)
+add_compile_definitions(TRI_GAUSS_NUM=1)
+add_compile_definitions(STEP_NUM=16) # number of time steps for history of each particle
+
+################################
 
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 include_directories(

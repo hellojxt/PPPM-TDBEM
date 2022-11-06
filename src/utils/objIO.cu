@@ -36,7 +36,7 @@ void Mesh::stretch(float scale)
         v *= scale;
 }
 
-void Mesh::stretch_to(float scale)
+float Mesh::get_scale()
 {
     float3 min = vertices[0];
     float3 max = vertices[0];
@@ -47,6 +47,12 @@ void Mesh::stretch_to(float scale)
     }
     float3 size = max - min;
     float max_size = fmaxf(size.x, fmaxf(size.y, size.z));
+    return max_size;
+}
+
+void Mesh::stretch_to(float scale)
+{
+    auto max_size = get_scale();
     stretch(scale / max_size);
 }
 

@@ -18,6 +18,7 @@ class Mesh
         void move(float3 offset);
         void move_to(float3 pos);
         float3 get_center();
+        float get_scale();
         void stretch(float scale);
         void stretch_to(float scale);
         void normalize();

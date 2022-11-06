@@ -11,7 +11,7 @@
 #include "window.h"
 
 #define ALL_STEP 512
-#define SET_DIRICHLET true
+#define SET_DIRICHLET false
 
 using namespace pppm;
 
@@ -33,8 +33,8 @@ int main()
     int res = 50;
     PPPMSolver *solver = empty_pppm(res);
     auto mesh = Mesh::loadOBJ("../assets/bunny.obj", true);
-    mesh.stretch_to(solver->size().x / 2.0f);
-    LOG("stretch to " << solver->size().x / 2.0f)
+    mesh.stretch_to(solver->size().x / 4.0f);
+    LOG("stretch to " << mesh.get_scale())
     mesh.move_to(solver->center());
 
     solver->set_mesh(mesh.vertices, mesh.triangles);
@@ -45,7 +45,7 @@ int main()
 
     re.set_params(make_int3(0, 0, z_idx), ALL_STEP, 1.0f);
 
-    auto sine = SineSource(2 * PI * 5000);
+    auto sine = SineSource(2 * PI * 3000);
     float wave_number = sine.omega / AIR_WAVE_SPEED;
     LOG("wave number: " << wave_number)
     auto mp = MonoPole(solver->center(), wave_number);
@@ -73,8 +73,8 @@ int main()
     {
         auto &p = paticles[p_id];
         auto pair_info = PairInfo(p.indices, trg_pos);
-        bem_sum += bem.helmholtz(vertices.data(), pair_info, mp.neumann(p.pos, p.normal).real(),
-                                 mp.dirichlet(p.pos).real(), wave_number);
+        bem_sum +=
+            bem.helmholtz(vertices.data(), pair_info, mp.neumann(p.pos, p.normal), mp.dirichlet(p.pos), wave_number);
     }
 
     auto solver_signal = re.get_time_siganl(y_idx, x_idx).cpu();
@@ -90,5 +90,5 @@ int main()
     write_to_txt("pppm_signal.txt", solver_signal);
     write_to_txt("helmholtz_signal.txt", helmholtz_result);
     write_to_txt("analytic_signal.txt", analytic_result);
-    renderArray(re);
+    // renderArray(re);
 }

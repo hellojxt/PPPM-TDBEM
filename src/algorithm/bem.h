@@ -7,7 +7,6 @@
 namespace pppm
 {
 
-#define STEP_NUM 32  // number of time steps for history of each particle
 #define pureImag cpx(0, 1)
 
 template <int step = 1>
