@@ -67,5 +67,8 @@ target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
 add_executable(PPPMTest tests/PPPMTest.cu)
 target_link_libraries(PPPMTest PRIVATE uilib alglib utillib)
 
+add_executable(PPPMDynamicTest tests/PPPMDynamicTest.cu)
+target_link_libraries(PPPMDynamicTest PRIVATE uilib alglib utillib)
+
 add_executable(GhostCellTest tests/GhostCellTest.cu)
 target_link_libraries(GhostCellTest PRIVATE Catch2::Catch2WithMain alglib utillib)

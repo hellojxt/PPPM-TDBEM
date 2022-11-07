@@ -26,6 +26,7 @@ __global__ void copy_kernel(GArr3D<float> src, GArr3D<float> dst, int t, int3 fa
 void RenderElement::assign(int idx, GArr3D<float> src)
 {
     cuExecute2D(dim2(data.rows, data.cols), copy_kernel, src, data, idx, plane);
+    current_data_idx = idx;
 }
 
 __global__ void get_time_signal_kernel(GArr3D<float> data, GArr<float> signal, int x, int y)

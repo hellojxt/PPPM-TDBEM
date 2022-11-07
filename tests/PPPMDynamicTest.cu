@@ -10,7 +10,7 @@
 #include "visualize.h"
 #include "window.h"
 
-#define ALL_STEP 512
+#define ALL_STEP 64
 #define SET_DIRICHLET false
 
 using namespace pppm;
@@ -32,7 +32,7 @@ int main()
 {
     int res = 50;
     PPPMSolver *solver = empty_pppm(res);
-    auto mesh = Mesh::loadOBJ("../assets/bunny.obj", true);
+    auto mesh = Mesh::loadOBJ("../assets/sphere.obj", true);
     mesh.stretch_to(solver->size().x / 4.0f);
     LOG("stretch to " << mesh.get_scale())
     mesh.move_to(solver->center());
@@ -61,6 +61,14 @@ int main()
             solver->update_particle_dirichlet();
         solver->solve_fdtd_near_with_cache();
         re.assign(i, solver->fdtd.grids[i]);
+        if ((i + 1) % STEP_NUM == 0)
+        {
+            mesh.move(make_float3(solver->size().x / 32.0f, 0, 0));
+            solver->set_mesh(mesh.vertices, mesh.triangles);
+            solver->precompute_grid_cache();
+            solver->precompute_particle_cache();
+            re.update_mesh();
+        }
     }
     TOCK(solve_with_cache)
 
@@ -90,6 +98,5 @@ int main()
     write_to_txt("pppm_signal.txt", solver_signal);
     write_to_txt("helmholtz_signal.txt", helmholtz_result);
     write_to_txt("analytic_signal.txt", analytic_result);
-    re.update_mesh();
     renderArray(re);
 }

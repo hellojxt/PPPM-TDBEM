@@ -57,7 +57,9 @@ int main()
         re_fdtd.assign(i, fdtd.grids[fdtd.t]);
         re_far.assign(i, solver->far_field[fdtd.t]);
     }
+    re_fdtd.update_mesh();
+    re_far.update_mesh();
     printf("Done\n");
     // visualizer
-    renderArray({re_fdtd, re_far});
+    renderArray(re_fdtd, re_far);
 }

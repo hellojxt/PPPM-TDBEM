@@ -31,5 +31,6 @@ int main()
         solver->fdtd.step();
         re.assign(i, solver->fdtd.grids[i]);
     }
+    re.update_mesh();
     renderArray(re);
 }

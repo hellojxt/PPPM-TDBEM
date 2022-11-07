@@ -132,10 +132,21 @@ class PPPMSolver
         // set mesh for the particle grid
         void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_)
         {
+            if (fdtd.t > -1)
+                remove_current_mesh();
             pg.set_mesh(verts_, tris_);
             pg.construct_grid();
             particle_history.resize(pg.particles.size());
             particle_history.reset();
+        }
+
+        void remove_current_mesh()
+        {
+            pg.clear();
+            particle_history.clear();
+            int t = fdtd.t;
+            for (int i = 0; i < GRID_TIME_SIZE; i++)
+                far_field[t - i].assign(fdtd.grids[t - i]);
         }
 
         void clear()

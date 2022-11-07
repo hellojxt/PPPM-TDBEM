@@ -60,13 +60,15 @@ __global__ void preprocess_image_data(GArr3D<float> in_data,
                                       GArr3D<uchar4> out_data,
                                       float data_max,
                                       int upsample_factor,
-                                      float line_width)
+                                      float line_width,
+                                      int start_batch,
+                                      int end_batch)
 {
     for (int x = blockIdx.x; x < out_data.rows; x += gridDim.x)
     {
         for (int y = threadIdx.x; y < out_data.cols; y += blockDim.x)
         {
-            for (int b = 0; b < out_data.batchs; b++)
+            for (int b = start_batch; b < end_batch; b++)
             {
                 float2 pos = make_float2(x + 0.5f, y + 0.5f);
                 int x_data_idx = (x / upsample_factor);
@@ -100,32 +102,21 @@ __global__ void preprocess_image_data(GArr3D<float> in_data,
     }
 }
 
-void CudaRender::setData(GArr3D<float> origin_data, float data_max, float line_width)
+void CudaRender::setData(GArr3D<float> origin_data, float data_max, float line_width, int start_batch, int end_batch)
 {
     int upsample_factor = 1080 / origin_data.rows;
-    data.resize(origin_data.batchs, origin_data.rows * upsample_factor, origin_data.cols * upsample_factor);
-    if (data_max == -1)
+    if (start_batch == 0)
     {
-        auto min_ptr = thrust::min_element(thrust::device, origin_data.begin(), origin_data.end());
-        auto max_ptr = thrust::max_element(thrust::device, origin_data.begin(), origin_data.end());
-        GArr<float> min_gpu(min_ptr, 1);
-        GArr<float> max_gpu(max_ptr, 1);
-        float data_max = max_gpu.last_item();
-        float data_min = min_gpu.last_item();
-        if (-data_min > data_max)
-        {
-            data_max = -data_min;
-        }
-        printf("data_max: %f, data_min: %f\n", data_max, data_min);
+        data.resize(origin_data.batchs, origin_data.rows * upsample_factor, origin_data.cols * upsample_factor);
+        width = data.rows;
+        height = data.cols;
+        frame_idx = 0;
+        frame_idx_last = -1;
+        update_frame_count = 0;
+        play_speed = 0.5f;
     }
-    cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor, line_width);
-    frame_num = data.batchs;
-    width = data.rows;
-    height = data.cols;
-    frame_idx = 0;
-    frame_idx_last = -1;
-    update_frame_count = 0;
-    play_speed = 0.5f;
+    cuExecuteBlock(data.rows, 64, preprocess_image_data, origin_data, data, data_max, upsample_factor, line_width,
+                   start_batch, end_batch);
 }
 
 // calculate interaction between a line segment and a plane
@@ -276,7 +267,8 @@ __global__ void add_mesh_kernel(GArr<float3> vertices,
     }
 }
 
-void __global__ add_mesh_post_kernel(GArr3D<uchar4> data, GArr2D<int> gauss, GArr2D<int> gauss_num)
+void __global__
+add_mesh_post_kernel(GArr3D<uchar4> data, GArr2D<int> gauss, GArr2D<int> gauss_num, int start_batch, int end_batch)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -288,7 +280,7 @@ void __global__ add_mesh_post_kernel(GArr3D<uchar4> data, GArr2D<int> gauss, GAr
     if (gauss_num(i, j) > 0)
     {
         float alpha = gauss(i, j) / 255.0f;
-        for (int b = 0; b < data.batchs; b++)
+        for (int b = start_batch; b < end_batch; b++)
             data(b, i, j) = make_uchar4((u_char)(data(b, i, j).x * (1.0f - alpha) + line_color.x * alpha),
                                         (u_char)(data(b, i, j).y * (1.0f - alpha) + line_color.y * alpha),
                                         (u_char)(data(b, i, j).z * (1.0f - alpha) + line_color.z * alpha),
@@ -302,7 +294,9 @@ void CudaRender::add_mesh_to_images(GArr<float3> vertices,
                                     float3 max_pos,
                                     PlaneType plane,
                                     float3 plane_pos,
-                                    float line_width)
+                                    float line_width,
+                                    int start_batch,
+                                    int end_batch)
 {
     GArr2D<int> gauss;
     GArr2D<int> gauss_num;
@@ -312,7 +306,7 @@ void CudaRender::add_mesh_to_images(GArr<float3> vertices,
     gauss_num.reset();
     cuExecute(triangles.size(), add_mesh_kernel, vertices, triangles, min_pos, max_pos, data, gauss, gauss_num, plane,
               plane_pos, line_width);
-    cuExecute2D(dim2(data.rows, data.cols), add_mesh_post_kernel, data, gauss, gauss_num);
+    cuExecute2D(dim2(data.rows, data.cols), add_mesh_post_kernel, data, gauss, gauss_num, start_batch, end_batch);
     gauss.clear();
     gauss_num.clear();
 }

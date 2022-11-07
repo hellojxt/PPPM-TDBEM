@@ -32,14 +32,23 @@ class CudaRender : public Window
         CudaRender() { this->title = "CudaRender"; }
         CudaRender(const char *str) { this->title = str; }
 
-        void setData(GArr3D<float> origin_data, float data_max = -1, float line_width = 0.5f);
+        void set_overall_frame_num(int frame_num_) { frame_num = frame_num_; }
+
+        void setData(GArr3D<float> origin_data,
+                     float data_max = -1,
+                     float line_width = 0.5f,
+                     int start_batch = 0,
+                     int end_batch = 0);
+
         void add_mesh_to_images(GArr<float3> vertices,
                                 GArr<int3> triangles,
                                 float3 min_pos,
                                 float3 max_pos,
                                 PlaneType plane,
                                 float3 plane_pos,
-                                float line_width = 3.0f);
+                                float line_width = 3.0f,
+                                int start_batch = 0,
+                                int end_batch = 0);
         void init();
         void update();
         void clear();

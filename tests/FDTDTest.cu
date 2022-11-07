@@ -31,5 +31,5 @@ int main()
         cuExecuteBlock(1, 1, set_center_signal, solver->fdtd, s);
         re.assign(i, solver->fdtd.grids[i]);
     }
-    renderArray(re, false);
+    renderArray(re);
 }
