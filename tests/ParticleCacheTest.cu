@@ -40,14 +40,14 @@ TEST_CASE("ParticleCache", "[pc]")
         auto particle = particles[i];
         auto r = particle_map[i].range;
         auto base_coord = particle_map[i].base_coord;
-        auto dcoord = particle.pos - solver->fdtd.getCenter(base_coord);
+        auto dcoord = particle.pos - solver->pg.getCenter(base_coord);
         SECTION("test particle cache info (cache size and neighbor list)")
         {
 
             REQUIRE((dcoord.x >= 0 && dcoord.x <= solver->fdtd.dl));
             REQUIRE((dcoord.y >= 0 && dcoord.y <= solver->fdtd.dl));
             REQUIRE((dcoord.z >= 0 && dcoord.z <= solver->fdtd.dl));
-            float3 center = (solver->fdtd.getCenter(base_coord) + solver->fdtd.getCenter(base_coord + 1)) / 2;
+            float3 center = (solver->pg.getCenter(base_coord) + solver->pg.getCenter(base_coord + 1)) / 2;
             int neighbor_number = 0;
             for (int j = 0; j < particles.size(); j++)
             {
@@ -87,7 +87,7 @@ TEST_CASE("ParticleCache", "[pc]")
             for (int j = 0; j < 8; j++)
             {
                 int3 coord = base_coord + make_int3((j >> 2) & 1, (j >> 1) & 1, j & 1);
-                interpolation_value += func(solver->fdtd.getCenter(coord)) * weights[j];
+                interpolation_value += func(solver->pg.getCenter(coord)) * weights[j];
             }
             float guass_x[TRI_GAUSS_NUM][2] = TRI_GAUSS_XS;
             float guass_w[TRI_GAUSS_NUM] = TRI_GAUSS_WS;

@@ -24,6 +24,8 @@ class GArr3D
             size = make_int3(batchs, rows, cols);
             this->data.resize(rows * cols * batchs);
         }
+
+        void resize(int3 size) { resize(size.x, size.y, size.z); }
         GArr3D() {}
         GArr3D(int batchs, int rows, int cols) { this->resize(batchs, rows, cols); }
         GArr3D(CArr3D<T> &A) { this->assign(A); }

@@ -10,7 +10,7 @@
 #include "visualize.h"
 #include "window.h"
 
-#define ALL_STEP 64
+#define ALL_STEP 512
 #define SET_DIRICHLET false
 
 using namespace pppm;
@@ -25,7 +25,8 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp
     float dt = pppm.fdtd.dt;
     if (SET_DIRICHLET)
         pppm.particle_history[particle_id].dirichlet[t] = (mp.dirichlet(p.pos) * sine(dt * t)).real();
-    pppm.particle_history[particle_id].neumann[t] = (mp.neumann(p.pos, p.normal) * sine(dt * t)).real();
+    pppm.particle_history[particle_id].neumann[t] =
+        (mp.neumann(p.pos, p.normal) * sine(dt * t)).real() * (t < STEP_NUM * 5);
 }
 
 int main()
@@ -39,7 +40,7 @@ int main()
 
     solver->set_mesh(mesh.vertices, mesh.triangles);
     RenderElement re(solver->pg, "PPPM");
-    int x_idx = res / 6;
+    int x_idx = res / 8;
     int y_idx = res / 2;
     int z_idx = res / 2;
 
@@ -52,7 +53,7 @@ int main()
 
     solver->precompute_grid_cache();
     solver->precompute_particle_cache();
-    TICK(solve_with_cache)
+
     for (int i = 0; i < ALL_STEP; i++)
     {
         solver->solve_fdtd_far_with_cache();
@@ -61,42 +62,19 @@ int main()
             solver->update_particle_dirichlet();
         solver->solve_fdtd_near_with_cache();
         re.assign(i, solver->fdtd.grids[i]);
-        if ((i + 1) % STEP_NUM == 0)
+        if ((i + 1) % STEP_NUM == 0 && i / STEP_NUM < 5)
         {
-            mesh.move(make_float3(solver->size().x / 32.0f, 0, 0));
+            re.update_mesh();
+            mesh.move(make_float3(solver->size().x / 64.0f, 0, 0));
             solver->set_mesh(mesh.vertices, mesh.triangles);
             solver->precompute_grid_cache();
             solver->precompute_particle_cache();
-            re.update_mesh();
         }
-    }
-    TOCK(solve_with_cache)
-
-    TDBEM &bem = solver->bem;
-    auto vertices = mesh.vertices;
-    auto paticles = solver->pg.particles.cpu();
-    float3 trg_pos = solver->fdtd.getCenter(x_idx, y_idx, z_idx);
-    cpx bem_sum = 0;
-    for (int p_id = 0; p_id < paticles.size(); p_id++)
-    {
-        auto &p = paticles[p_id];
-        auto pair_info = PairInfo(p.indices, trg_pos);
-        bem_sum +=
-            bem.helmholtz(vertices.data(), pair_info, mp.neumann(p.pos, p.normal), mp.dirichlet(p.pos), wave_number);
     }
 
     auto solver_signal = re.get_time_siganl(y_idx, x_idx).cpu();
-    CArr<float> helmholtz_result(ALL_STEP);
-    for (int i = 0; i < ALL_STEP; i++)
-        helmholtz_result[i] = (bem_sum * sine(solver->fdtd.dt * i)).real();
-    CArr<float> analytic_result(ALL_STEP);
-    for (int i = 0; i < ALL_STEP; i++)
-        analytic_result[i] = (mp.dirichlet(trg_pos) * sine(solver->fdtd.dt * i)).real();
 
-    LOG("bem sum: " << bem_sum)
-    LOG("analytic weight: " << mp.dirichlet(trg_pos))
-    write_to_txt("pppm_signal.txt", solver_signal);
-    write_to_txt("helmholtz_signal.txt", helmholtz_result);
-    write_to_txt("analytic_signal.txt", analytic_result);
+    write_to_txt("pppm_dynamic_signal.txt", solver_signal);
+    re.update_mesh();
     renderArray(re);
 }

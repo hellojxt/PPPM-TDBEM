@@ -65,7 +65,7 @@ void test_precompute_grid_cache(PPPMSolver *solver)
         {
             GridMap m = grid_map[grid_id];
             int3 coord = m.coord;
-            float3 center = solver->fdtd.getCenter(coord);
+            float3 center = solver->pg.getCenter(coord);
             Range r = m.range;
             for (int i = r.start; i < r.end; i++)
             {

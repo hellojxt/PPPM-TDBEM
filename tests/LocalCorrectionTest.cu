@@ -16,7 +16,7 @@ int main()
     TDBEM bem;
     bem.init(fdtd.dt);
     int3 coord = make_int3(32, 32, 32);
-    float3 center = fdtd.getCenter(coord);
+    float3 center = pg.getCenter(coord);
     float3 vertices[3] = {center + make_float3(0.3f, 0.0f, 0.0f) * fdtd.dl,
                           center + make_float3(0.3f, 0.0f, 0.1f) * fdtd.dl,
                           center + make_float3(0.3f, 0.1f, 0.0f) * fdtd.dl};
@@ -48,13 +48,13 @@ int main()
                 for (int dz = -1; dz <= 1; dz++)
                 {
                     int3 c = coord + make_int3(dx, dy, dz);
-                    grid(c) = bem.laplace(vertices, PairInfo(src_face, fdtd.getCenter(c)), neumann, dirichlet, t);
+                    grid(c) = bem.laplace(vertices, PairInfo(src_face, pg.getCenter(c)), neumann, dirichlet, t);
                 }
             }
         }
         fdtd.grids[t].assign(grid);
         check_fdtd[t] = grid(check_coord);
-        check_bem[t] = bem.laplace(vertices, PairInfo(src_face, fdtd.getCenter(check_coord)), neumann, dirichlet, t);
+        check_bem[t] = bem.laplace(vertices, PairInfo(src_face, pg.getCenter(check_coord)), neumann, dirichlet, t);
     }
     write_to_txt("check_fdtd.txt", check_fdtd, TEST_MAX_STEP);
     write_to_txt("check_bem.txt", check_bem, TEST_MAX_STEP);

@@ -67,7 +67,7 @@ int main()
     TDBEM &bem = solver->bem;
     auto vertices = mesh.vertices;
     auto paticles = solver->pg.particles.cpu();
-    float3 trg_pos = solver->fdtd.getCenter(x_idx, y_idx, z_idx);
+    float3 trg_pos = solver->pg.getCenter(x_idx, y_idx, z_idx);
     cpx bem_sum = 0;
     for (int p_id = 0; p_id < paticles.size(); p_id++)
     {

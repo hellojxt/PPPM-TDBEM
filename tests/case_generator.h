@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include "pppm.h"
 #include "ghost_cell.h"
+#include "pppm.h"
 
 using namespace pppm;
 
@@ -62,7 +62,7 @@ static PPPMSolver *point_pppm(int res = 64)
     PPPMSolver *pppm = empty_pppm(res);
     int center_idx = pppm->fdtd.res / 2;
     int3 coord = make_int3(center_idx, center_idx, center_idx);
-    float3 center = pppm->fdtd.getCenter(coord);
+    float3 center = pppm->pg.getCenter(coord);
     CArr<float3> vertices(3);
     vertices[0] = center + make_float3(0.0f, 0.1f, 0.0f) * pppm->fdtd.dl;
     vertices[1] = center + make_float3(0.0f, 0.0f, 0.0f) * pppm->fdtd.dl;
@@ -73,31 +73,11 @@ static PPPMSolver *point_pppm(int res = 64)
     return pppm;
 }
 
-static ghost_cell::GhostCellSolver *random_ghost_cell(int triangle_count, int res = 64)
+static GhostCellSolver *empty_ghost_cell_solver(int res)
 {
-    CArr<float3> vertices;
-    CArr<int3> triangles;
-    vertices.resize(triangle_count * 3);
-    triangles.resize(triangle_count);
-
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
     float grid_size = 0.005;
     float dt = 8e-6f;
-
-    for (int i = 0; i < triangle_count; i++)
-    {
-        float3 v0 = make_float3(0.0f, 0.0f, 1.0f) * RAND_F * RAND_SIGN;
-        float3 v1 = make_float3(1.0f, 0.0f, 0.0f) * RAND_F * RAND_SIGN;
-        float3 v2 = make_float3(0.0f, 1.0f, 0.0f) * RAND_F * RAND_SIGN;
-        float3 offset = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(res - 4) * grid_size +
-                        make_float3(2.0f, 2.0f, 2.0f) * grid_size;
-        vertices[i * 3 + 0] = v0 * grid_size + offset;
-        vertices[i * 3 + 1] = v1 * grid_size + offset;
-        vertices[i * 3 + 2] = v2 * grid_size + offset;
-        triangles[i] = make_int3(i * 3 + 0, i * 3 + 1, i * 3 + 2);
-    }
-
-    auto solver = new ghost_cell::GhostCellSolver(min_pos, grid_size, res, dt, vertices, triangles);
-
+    GhostCellSolver *solver = new GhostCellSolver(min_pos, grid_size, res, dt);
     return solver;
 }

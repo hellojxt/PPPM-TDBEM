@@ -90,7 +90,7 @@ GPU_FUNC inline void add_grid_near_field(PPPMSolver &pppm, BEMCache &e, int3 dst
     int3 src = make_int3(particle.cell_coord);
     if (src.x == dst.x && src.y == dst.y && src.z == dst.z)
         return;
-    float3 dst_point = pppm.fdtd.getCenter(dst);  // use the center of the grid cell as destination point
+    float3 dst_point = pppm.pg.getCenter(dst);  // use the center of the grid cell as destination point
     LayerWeight w;
     pppm.bem.laplace_weight(pppm.pg.vertices.data(), PairInfo(particle.indices, dst_point), &w);
     e.weight.add(w, scale, offset);
@@ -245,7 +245,7 @@ __global__ void get_particle_neighbor_sum(PPPMSolver pppm)
     float sum = 0;
     Particle &p = pppm.pg.particles[particle_id];
     // calculate the base coordinate (lowest coord) of the 2*2*2 grids
-    float3 diff = p.pos - pppm.fdtd.getCenter(p.cell_coord);
+    float3 diff = p.pos - pppm.pg.getCenter(p.cell_coord);
     int3 base_coord = make_int3(p.cell_coord) - make_int3((diff.x < 0), (diff.y < 0), (diff.z < 0));
     ParticleMap pm;
     pm.base_coord = base_coord;
@@ -262,7 +262,7 @@ __global__ void get_particle_neighbor_sum(PPPMSolver pppm)
     for (int i = 0; i < TRI_GAUSS_NUM; i++)
     {
         float3 v = local_to_global(guass_x[i][0], guass_x[i][1], dst_v);
-        float3 d = (v - pppm.fdtd.getCenter(base_coord)) / pppm.pg.grid_size;
+        float3 d = (v - pppm.pg.getCenter(base_coord)) / pppm.pg.grid_size;
         trilinear_interpolation(d, w_temp);
         weight_add(w_temp, 0.5 * guass_w[i] * trg_jacobian, pm.weight);
         // weight_add(w_temp, 1.0f / TRI_GAUSS_NUM, pm.weight);
@@ -354,7 +354,7 @@ __global__ void precompute_cache_data(PPPMSolver pppm)
                 {
                     int weight_idx = dx * 4 + dy * 2 + dz;
                     int3 coord = pm.base_coord + make_int3(dx, dy, dz);
-                    auto center = pppm.fdtd.getCenter(coord);
+                    auto center = pppm.pg.getCenter(coord);
                     if (length(center - neighbor_particle.pos) > pppm.pg.grid_size * 1.5)
                     {
                         add_particle_near_field(pppm, w, neighbor_particle.indices, center, -pm.weight[weight_idx], 0);

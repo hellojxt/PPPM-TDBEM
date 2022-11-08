@@ -32,7 +32,7 @@ int main()
     auto solver = empty_pppm(res);
     FDTD &fdtd = solver->fdtd;
     int3 coord = make_int3(res / 2, res / 2, res / 2);
-    float3 center = fdtd.getCenter(coord);
+    float3 center = solver->pg.getCenter(coord);
     CArr<float3> vertices(3);
     vertices[0] = center + make_float3(0.0f, 0.1f, 0.3f) * fdtd.dl;
     vertices[1] = center + make_float3(0.0f, 0.0f, 0.1f) * fdtd.dl;

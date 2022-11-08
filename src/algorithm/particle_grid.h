@@ -61,5 +61,13 @@ class ParticleGrid
         void reset() { clear(); }
 
         void construct_grid();
+
+        CGPU_FUNC inline float3 getCenter(int i, int j, int k) const
+        {
+            return make_float3((i + 0.5f) * grid_size, (j + 0.5f) * grid_size, (k + 0.5f) * grid_size) + min_pos;
+        }
+
+        CGPU_FUNC inline float3 getCenter(int3 c) const { return getCenter(c.x, c.y, c.z); }
+        CGPU_FUNC inline float3 getCenter(uint3 c) const { return getCenter(c.x, c.y, c.z); }
 };
 }  // namespace pppm

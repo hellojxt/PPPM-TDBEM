@@ -70,5 +70,5 @@ target_link_libraries(PPPMTest PRIVATE uilib alglib utillib)
 add_executable(PPPMDynamicTest tests/PPPMDynamicTest.cu)
 target_link_libraries(PPPMDynamicTest PRIVATE uilib alglib utillib)
 
-add_executable(GhostCellTest tests/GhostCellTest.cu)
-target_link_libraries(GhostCellTest PRIVATE Catch2::Catch2WithMain alglib utillib)
+add_executable(CellClassificationTest tests/CellClassificationTest.cu)
+target_link_libraries(CellClassificationTest PRIVATE uilib alglib utillib)
