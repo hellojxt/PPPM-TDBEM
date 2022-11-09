@@ -75,3 +75,6 @@ target_link_libraries(CellClassificationTest PRIVATE uilib alglib utillib)
 
 add_executable(CusparseTest tests/CusparseTest.cu)
 target_link_libraries(CusparseTest PRIVATE Catch2::Catch2WithMain alglib utillib)
+
+add_executable(SVDTest tests/SVDTest.cu)
+target_link_libraries(SVDTest PRIVATE Catch2::Catch2WithMain alglib utillib)
