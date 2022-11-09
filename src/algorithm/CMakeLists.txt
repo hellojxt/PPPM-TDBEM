@@ -4,7 +4,12 @@ add_library(alglib
         pppm_direct.cu
         pppm_cache.cu
         particle_grid.cu
-        ghost_cell.cu
+        sparse.cu
         ghost_cell_util.cu
-        
+        ghost_cell.cu
 )
+find_package(CUDAToolkit REQUIRED)
+target_include_directories(alglib
+    PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+)
+target_link_libraries(alglib PUBLIC cudart cusparse cublas)
