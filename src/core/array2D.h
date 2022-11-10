@@ -23,7 +23,7 @@ class GArr2D
             size = make_int2(rows, cols);
             this->data.resize(rows * cols);
         }
-        GArr2D() {}
+        GArr2D() { resize(0, 0); }
         GArr2D(int rows, int cols) { this->resize(rows, cols); }
 
         GArr2D(T *data, int rows, int cols)

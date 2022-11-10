@@ -60,8 +60,8 @@ SVDResult cusolver_svd(GArr3D<float> A)
     float *d_U = U.begin();
     GArr3D<float> V(A.batchs, m, m); /* right singular vectors */
     float *d_V = V.begin();
-    int *d_info = nullptr; /* error info */
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&d_info), sizeof(int) * batchSize));
+    GArr<int> info(A.batchs); /* error info */
+    int *d_info = info.begin();
 
     int lwork = 0;           /* size of workspace */
     float *d_work = nullptr; /* device workspace for getrf */
@@ -120,10 +120,39 @@ SVDResult cusolver_svd(GArr3D<float> A)
 
     CUDA_CHECK(cudaStreamSynchronize(stream));
     /* free resources */
-    CUDA_CHECK(cudaFree(d_info));
     CUDA_CHECK(cudaFree(d_work));
     CUSOLVER_CHECK(cusolverDnDestroy(cusolverH));
     CUDA_CHECK(cudaStreamDestroy(stream));
-    return SVDResult(S, U, V);
+    return SVDResult(S, U, V, info);
 }
+
+void __global__ inverse_from_svd_kernel(GArr2D<float> S, GArr3D<float> U, GArr3D<float> V, GArr3D<float> inv_A)
+{
+    int batch = blockIdx.x;
+    int row = threadIdx.x;
+    int col = threadIdx.y;
+    float sum = 0;
+    // A^T = (U^T) * (S^T) * (V^T)^T
+    // A = V^T * S * U
+    // A^-1 = U^T * S^-1 * V
+    for (int i = 0; i < U.rows; i++)
+    {
+        float s = S(batch, i);
+        if (s > 1e-6)
+        {
+            s = 1 / s;
+        }
+        sum += U(batch, i, row) * s * V(batch, i, col);
+    }
+    inv_A(batch, row, col) = sum;
+}
+
+GArr3D<float> inverse_from_svd(GArr2D<float> S, GArr3D<float> U, GArr3D<float> V)
+{
+    GArr3D<float> inv_A(U.batchs, U.rows, U.cols);
+    inverse_from_svd_kernel<<<U.batchs, dim3(U.rows, U.cols)>>>(S, U, V, inv_A);
+    cuSynchronize();
+    return inv_A;
+}
+
 };  // namespace pppm

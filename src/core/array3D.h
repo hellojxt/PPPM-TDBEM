@@ -26,7 +26,7 @@ class GArr3D
         }
 
         void resize(int3 size) { resize(size.x, size.y, size.z); }
-        GArr3D() {}
+        GArr3D() { resize(0, 0, 0); }
         GArr3D(int batchs, int rows, int cols) { this->resize(batchs, rows, cols); }
         GArr3D(CArr3D<T> &A) { this->assign(A); }
         void assign(const CArr3D<T> &A)

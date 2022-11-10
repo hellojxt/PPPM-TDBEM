@@ -129,7 +129,7 @@ template <typename T>
 class GArr
 {
     public:
-        GArr(){};
+        GArr() { resize(0); };
 
         GArr(uint num) { this->resize(num); }
 

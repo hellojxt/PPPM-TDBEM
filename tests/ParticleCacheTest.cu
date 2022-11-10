@@ -100,7 +100,7 @@ TEST_CASE("ParticleCache", "[pc]")
                 float3 v = local_to_global(guass_x[i][0], guass_x[i][1], dst_v);
                 ground_truth += 0.5 * guass_w[i] * func(v) * trg_jacobian;
             }
-            REQUIRE(interpolation_value == Approx(ground_truth).margin(1e-3));
+            REQUIRE(interpolation_value == Approx(ground_truth).margin(trg_jacobian * 1e-5));
         }
     }
 

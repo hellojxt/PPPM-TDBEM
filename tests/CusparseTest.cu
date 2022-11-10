@@ -11,6 +11,7 @@ using Catch::Approx;
 
 TEST_CASE("cusparse", "[cs]")
 {
+
     BiCGSTAB_Solver solver;
 
     int m = 100;
@@ -85,7 +86,7 @@ TEST_CASE("cusparse", "[cs]")
             x_vals.clear();
             for (int i = 0; i < m; i++)
             {
-                REQUIRE(x_vals_cpu[i] == Approx(x[i]).margin(1e-6));
+                REQUIRE(x_vals_cpu[i] == Approx(x[i]).margin(1e-3));
             }
         }
     }
