@@ -15,9 +15,9 @@ TEST_CASE("cusparse", "[cs]")
     BiCGSTAB_Solver solver;
 
     int m = 100;
-    CArr2D<double> A(m, m);
-    CArr<double> x(m);
-    CArr<double> b(m);
+    CArr2D<float> A(m, m);
+    CArr<float> x(m);
+    CArr<float> b(m);
     for (int _test = 0; _test < TEST_NUM; _test++)
     {
         // generate a sparse random matrix with diagonal dominant
@@ -58,7 +58,7 @@ TEST_CASE("cusparse", "[cs]")
         // convert A to COO format
         std::vector<int> row;
         std::vector<int> col;
-        std::vector<double> val;
+        std::vector<float> val;
         for (int i = 0; i < m; i++)
         {
             for (int j = 0; j < m; j++)
@@ -73,7 +73,7 @@ TEST_CASE("cusparse", "[cs]")
         }
         // solve Ax = b
         GArr<int> A_rows, A_cols;
-        GArr<double> A_vals, b_vals, x_vals;
+        GArr<float> A_vals, b_vals, x_vals;
         A_rows.assign(row);
         A_cols.assign(col);
         A_vals.assign(val);

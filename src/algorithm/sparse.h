@@ -9,13 +9,22 @@
 
 namespace pppm
 {
-using real = double;
 
 typedef struct VecStruct
 {
         cusparseDnVecDescr_t vec;
-        double *ptr;
+        float *ptr;
 } Vec;
+
+class COOMatrix
+{
+    public:
+        GArr<int> rows;
+        GArr<int> cols;
+        GArr<float> vals;
+        int rows_num;
+        int cols_num;
+};
 
 class BiCGSTAB_Solver
 {
@@ -25,15 +34,15 @@ class BiCGSTAB_Solver
         cusparseHandle_t cusparseHandle = NULL;
         cusparseSpMatDescr_t matA, matM_lower, matM_upper;
         void *d_bufferMV;
-        double *d_M_values;
+        float *d_M_values;
         bool cache_stored;
 
         BiCGSTAB_Solver();
 
-        void set_csr_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<real> &A_vals, int num_rows, int num_cols);
-        void set_coo_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<real> &A_vals, int num_rows, int num_cols);
+        void set_csr_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<float> &A_vals, int num_rows, int num_cols);
+        void set_coo_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<float> &A_vals, int num_rows, int num_cols);
 
-        GArr<real> solve(GArr<real> &b, int maxIterations = 20, double tolerance = 1e-10);
+        GArr<float> solve(GArr<float> &b, int maxIterations = 20, float tolerance = 1e-10);
 
         void clear_cache();
 
