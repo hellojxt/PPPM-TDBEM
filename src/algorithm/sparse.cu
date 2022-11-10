@@ -441,4 +441,49 @@ GArr<float> BiCGSTAB_Solver::solve(GArr<float> &b, int maxIterations, float tole
     return X;
 }
 
+__global__ void eliminate_zeros_kernel(GArr<int> index,
+                                       GArr<int> rows,
+                                       GArr<int> cols,
+                                       GArr<float> vals,
+                                       GArr<int> rows_shrink,
+                                       GArr<int> cols_shrink,
+                                       GArr<float> vals_shrink)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < index.size() && vals[i] != 0)
+    {
+        int idx = index[i] - 1;
+        rows_shrink[idx] = rows[i];
+        cols_shrink[idx] = cols[i];
+        vals_shrink[idx] = vals[i];
+    }
+}
+
+struct nonzero_vals
+{
+        __host__ __device__ int operator()(const float x) { return x != 0; }
+};
+
+void COOMatrix::eliminate_zeros()
+{
+    GArr<int> index;
+    index.resize(vals.size());
+    thrust::transform(thrust::device, vals.begin(), vals.end(), index.begin(), nonzero_vals());
+    thrust::inclusive_scan(thrust::device, index.begin(), index.end(), index.begin());
+    int num_nonzeros = index.last_item();
+    GArr<int> rows_shrink;
+    GArr<int> cols_shrink;
+    GArr<float> vals_shrink;
+    rows_shrink.resize(num_nonzeros);
+    cols_shrink.resize(num_nonzeros);
+    vals_shrink.resize(num_nonzeros);
+    cuExecute(vals.size(), eliminate_zeros_kernel, index, rows, cols, vals, rows_shrink, cols_shrink, vals_shrink);
+    rows.clear();
+    cols.clear();
+    vals.clear();
+    rows = rows_shrink;
+    cols = cols_shrink;
+    vals = vals_shrink;
+}
+
 };  // namespace pppm

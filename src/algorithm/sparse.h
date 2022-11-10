@@ -24,6 +24,20 @@ class COOMatrix
         GArr<float> vals;
         int rows_num;
         int cols_num;
+        COOMatrix()
+        {
+            rows_num = 0;
+            cols_num = 0;
+        }
+        void set_matrix(int rows_num, int cols_num, GArr<int> &rows, GArr<int> &cols, GArr<float> &vals)
+        {
+            this->rows_num = rows_num;
+            this->cols_num = cols_num;
+            this->rows = rows;
+            this->cols = cols;
+            this->vals = vals;
+        }
+        void eliminate_zeros();
 };
 
 class BiCGSTAB_Solver
@@ -41,6 +55,7 @@ class BiCGSTAB_Solver
 
         void set_csr_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<float> &A_vals, int num_rows, int num_cols);
         void set_coo_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<float> &A_vals, int num_rows, int num_cols);
+        void set_coo_matrix(COOMatrix &A) { set_coo_matrix(A.rows, A.cols, A.vals, A.rows_num, A.cols_num); }
 
         GArr<float> solve(GArr<float> &b, int maxIterations = 20, float tolerance = 1e-10);
 

@@ -21,9 +21,9 @@ namespace pppm
 
 #define LOG_FILE std::cout
 #define LOG(x) LOG_FILE << x << std::endl;
+#define LOG_INFO(x) LOG_FILE << #x << " = " << x << std::endl;
 #define LOG_ERROR(x) LOG_FILE << LOG_ERROR_COLOR << x << LOG_RESET_COLOR << std::endl;
 #define LOG_WARNING(x) LOG_FILE << LOG_WARNING_COLOR << x << LOG_RESET_COLOR << std::endl;
-#define LOG_INFO(x) LOG_FILE << LOG_INFO_COLOR << x << LOG_RESET_COLOR << std::endl;
 #define LOG_DEBUG(x) LOG_FILE << LOG_DEBUG_COLOR << x << LOG_RESET_COLOR << std::endl;
 #define LOG_LINE(x) \
     LOG_FILE << LOG_BOLD_COLOR << "---------------" << x << "---------------" << LOG_RESET_COLOR << std::endl;

@@ -5,6 +5,7 @@
 #include "array.h"
 #include "macro.h"
 #include "sparse.h"
+
 using namespace pppm;
 #define TEST_NUM 4
 using Catch::Approx;
@@ -63,12 +64,9 @@ TEST_CASE("cusparse", "[cs]")
         {
             for (int j = 0; j < m; j++)
             {
-                if (A(i, j) != 0)
-                {
-                    row.push_back(i);
-                    col.push_back(j);
-                    val.push_back(A(i, j));
-                }
+                row.push_back(i);
+                col.push_back(j);
+                val.push_back(A(i, j));
             }
         }
         // solve Ax = b
@@ -77,8 +75,13 @@ TEST_CASE("cusparse", "[cs]")
         A_rows.assign(row);
         A_cols.assign(col);
         A_vals.assign(val);
+
+        COOMatrix mat;
+        mat.set_matrix(m, m, A_rows, A_cols, A_vals);
+        mat.eliminate_zeros();
+
         b_vals.assign(b);
-        solver.set_coo_matrix(A_rows, A_cols, A_vals, m, m);
+        solver.set_coo_matrix(mat);
         for (int _test_inner = 0; _test_inner < TEST_NUM; _test_inner++)
         {
             x_vals = solver.solve(b_vals);
