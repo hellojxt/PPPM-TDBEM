@@ -18,9 +18,12 @@ class SVDResult
         GArr3D<float> U;
         GArr3D<float> V;
         GArr<int> info;
+        GArr3D<float> inv_A;
 
         SVDResult(GArr2D<float> &S, GArr3D<float> &U, GArr3D<float> &V, GArr<int> &info)
             : S(S), U(U), V(V), info(info){};
+
+        void solve_inverse() { inv_A = inverse_from_svd(S, U, V); }
 
         void clear()
         {
@@ -28,20 +31,8 @@ class SVDResult
             U.clear();
             V.clear();
             info.clear();
-            m_inv_A.clear();
+            inv_A.clear();
         }
-
-        GArr3D<float> get_inv_A()
-        {
-            if (m_inv_A.batchs == 0)
-            {
-                m_inv_A = inverse_from_svd(S, U, V);
-            }
-            return m_inv_A;
-        }
-
-    private:
-        GArr3D<float> m_inv_A;
 };
 
 SVDResult cusolver_svd(GArr3D<float> A);

@@ -26,7 +26,8 @@ TEST_CASE("SVD", "[svd]")
     }
     GArr3D<float> A_GPU(A);
     auto result = cusolver_svd(A_GPU);
-    auto A_inv = result.get_inv_A().cpu();
+    result.solve_inverse();
+    auto A_inv = result.inv_A.cpu();
     // check A_inv * A = I
     for (int i = 0; i < 128; i++)
     {
