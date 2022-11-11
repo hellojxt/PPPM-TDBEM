@@ -1,21 +1,25 @@
 #include "case_generator.h"
 #include "ghost_cell.h"
+#include "macro.h"
 #include "objIO.h"
 #include "visualize.h"
-
+using namespace pppm;
 struct view_transformer
 {
         CGPU_FUNC float operator()(CellInfo &x) const
         {
-            float k = (x.type == GHOST) ? 1.0f : -1.0f;
-            return 1.0f / (x.nearst_distance + 1e-10) * k;
+            if (x.type == SOLID)
+                return 0.0f;  // green for solid
+            if (x.type == GHOST)
+                return 1.0f / (x.nearst_distance + 0.005);  // light red for ghost
+            if (x.type == AIR)
+                return -1.0f / (x.nearst_distance + 0.005);  // light blue for air
+            return -MAX_FLOAT;                               // blue for UNKNOWN
         }
 };
 
 int main()
 {
-    using namespace pppm;
-
     GhostCellSolver *solver = empty_ghost_cell_solver(64);
     auto mesh = Mesh::loadOBJ("../assets/sphere.obj", true);
     mesh.stretch_to(solver->size().x / 3.0f);

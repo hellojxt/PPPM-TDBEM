@@ -26,6 +26,15 @@ TEST_CASE("SVD", "[svd]")
     }
     GArr3D<float> A_GPU(A);
     auto result = cusolver_svd(A_GPU);
+    auto single_values = result.S.cpu();
+    // check if the singular values are sorted
+    for (int i = 0; i < 128; i++)
+    {
+        for (int j = 0; j < 7; j++)
+        {
+            REQUIRE(single_values(i, j) >= single_values(i, j + 1));
+        }
+    }
     result.solve_inverse();
     auto A_inv = result.inv_A.cpu();
     // check A_inv * A = I

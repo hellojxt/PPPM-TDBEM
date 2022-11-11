@@ -29,6 +29,22 @@ class COOMatrix
             rows_num = 0;
             cols_num = 0;
         }
+        void resize(int rows_num, int cols_num, int nnz)
+        {
+            this->rows_num = rows_num;
+            this->cols_num = cols_num;
+            rows.resize(nnz);
+            cols.resize(nnz);
+            vals.resize(nnz);
+        }
+
+        void reset()
+        {
+            rows.reset();
+            cols.reset();
+            vals.reset();
+        }
+
         void set_matrix(int rows_num, int cols_num, GArr<int> &rows, GArr<int> &cols, GArr<float> &vals)
         {
             this->rows_num = rows_num;

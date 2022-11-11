@@ -1,3 +1,4 @@
+#include "ghost_cell.h"
 #include "ghost_cell_util.h"
 #include "helper_math.h"
 namespace pppm
@@ -15,7 +16,7 @@ __global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
 
     float3 grid_center = grid.getCenter(x, y, z);
     CellInfo result;
-    result.type = AIR;
+    result.type = UNKNOWN;
     result.nearst_distance = MAX_FLOAT;
 
     for (int dx = -1; dx <= 1; dx++)
@@ -38,17 +39,25 @@ __global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
                     {
                         result.nearst_distance = curr_len;
                         result.nearst_point = nearest_point;
-                        result.nearest_particle = grid.particles[i];
+                        result.nearest_particle_idx = i;
+                        result.reflect_point = 2 * nearest_point - grid_center;
                     }
                 }
             }
-    float direction = dot(result.nearest_particle.normal, grid_center - result.nearst_point);
-    result.type = (direction > 0) ? AIR : SOLID;
+    if (result.nearst_distance < MAX_FLOAT)
+    {
+        auto nearest_particle = grid.particles[result.nearest_particle_idx];
+        float direction = dot(nearest_particle.normal, grid_center - result.nearst_point);
+        result.type = (direction > 0) ? AIR : SOLID;
+    }
     cell_data(x, y, z) = result;
     return;
 }
 
-__global__ void cell_classfication_kernel(GArr3D<CellInfo> cell_data, ParticleGrid grid, GArr3D<CellType> type_arr)
+__global__ void cell_classfication_kernel(GArr3D<CellInfo> cell_data,
+                                          ParticleGrid grid,
+                                          GArr3D<CellType> type_arr,
+                                          GArr3D<int> ghost_idx_arr)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -75,9 +84,13 @@ __global__ void cell_classfication_kernel(GArr3D<CellInfo> cell_data, ParticleGr
         }
     }
     type_arr(x, y, z) = type;
+    ghost_idx_arr(x, y, z) = (type == GHOST);
 }
 
-__global__ void apply_cell_type_kernel(GArr3D<CellInfo> cell_data, ParticleGrid grid, GArr3D<CellType> type_arr)
+__global__ void apply_cell_type_kernel(GArr3D<CellInfo> cell_data,
+                                       ParticleGrid grid,
+                                       GArr3D<CellType> type_arr,
+                                       GArr3D<int> ghost_idx_arr)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -87,16 +100,23 @@ __global__ void apply_cell_type_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
     if (x < 0 || x >= grid_dim || y < 0 || y >= grid_dim || z < 0 || z >= grid_dim)
         return;
     cell_data(x, y, z).type = type_arr(x, y, z);
+    cell_data(x, y, z).ghost_idx = ghost_idx_arr(x, y, z) - 1;
 }
 
-void fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data)
+int fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data)
 {
     cuExecute3D(grid.grid_dim, fill_in_nearest_kernel, cell_data, grid);
     GArr3D<CellType> type_arr;
+    GArr3D<int> ghost_idx_arr;
     type_arr.resize(grid.grid_dim);
-    cuExecute3D(grid.grid_dim, cell_classfication_kernel, cell_data, grid, type_arr);
-    cuExecute3D(grid.grid_dim, apply_cell_type_kernel, cell_data, grid, type_arr);
+    ghost_idx_arr.resize(grid.grid_dim);
+    cuExecute3D(grid.grid_dim, cell_classfication_kernel, cell_data, grid, type_arr, ghost_idx_arr);
+    thrust::inclusive_scan(thrust::device, ghost_idx_arr.begin(), ghost_idx_arr.end(), ghost_idx_arr.begin());
+    cuExecute3D(grid.grid_dim, apply_cell_type_kernel, cell_data, grid, type_arr, ghost_idx_arr);
+    int ghost_cell_num = ghost_idx_arr.data.last_item();
     type_arr.clear();
+    ghost_idx_arr.clear();
+    return ghost_cell_num;
 }
 
 };  // namespace pppm

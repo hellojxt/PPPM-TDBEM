@@ -54,6 +54,7 @@ namespace pppm
 
 #define PI 3.14159265359
 #define AIR_WAVE_SPEED 340.29f
+#define AIR_DENSITY 1.225f
 #define CGPU_FUNC __host__ __device__
 #define GPU_FUNC __device__
 #define CPU_FUNC __host__
