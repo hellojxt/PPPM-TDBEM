@@ -21,7 +21,7 @@ namespace pppm
 
 #define LOG_FILE std::cout
 #define LOG(x) LOG_FILE << x << std::endl;
-#define LOG_INFO(x) LOG_FILE << #x << " = " << x << std::endl;
+#define LOG_INFO(x) LOG_FILE << #x << " = \n" << x << std::endl;
 #define LOG_ERROR(x) LOG_FILE << LOG_ERROR_COLOR << x << LOG_RESET_COLOR << std::endl;
 #define LOG_WARNING(x) LOG_FILE << LOG_WARNING_COLOR << x << LOG_RESET_COLOR << std::endl;
 #define LOG_DEBUG(x) LOG_FILE << LOG_DEBUG_COLOR << x << LOG_RESET_COLOR << std::endl;
@@ -106,7 +106,7 @@ static inline void checkCudaError(const char *msg)
         atomicAdd_block(((float *)(dst)) + 1, (value).imag()); \
     }
 
-#ifdef DEBUG
+#ifdef NDEBUG
 #    define cuSafeCall(X) X
 #else
 #    define cuSafeCall(X) \
@@ -118,7 +118,7 @@ static inline void checkCudaError(const char *msg)
  * @brief Macro to check cuda errors
  *
  */
-#ifdef DEBUG
+#ifdef NDEBUG
 #    define cuSynchronize() \
         {}
 #else

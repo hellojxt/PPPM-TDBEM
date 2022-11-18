@@ -100,7 +100,14 @@ __global__ void apply_cell_type_kernel(GArr3D<CellInfo> cell_data,
     if (x < 0 || x >= grid_dim || y < 0 || y >= grid_dim || z < 0 || z >= grid_dim)
         return;
     cell_data(x, y, z).type = type_arr(x, y, z);
-    cell_data(x, y, z).ghost_idx = ghost_idx_arr(x, y, z) - 1;
+    if (type_arr(x, y, z) == GHOST)
+    {
+        cell_data(x, y, z).ghost_idx = ghost_idx_arr(x, y, z) - 1;
+    }
+    else
+    {
+        cell_data(x, y, z).ghost_idx = -1;
+    }
 }
 
 int fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data)

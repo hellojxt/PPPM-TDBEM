@@ -9,6 +9,29 @@ CGPU_FUNC inline int3 neighbor_idx_to_coord(int idx)
     return make_int3(idx % 2, (idx / 2) % 2, idx / 4);
 }
 
+// normalize the coordinate to the range [-1, 1]^3
+GPU_FUNC inline float3 get_normalized_coord(float3 coord, int3 base_coord, GhostCellSolver &solver)
+{
+    float3 base_point = solver.grid.getCenter(base_coord);
+    return (coord - base_point) / solver.grid_size() * 2 + make_float3(-1, -1, -1);
+}
+
+// return the base coordinate of the 8 interpolation points of the reflect point
+GPU_FUNC inline int3 get_base_coord_for_reflect(CellInfo ghost_cell, GhostCellSolver &solver)
+{
+    float grid_size = solver.grid_size();
+    float3 reflect_point = ghost_cell.reflect_point;
+    int3 base_coord = make_int3(reflect_point / grid_size - 0.5f);
+#ifdef MEMORY_CHECK
+    float3 base_point = solver.grid.getCenter(base_coord);
+    float3 offset = reflect_point - base_point;
+    if (offset.x < 0 || offset.y < 0 || offset.z < 0 || offset.x > grid_size || offset.y > grid_size ||
+        offset.z > grid_size)
+        printf("interpolation error in construct_phi_matrix_kernel in ghost_cell.cu");
+#endif
+    return base_coord;
+}
+
 __global__ void construct_ghost_cell_list(GhostCellSolver solver)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -30,9 +53,9 @@ void GhostCellSolver::precompute_cell_data()
     ghost_cell_num = fill_cell_data(grid, cell_data);
     ghost_cells.resize(ghost_cell_num);
     cuExecute3D(grid.grid_dim, construct_ghost_cell_list, *this);
+    if (ghost_cell_num <= 0)
+        LOG_ERROR("No ghost cell found!");
 };
-
-#define SINGULAR_EPS 0.02f
 
 __global__ void construct_phi_matrix_kernel(GArr3D<float> phi, GhostCellSolver solver)
 {
@@ -41,38 +64,19 @@ __global__ void construct_phi_matrix_kernel(GArr3D<float> phi, GhostCellSolver s
         return;
     int3 ghost_cell_coord = solver.ghost_cells[ghost_idx];
     CellInfo ghost_cell = solver.cell_data(ghost_cell_coord);
-    float3 nearest_point = ghost_cell.nearst_point;
-    float3 reflect_point = ghost_cell.reflect_point;
-    float grid_size = solver.grid.grid_size;
-    int3 base_coord = make_int3(reflect_point / grid_size - 0.5f);
-    float3 base_point = solver.grid.getCenter(base_coord);
-#ifdef MEMORY_CHECK
-    float3 offset = reflect_point - base_point;
-    if (offset.x < 0 || offset.y < 0 || offset.z < 0 || offset.x > grid_size || offset.y > grid_size ||
-        offset.z > grid_size)
-        printf("interpolation error in construct_phi_matrix_kernel in ghost_cell.cu");
-#endif
-    float3 normal = solver.grid.particles[ghost_cell.nearest_particle_idx].normal;
+    float3 normal = normalize(ghost_cell.reflect_point - ghost_cell.nearst_point);
+    int3 base_coord = get_base_coord_for_reflect(ghost_cell, solver);
+
     for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
     {
         int3 dcoord = neighbor_idx_to_coord(i);
-        int3 coord = base_coord + dcoord;
-        float distance = length(solver.grid.getCenter(coord) - nearest_point);
-        if (distance > grid_size * SINGULAR_EPS)
-        {
-            // phi[ghost_idx][i] = [xyz, xy, xz, yz, x, y, z, 1];
-            phi(ghost_idx, i, 0) = coord.x * coord.y * coord.z;
-            phi(ghost_idx, i, 1) = coord.x * coord.y;
-            phi(ghost_idx, i, 2) = coord.y * coord.z;
-            phi(ghost_idx, i, 3) = coord.x * coord.z;
-            phi(ghost_idx, i, 4) = coord.x;
-            phi(ghost_idx, i, 5) = coord.y;
-            phi(ghost_idx, i, 6) = coord.z;
-            phi(ghost_idx, i, 7) = 1;
-        }
-        else
+        int3 neighbor_coord = base_coord + dcoord;
+        bool is_self = (neighbor_coord.x == ghost_cell_coord.x && neighbor_coord.y == ghost_cell_coord.y &&
+                        neighbor_coord.z == ghost_cell_coord.z);
+        if (is_self)
         {
             // dn phi = normal dot D phi
+            float3 coord = get_normalized_coord(ghost_cell.nearst_point, base_coord, solver);
             phi(ghost_idx, i, 0) = dot(normal, make_float3(coord.y * coord.z, coord.x * coord.z, coord.x * coord.y));
             phi(ghost_idx, i, 1) = dot(normal, make_float3(coord.y, coord.x, 0));
             phi(ghost_idx, i, 2) = dot(normal, make_float3(0, coord.z, coord.y));
@@ -82,6 +86,19 @@ __global__ void construct_phi_matrix_kernel(GArr3D<float> phi, GhostCellSolver s
             phi(ghost_idx, i, 6) = dot(normal, make_float3(0, 0, 1));
             phi(ghost_idx, i, 7) = 0;
         }
+        else
+        {
+            // phi[ghost_idx][i] = [xyz, xy, xz, yz, x, y, z, 1];
+            float3 coord = make_float3(dcoord * 2 - 1);
+            phi(ghost_idx, i, 0) = coord.x * coord.y * coord.z;
+            phi(ghost_idx, i, 1) = coord.x * coord.y;
+            phi(ghost_idx, i, 2) = coord.y * coord.z;
+            phi(ghost_idx, i, 3) = coord.x * coord.z;
+            phi(ghost_idx, i, 4) = coord.x;
+            phi(ghost_idx, i, 5) = coord.y;
+            phi(ghost_idx, i, 6) = coord.z;
+            phi(ghost_idx, i, 7) = 1;
+        }
     }
 }
 
@@ -90,8 +107,9 @@ __global__ void precompute_p_weight_kernel(SVDResult svd_result, GhostCellSolver
     int ghost_idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (ghost_idx >= solver.ghost_cell_num)
         return;
-    int condition_num = svd_result.S(ghost_idx, 0) / svd_result.S(ghost_idx, GHOST_CELL_NEIGHBOR_NUM - 1);
-    if (condition_num > CONDITION_NUMBER_THRESHOLD)
+    float condition_num = svd_result.S(ghost_idx, 0) / svd_result.S(ghost_idx, GHOST_CELL_NEIGHBOR_NUM - 1);
+    // printf("condition_num: %f , threshold: %f\n", condition_num, solver.condition_number_threshold);
+    if (condition_num > solver.condition_number_threshold)
     {
         solver.ghost_order[ghost_idx] = AccuracyOrder::FIRST_ORDER;
         for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
@@ -103,19 +121,24 @@ __global__ void precompute_p_weight_kernel(SVDResult svd_result, GhostCellSolver
     {
         solver.ghost_order[ghost_idx] = AccuracyOrder::SECOND_ORDER;
         int3 ghost_cell_coord = solver.ghost_cells[ghost_idx];
-        float3 r = solver.cell_data(ghost_cell_coord).reflect_point;
+        auto ghost_cell = solver.cell_data(ghost_cell_coord);
+        int3 base_coord = get_base_coord_for_reflect(ghost_cell, solver);
+        float3 r = get_normalized_coord(ghost_cell.reflect_point, base_coord, solver);
+        printf("r: %f %f %f\n", r.x, r.y, r.z);
         float phi_r[GHOST_CELL_NEIGHBOR_NUM] = {r.x * r.y * r.z, r.x * r.y, r.y * r.z, r.x * r.z, r.x, r.y, r.z, 1};
+        // p_weight = inv_A.T * phi_r
         for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
         {
-            int sum = 0;
+            float sum = 0;
             for (int j = 0; j < GHOST_CELL_NEIGHBOR_NUM; j++)
             {
-                sum += svd_result.inv_A(ghost_idx, j, i);
+                sum += svd_result.inv_A(ghost_idx, j, i) * phi_r[j];
             }
-            solver.p_weight(ghost_idx, i) = sum * phi_r[i];
+            solver.p_weight(ghost_idx, i) = sum;
         }
     }
 }
+
 template <bool CONSTRUCT_MATRIX = true, bool CONSTRUCT_RHS = true>
 __global__ void construct_equation_kernel(GhostCellSolver solver)
 {
@@ -124,15 +147,15 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
         return;
     auto acc_order = solver.ghost_order[ghost_idx];
     int offset = ghost_idx * (GHOST_CELL_NEIGHBOR_NUM + 1);
-    if (CONSTRUCT_MATRIX)
-    {
-        solver.A.rows[offset] = ghost_idx;
-        solver.A.cols[offset] = ghost_idx;
-        solver.A.vals[offset] = 1;
-    }
     int3 ghost_cell_coord = solver.ghost_cells[ghost_idx];
     if (acc_order == AccuracyOrder::FIRST_ORDER)
     {
+        if (CONSTRUCT_MATRIX)
+        {
+            solver.A.rows[offset] = ghost_idx;
+            solver.A.cols[offset] = ghost_idx;
+            solver.A.vals[offset] = 1;
+        }
         if (CONSTRUCT_RHS)
         {
             int3 dcoord[6] = {make_int3(1, 0, 0),  make_int3(-1, 0, 0), make_int3(0, 1, 0),
@@ -154,44 +177,56 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
     else if (acc_order == AccuracyOrder::SECOND_ORDER)
     {
         auto ghost_cell = solver.cell_data(ghost_cell_coord);
-        float3 nearest_point = ghost_cell.nearst_point;
-        float3 reflect_point = ghost_cell.reflect_point;
-        int3 base_coord = make_int3(reflect_point / solver.grid_size() - 0.5f);
-        float b_value = solver.neuuman_data[ghost_cell.nearest_particle_idx] * AIR_DENSITY * solver.grid_size();
+        int3 base_coord = get_base_coord_for_reflect(ghost_cell, solver);
+        float b_value = 0;
+        if (CONSTRUCT_RHS)
+            b_value +=
+                solver.neuuman_data[ghost_cell.nearest_particle_idx] * AIR_DENSITY * ghost_cell.nearst_distance * 2;
         for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
         {
             int3 dcoord = neighbor_idx_to_coord(i);
-            int3 coord = base_coord + dcoord;
-            float distance = length(solver.grid.getCenter(coord) - nearest_point);
-            auto neighbor_cell = solver.cell_data(coord);
-            if ((distance > solver.grid_size() * SINGULAR_EPS) && (neighbor_cell.type == GHOST))
-            {
-                if (CONSTRUCT_MATRIX)
-                {
-                    solver.A.rows[offset + i + 1] = ghost_idx;
-                    solver.A.cols[offset + i + 1] = neighbor_cell.ghost_idx;
-                    solver.A.vals[offset + i + 1] = -solver.p_weight(ghost_idx, i);
-                }
-            }
-            else
+            int3 neighbor_coord = base_coord + dcoord;
+            auto neighbor_cell = solver.cell_data(neighbor_coord);
+            bool is_self = (neighbor_cell.ghost_idx == ghost_idx);
+            if (is_self)  // ghost cell self, p = -rho*an(nearst_point)
             {
                 if (CONSTRUCT_RHS)
                 {
-                    if (neighbor_cell.type == GHOST)
-                    {
-                        b_value += solver.p_weight(ghost_idx, i) *
-                                   solver.neuuman_data[ghost_cell.nearest_particle_idx] * AIR_DENSITY;
-                    }
-                    else
-                    {
-                        b_value += solver.p_weight(ghost_idx, i) * solver.fdtd.grids[solver.fdtd.t](coord);
-                    }
+                    float scale_factor =
+                        solver.grid_size() / 2;  // correction factor as stencils are transformed to the [−1, 1]^3
+                    b_value += solver.p_weight(ghost_idx, i) *
+                               (-scale_factor * solver.neuuman_data[ghost_cell.nearest_particle_idx] * AIR_DENSITY);
+                }
+            }
+            else if (neighbor_cell.type == GHOST)  // other ghost cell, add matrix element
+            {
+                if (CONSTRUCT_MATRIX)
+                {
+                    solver.A.rows[offset + i] = ghost_idx;
+                    solver.A.cols[offset + i] = neighbor_cell.ghost_idx;
+                    // solver.A.vals[offset + i] = 0;
+                    solver.A.vals[offset + i] = -solver.p_weight(ghost_idx, i);
+                    printf("A(%d, %d) = %f\n", ghost_idx, neighbor_cell.ghost_idx, solver.p_weight(ghost_idx, i));
+                }
+            }
+            else  // neighbor cell is air
+            {
+                if (CONSTRUCT_RHS)
+                {
+                    b_value += solver.p_weight(ghost_idx, i) * solver.fdtd.grids[solver.fdtd.t](neighbor_coord);
                 }
             }
         }
         if (CONSTRUCT_RHS)
         {
             solver.b[ghost_idx] = b_value;
+        }
+
+        if (CONSTRUCT_MATRIX)
+        {
+            solver.A.rows[offset + GHOST_CELL_NEIGHBOR_NUM] = ghost_idx;
+            solver.A.cols[offset + GHOST_CELL_NEIGHBOR_NUM] = ghost_idx;
+            solver.A.vals[offset + GHOST_CELL_NEIGHBOR_NUM] = 1;
         }
     }
 }
@@ -207,11 +242,34 @@ void GhostCellSolver::precompute_ghost_matrix()
     cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this);
     auto svd_result = cusolver_svd(phi);
     svd_result.solve_inverse();
+    ghost_order.resize(ghost_cell_num);
     cuExecute(ghost_cell_num, precompute_p_weight_kernel, svd_result, *this);
     auto construct_matrix_kernel = construct_equation_kernel<true, false>;
     cuExecute(ghost_cell_num, construct_matrix_kernel, *this);
+    A.eliminate_zeros();
+    A.sort_by_row();
+    linear_solver.set_coo_matrix(A);
     phi.clear();
     svd_result.clear();
+}
+
+__global__ void update_ghost_cell_kernel(GArr<float> x, GhostCellSolver solver)
+{
+    int ghost_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (ghost_idx >= solver.ghost_cell_num)
+        return;
+    int3 ghost_cell_coord = solver.ghost_cells[ghost_idx];
+    solver.fdtd.grids[solver.fdtd.t](ghost_cell_coord) = x[ghost_idx];
+}
+
+void GhostCellSolver::solve_ghost_cell()
+{
+    b.reset();
+    auto construct_rhs_kernel = construct_equation_kernel<false, true>;
+    cuExecute(ghost_cell_num, construct_rhs_kernel, *this);
+    x.clear();
+    x = linear_solver.solve(b, 100);
+    cuExecute(ghost_cell_num, update_ghost_cell_kernel, x, *this);
 }
 
 }  // namespace pppm

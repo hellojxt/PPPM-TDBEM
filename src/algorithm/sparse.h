@@ -45,6 +45,13 @@ class COOMatrix
             vals.reset();
         }
 
+        void clear()
+        {
+            rows.clear();
+            cols.clear();
+            vals.clear();
+        }
+
         void set_matrix(int rows_num, int cols_num, GArr<int> &rows, GArr<int> &cols, GArr<float> &vals)
         {
             this->rows_num = rows_num;
@@ -54,6 +61,37 @@ class COOMatrix
             this->vals = vals;
         }
         void eliminate_zeros();
+
+        void sort_by_row();
+
+        void print()
+        {
+            auto rows_cpu = rows.cpu();
+            auto cols_cpu = cols.cpu();
+            auto vals_cpu = vals.cpu();
+            // print dense matrix
+            for (int i = 0; i < rows_num; i++)
+            {
+                for (int j = 0; j < cols_num; j++)
+                {
+                    bool found = false;
+                    for (int k = 0; k < rows.size(); k++)
+                    {
+                        if (rows_cpu[k] == i && cols_cpu[k] == j)
+                        {
+                            printf("%f ", vals_cpu[k]);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        printf("%f ", 0.0f);
+                    }
+                }
+                printf("\n");
+            }
+        }
 };
 
 class BiCGSTAB_Solver
@@ -69,11 +107,12 @@ class BiCGSTAB_Solver
 
         BiCGSTAB_Solver();
 
+        // must be sorted!!! (although the cusparse documentation does not mention this)
         void set_csr_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<float> &A_vals, int num_rows, int num_cols);
         void set_coo_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<float> &A_vals, int num_rows, int num_cols);
         void set_coo_matrix(COOMatrix &A) { set_coo_matrix(A.rows, A.cols, A.vals, A.rows_num, A.cols_num); }
 
-        GArr<float> solve(GArr<float> &b, int maxIterations = 20, float tolerance = 1e-10);
+        GArr<float> solve(GArr<float> &b, int maxIterations = 20, float tolerance = 1e-6);
 
         void clear_cache();
 

@@ -6,9 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For CUDA-GDB
-# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
 # For nsight compute
-add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
+# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
@@ -72,6 +72,9 @@ target_link_libraries(PPPMDynamicTest PRIVATE uilib alglib utillib)
 
 add_executable(CellClassificationTest tests/CellClassificationTest.cu)
 target_link_libraries(CellClassificationTest PRIVATE uilib alglib utillib)
+
+add_executable(GhostCellTest tests/GhostCellTest.cu)
+target_link_libraries(GhostCellTest PRIVATE uilib alglib utillib)
 
 add_executable(CusparseTest tests/CusparseTest.cu)
 target_link_libraries(CusparseTest PRIVATE Catch2::Catch2WithMain alglib utillib)

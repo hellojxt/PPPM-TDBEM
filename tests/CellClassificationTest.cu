@@ -18,17 +18,8 @@ struct view_transformer
         }
 };
 
-int main()
+void view_cell_data(GhostCellSolver *solver)
 {
-    GhostCellSolver *solver = empty_ghost_cell_solver(64);
-    auto mesh = Mesh::loadOBJ("../assets/sphere.obj", true);
-    mesh.stretch_to(solver->size().x / 3.0f);
-    mesh.move_to(solver->center());
-
-    solver->set_mesh(mesh.vertices, mesh.triangles);
-
-    solver->precompute_cell_data();
-
     GArr3D<float> view_data;
     view_data.resize(solver->cell_data.size);
     thrust::transform(thrust::device, solver->cell_data.begin(), solver->cell_data.end(), view_data.begin(),
@@ -39,4 +30,16 @@ int main()
     re.assign(0, view_data);
     re.update_mesh();
     re.render();
+}
+
+int main()
+{
+    GhostCellSolver *solver = empty_ghost_cell_solver(64);
+    auto mesh = Mesh::loadOBJ("../assets/sphere.obj", true);
+    mesh.stretch_to(solver->size().x / 3.0f);
+    mesh.move_to(solver->center());
+
+    solver->set_mesh(mesh.vertices, mesh.triangles);
+
+    view_cell_data(solver);
 }

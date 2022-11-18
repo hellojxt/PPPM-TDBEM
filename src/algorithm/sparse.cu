@@ -1,4 +1,4 @@
-
+#include "array.h"
 #include "sparse.h"
 
 namespace pppm
@@ -83,6 +83,57 @@ namespace pppm
         }                                                                              \
     }
 
+void COOMatrix::sort_by_row()
+{
+
+    // sort coo by rows
+    int nnz = vals.size();
+    auto num_columns = cols_num;
+    auto num_rows = rows_num;
+    int *d_rows, *d_columns, *d_permutation;
+    float *d_values, *d_values_sorted;
+    void *d_buffer;
+    size_t bufferSize;
+    d_rows = rows.data();
+    d_columns = cols.data();
+    d_values = vals.data();
+    CHECK_CUDA(cudaMalloc((void **)&d_values_sorted, nnz * sizeof(float)))
+    CHECK_CUDA(cudaMalloc((void **)&d_permutation, nnz * sizeof(int)))
+    cusparseHandle_t handle = NULL;
+    cusparseSpVecDescr_t vec_permutation;
+    cusparseDnVecDescr_t vec_values;
+    CHECK_CUSPARSE(cusparseCreate(&handle))
+    // Create sparse vector for the permutation
+    CHECK_CUSPARSE(cusparseCreateSpVec(&vec_permutation, nnz, nnz, d_permutation, d_values_sorted, CUSPARSE_INDEX_32I,
+                                       CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F))
+    // Create dense vector for wrapping the original coo values
+    CHECK_CUSPARSE(cusparseCreateDnVec(&vec_values, nnz, d_values, CUDA_R_32F))
+
+    // Query working space of COO sort
+    CHECK_CUSPARSE(cusparseXcoosort_bufferSizeExt(handle, num_rows, num_columns, nnz, d_rows, d_columns, &bufferSize))
+    CHECK_CUDA(cudaMalloc(&d_buffer, bufferSize))
+    // Setup permutation vector to identity
+    CHECK_CUSPARSE(cusparseCreateIdentityPermutation(handle, nnz, d_permutation))
+    CHECK_CUSPARSE(
+        cusparseXcoosortByRow(handle, num_rows, num_columns, nnz, d_rows, d_columns, d_permutation, d_buffer))
+    CHECK_CUSPARSE(cusparseGather(handle, vec_values, vec_permutation))
+    // destroy matrix/vector descriptors
+    CHECK_CUSPARSE(cusparseDestroySpVec(vec_permutation))
+    CHECK_CUSPARSE(cusparseDestroyDnVec(vec_values))
+    CHECK_CUSPARSE(cusparseDestroy(handle))
+    CHECK_CUDA(cudaFree(d_buffer))
+    CHECK_CUDA(cudaFree(d_permutation))
+    vals.clear();
+    vals = GArr<float>(d_values_sorted, nnz);
+}
+
+template <typename T>
+void print_device(T *data, int num)
+{
+    GArr<T> h_data(data, num);
+    LOG(h_data);
+}
+
 int solve_BiCGStab_cusparse(cublasHandle_t cublasHandle,
                             cusparseHandle_t cusparseHandle,
                             int m,
@@ -147,15 +198,16 @@ int solve_BiCGStab_cusparse(cublasHandle_t cublasHandle,
     //--------------------------------------------------------------------------
     // nrm_R0 = ||R||
     float nrm_R;
+    float nrm_S;
     CHECK_CUBLAS(cublasSnrm2(cublasHandle, m, d_R0.ptr, 1, &nrm_R))
     float threshold = tolerance * nrm_R;
 
     //--------------------------------------------------------------------------
     // ### 2 ### repeat until convergence based on max iterations and
     //           and relative residual
-    for (int i = 1; i <= maxIterations; i++)
+    int i;
+    for (i = 1; i <= maxIterations; i++)
     {
-
         //----------------------------------------------------------------------
         // ### 4, 7 ### P_i = R_i
         CHECK_CUDA(cudaMemcpy(d_P.ptr, d_R.ptr, m * sizeof(float), cudaMemcpyDeviceToDevice))
@@ -209,7 +261,6 @@ int solve_BiCGStab_cusparse(cublasHandle_t cublasHandle,
         CHECK_CUBLAS(cublasSaxpy(cublasHandle, m, &minus_alpha, d_V.ptr, 1, d_S.ptr, 1))
         //----------------------------------------------------------------------
         // ### 13 ###  check ||S|| < threshold
-        float nrm_S;
         CHECK_CUBLAS(cublasSnrm2(cublasHandle, m, d_S.ptr, 1, &nrm_S))
         if (nrm_S < threshold)
             break;
@@ -251,8 +302,11 @@ int solve_BiCGStab_cusparse(cublasHandle_t cublasHandle,
         // ### 18 ###  check ||R_i|| < threshold
         CHECK_CUBLAS(cublasSnrm2(cublasHandle, m, d_R.ptr, 1, &nrm_R))
         if (nrm_R < threshold)
+        {
             break;
+        }
     }
+    int converge_iter_num = i;
     //--------------------------------------------------------------------------
     //    (a) copy b in R
     CHECK_CUDA(cudaMemcpy(d_R.ptr, d_B.ptr, m * sizeof(float), cudaMemcpyDeviceToDevice))
@@ -266,7 +320,7 @@ int solve_BiCGStab_cusparse(cublasHandle_t cublasHandle,
     CHECK_CUSPARSE(cusparseSpSV_destroyDescr(spsvDescrU))
     CHECK_CUDA(cudaFree(d_bufferL))
     CHECK_CUDA(cudaFree(d_bufferU))
-    return EXIT_SUCCESS;
+    return converge_iter_num;
 }
 
 BiCGSTAB_Solver::BiCGSTAB_Solver()
@@ -356,13 +410,25 @@ void BiCGSTAB_Solver::set_csr_matrix(GArr<int> &A_rows,
     CHECK_CUSPARSE(cusparseScsrilu02_bufferSize(cusparseHandle, m, nnz, matLU, d_M_values, d_A_rows, d_A_columns, infoM,
                                                 &bufferSizeLU))
     CHECK_CUDA(cudaMalloc(&d_bufferLU, bufferSizeLU))
+    // print_device(d_M_values, nnz);
+    // print_device(d_A_rows, m + 1);
+    // print_device(d_A_columns, nnz);
     CHECK_CUSPARSE(cusparseScsrilu02_analysis(cusparseHandle, m, nnz, matLU, d_M_values, d_A_rows, d_A_columns, infoM,
-                                              CUSPARSE_SOLVE_POLICY_USE_LEVEL, d_bufferLU))
+                                              CUSPARSE_SOLVE_POLICY_NO_LEVEL, d_bufferLU))
     int structural_zero;
+
+    // cusparseStatus_t status = (cusparseXcsrilu02_zeroPivot(cusparseHandle, infoM, &structural_zero));
+    // printf("structural_zero: %d\n", structural_zero);
+    // if (status != CUSPARSE_STATUS_SUCCESS)
+    // {
+    //     printf("cuSPARSE API failed at line %d with error: %s (%d)\n", __LINE__, cusparseGetErrorString(status),
+    //            status);
+    //     exit(1);
+    // }
     CHECK_CUSPARSE(cusparseXcsrilu02_zeroPivot(cusparseHandle, infoM, &structural_zero))
     // M = L * U
     CHECK_CUSPARSE(cusparseScsrilu02(cusparseHandle, m, nnz, matLU, d_M_values, d_A_rows, d_A_columns, infoM,
-                                     CUSPARSE_SOLVE_POLICY_USE_LEVEL, d_bufferLU))
+                                     CUSPARSE_SOLVE_POLICY_NO_LEVEL, d_bufferLU))
     // Find numerical zero
     int numerical_zero;
     CHECK_CUSPARSE(cusparseXcsrilu02_zeroPivot(cusparseHandle, infoM, &numerical_zero))
@@ -427,6 +493,19 @@ void BiCGSTAB_Solver::clear()
     CHECK_CUBLAS(cublasDestroy(cublasHandle))
 }
 
+struct square
+{
+        CGPU_FUNC
+        float operator()(const float &x) const { return x * x; }
+};
+
+struct multiply
+{
+        float a;
+        multiply(float a) : a(a) {}
+        CGPU_FUNC float operator()(const float &x) const { return a * x; }
+};
+
 GArr<float> BiCGSTAB_Solver::solve(GArr<float> &b, int maxIterations, float tolerance)
 {
     GArr<float> X;
@@ -434,10 +513,25 @@ GArr<float> BiCGSTAB_Solver::solve(GArr<float> &b, int maxIterations, float tole
     X.reset();
     d_X.ptr = X.data();
     d_B.ptr = b.data();
+    // b_num = (\sum_i b_i^2)^0.5
+    float b_norm = std::sqrt(
+        thrust::transform_reduce(thrust::device, b.begin(), b.end(), square(), 0.0f, thrust::plus<float>()) / b.size());
+    if (b_norm == 0.0f)
+        return X;
+    // b = b / b_norm
+    thrust::transform(thrust::device, b.begin(), b.end(), b.begin(), multiply(1.0f / b_norm));
     CHECK_CUSPARSE(cusparseCreateDnVec(&d_B.vec, b.size(), d_B.ptr, CUDA_R_32F))
     CHECK_CUSPARSE(cusparseCreateDnVec(&d_X.vec, b.size(), d_X.ptr, CUDA_R_32F))
-    solve_BiCGStab_cusparse(cublasHandle, cusparseHandle, b.size(), matA, matM_lower, matM_upper, d_B, d_X, d_R0, d_R,
-                            d_P, d_P_aux, d_S, d_S_aux, d_V, d_T, d_tmp, d_bufferMV, maxIterations, tolerance);
+    int converge_iter_num =
+        solve_BiCGStab_cusparse(cublasHandle, cusparseHandle, b.size(), matA, matM_lower, matM_upper, d_B, d_X, d_R0,
+                                d_R, d_P, d_P_aux, d_S, d_S_aux, d_V, d_T, d_tmp, d_bufferMV, maxIterations, tolerance);
+#ifndef NDEBUG
+    std::cout << "BiCGStab converged in " << converge_iter_num << " iterations" << std::endl;
+#endif
+    // X = X * b_norm
+    thrust::transform(thrust::device, X.begin(), X.end(), X.begin(), multiply(b_norm));
+    // b = b * b_norm
+    thrust::transform(thrust::device, b.begin(), b.end(), b.begin(), multiply(b_norm));
     return X;
 }
 
