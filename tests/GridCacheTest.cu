@@ -35,8 +35,6 @@ void test_precompute_grid_cache(PPPMSolver *solver)
                         {
                             for (int dz = -1; dz <= 1; dz++)
                             {
-                                if (dx == 0 && dy == 0 && dz == 0)
-                                    continue;
                                 int3 neighbor = make_int3(x + dx, y + dy, z + dz);
                                 neighbor_num += grid_hash_map(neighbor).length();
                             }

@@ -124,7 +124,7 @@ __global__ void precompute_p_weight_kernel(SVDResult svd_result, GhostCellSolver
         auto ghost_cell = solver.cell_data(ghost_cell_coord);
         int3 base_coord = get_base_coord_for_reflect(ghost_cell, solver);
         float3 r = get_normalized_coord(ghost_cell.reflect_point, base_coord, solver);
-        printf("r: %f %f %f\n", r.x, r.y, r.z);
+        // printf("r: %f %f %f\n", r.x, r.y, r.z);
         float phi_r[GHOST_CELL_NEIGHBOR_NUM] = {r.x * r.y * r.z, r.x * r.y, r.y * r.z, r.x * r.z, r.x, r.y, r.z, 1};
         // p_weight = inv_A.T * phi_r
         for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
@@ -206,7 +206,7 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
                     solver.A.cols[offset + i] = neighbor_cell.ghost_idx;
                     // solver.A.vals[offset + i] = 0;
                     solver.A.vals[offset + i] = -solver.p_weight(ghost_idx, i);
-                    printf("A(%d, %d) = %f\n", ghost_idx, neighbor_cell.ghost_idx, solver.p_weight(ghost_idx, i));
+                    // printf("A(%d, %d) = %f\n", ghost_idx, neighbor_cell.ghost_idx, solver.p_weight(ghost_idx, i));
                 }
             }
             else  // neighbor cell is air
