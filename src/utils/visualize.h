@@ -3,7 +3,7 @@
 #include "objIO.h"
 #include "pppm.h"
 #include "window.h"
-
+#include "array_writer.h"
 namespace pppm
 {
 
@@ -97,6 +97,8 @@ class RenderElement
             gui.append(&render_window);
             gui.start();
         }
+
+        void write_image(int idx, std::string filename);
 };
 
 static inline void renderArray(RenderElement &e)

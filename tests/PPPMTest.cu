@@ -32,7 +32,8 @@ int main()
 {
     int res = 50;
     PPPMSolver *solver = empty_pppm(res);
-    auto mesh = Mesh::loadOBJ("../assets/bunny.obj", true);
+    auto filename = ASSET_DIR + std::string("sphere.obj");
+    auto mesh = Mesh::loadOBJ(filename, true);
     mesh.stretch_to(solver->size().x / 4.0f);
     LOG("stretch to " << mesh.get_scale())
     mesh.move_to(solver->center());
@@ -91,5 +92,6 @@ int main()
     write_to_txt("helmholtz_signal.txt", helmholtz_result);
     write_to_txt("analytic_signal.txt", analytic_result);
     re.update_mesh();
-    renderArray(re);
+    re.write_image(ALL_STEP / 2, "pppm.png");
+    // renderArray(re);
 }

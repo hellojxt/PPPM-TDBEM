@@ -44,4 +44,11 @@ GArr<float> RenderElement::get_time_siganl(int x, int y)
     return signal;
 }
 
+void RenderElement::write_image(int idx, std::string filename)
+{
+    update_mesh();
+    auto image = render_window.data[idx].cpu();
+    write_to_png(filename, image);
+}
+
 }  // namespace pppm

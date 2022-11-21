@@ -39,7 +39,8 @@ int main(int argc, char *argv[])
     float condition_number_threshold = argv[1] ? atof(argv[1]) : 25.0f;
     GhostCellSolver *solver = empty_ghost_cell_solver(64);
     solver->set_condition_number_threshold(condition_number_threshold);
-    auto mesh = Mesh::loadOBJ("../assets/ghost_cell_test/2.obj", true);
+    auto filename = ASSET_DIR + std::string("ghost_cell_test/2.obj");
+    auto mesh = Mesh::loadOBJ(filename, true);
     mesh.stretch_to(solver->size().x / 2.0f);
     mesh.move_to(solver->center());
     solver->set_mesh(mesh.vertices, mesh.triangles);

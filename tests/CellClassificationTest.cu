@@ -35,11 +35,13 @@ void view_cell_data(GhostCellSolver *solver)
 int main()
 {
     GhostCellSolver *solver = empty_ghost_cell_solver(64);
-    auto mesh = Mesh::loadOBJ("../assets/sphere.obj", true);
+    auto filename = ASSET_DIR + std::string("sphere.obj");
+    auto mesh = Mesh::loadOBJ(filename, true);
     mesh.stretch_to(solver->size().x / 3.0f);
     mesh.move_to(solver->center());
 
     solver->set_mesh(mesh.vertices, mesh.triangles);
+    solver->precompute_cell_data();
 
     view_cell_data(solver);
 }
