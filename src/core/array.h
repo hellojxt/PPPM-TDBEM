@@ -8,6 +8,19 @@
 namespace pppm
 {
 
+class to_cpu
+{
+    public:
+        unsigned int x, y, z;
+        to_cpu(int3 idx) : x(idx.x), y(idx.y), z(idx.z) {}
+        to_cpu(int x, int y, int z) : x(x), y(y), z(z) {}
+        to_cpu(uint3 idx) : x(idx.x), y(idx.y), z(idx.z) {}
+        to_cpu(unsigned int x, unsigned int y, unsigned int z) : x(x), y(y), z(z) {}
+        to_cpu(unsigned int x, unsigned int y) : x(x), y(y), z(0) {}
+        to_cpu(unsigned int x) : x(x), y(0), z(0) {}
+        to_cpu() : x(0), y(0), z(0) {}
+};
+
 /**
  * @brief Circular array
  */
@@ -203,6 +216,20 @@ class GArr
 #endif
         }
 
+        CPU_FUNC inline T operator[](to_cpu idx) const
+        {
+            T value;
+            cudaMemcpy(&value, m_data + idx.x, sizeof(T), cudaMemcpyDeviceToHost);
+            return value;
+        }
+
+        CPU_FUNC inline T operator[](to_cpu idx)
+        {
+            T value;
+            cudaMemcpy(&value, m_data + idx.x, sizeof(T), cudaMemcpyDeviceToHost);
+            return value;
+        }
+
         CGPU_FUNC inline uint size() const { return m_totalNum; }
         CGPU_FUNC inline bool isCPU() const { return false; }
         CGPU_FUNC inline bool isGPU() const { return true; }
@@ -214,9 +241,13 @@ class GArr
         // GArr &operator=(const CArr<T> &v)
         // { this->assign(v); return *this; }
 
-        inline CArr<T> cget(uint32_t idx, uint32_t count) { return CArr<T>(*this, idx, count); }
-        inline T cget(uint32_t idx) { return CArr<T>(*this, idx, 1)[0]; }
-        inline T last_item() { return this->cget(m_totalNum - 1); }
+        inline T last_item()
+        {
+            T value;
+            cudaMemcpy(&value, m_data + m_totalNum - 1, sizeof(T), cudaMemcpyDeviceToHost);
+            return value;
+        }
+
         inline CArr<T> cpu() { return CArr<T>(*this); }
 
         void assign(const GArr<T> &src, const uint count, const uint dstOffset = 0, const uint srcOffset = 0);

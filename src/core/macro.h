@@ -29,6 +29,21 @@ namespace pppm
     LOG_FILE << LOG_BOLD_COLOR << "---------------" << x << "---------------" << LOG_RESET_COLOR << std::endl;
 #define LOG_INLINE(x) LOG_FILE << x;
 
+#define START_TIME(x)                                        \
+    auto __time_variable = std::chrono::steady_clock::now(); \
+    bool __time_log = x;
+#define LOG_TIME(x)                                                                                              \
+    if (__time_log)                                                                                              \
+    {                                                                                                            \
+        LOG_FILE << LOG_BOLD_COLOR << x << " time: "                                                             \
+                 << std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - \
+                                                                              __time_variable)                   \
+                            .count() *                                                                           \
+                        1000                                                                                     \
+                 << " ms" << LOG_RESET_COLOR << std::endl;                                                       \
+        __time_variable = std::chrono::steady_clock::now();                                                      \
+    }
+
 #define TICK_PRECISION 3
 #define TICK(x) auto bench_##x = std::chrono::steady_clock::now();
 #define TICK_INLINE(x) auto bench_inline_##x = std::chrono::steady_clock::now();
@@ -51,6 +66,8 @@ namespace pppm
              << "s"                                                                                          \
              << "  \t";                                                                                      \
     std::cout.precision(ss_##x);
+
+#define TOCK_VALUE(x) std::chrono::duration<float>(std::chrono::steady_clock::now() - bench_##x).count()
 
 #define PI 3.14159265359
 #define AIR_WAVE_SPEED 340.29f

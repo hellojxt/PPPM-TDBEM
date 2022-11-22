@@ -7,7 +7,7 @@
 
 TEST_CASE("TDBEM", "[bem]")
 {
-#define BEM_EPS 0.05f
+#define BEM_EPS 0.1f
     using namespace pppm;
     float scale = 0.01f;
     float3 vertices[6] = {

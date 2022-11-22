@@ -24,8 +24,8 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp
     int t = pppm.fdtd.t;
     float dt = pppm.fdtd.dt;
     if (SET_DIRICHLET)
-        pppm.particle_history[particle_id].dirichlet[t] = (mp.dirichlet(p.pos) * sine(dt * t)).real();
-    pppm.particle_history[particle_id].neumann[t] = (mp.neumann(p.pos, p.normal) * sine(dt * t)).real();
+        pppm.dirichlet[particle_id][t] = (mp.dirichlet(p.pos) * sine(dt * t)).real();
+    pppm.neumann[particle_id][t] = (mp.neumann(p.pos, p.normal) * sine(dt * t)).real();
 }
 
 int main()
@@ -92,6 +92,6 @@ int main()
     write_to_txt("helmholtz_signal.txt", helmholtz_result);
     write_to_txt("analytic_signal.txt", analytic_result);
     re.update_mesh();
-    re.write_image(ALL_STEP / 2, "pppm.png");
-    // renderArray(re);
+    // re.write_image(ALL_STEP / 2, "pppm.png");
+    renderArray(re);
 }

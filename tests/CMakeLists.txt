@@ -42,3 +42,6 @@ target_link_libraries(CusparseTest PRIVATE Catch2::Catch2WithMain alglib utillib
 
 add_executable(SVDTest SVDTest.cu)
 target_link_libraries(SVDTest PRIVATE Catch2::Catch2WithMain alglib utillib)
+
+add_executable(CatchTest ParticleGridTest.cu TDBEMTest.cu GridCacheTest.cu ParticleCacheTest.cu FFTTest.cu CusparseTest.cu SVDTest.cu)
+target_link_libraries(CatchTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)

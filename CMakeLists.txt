@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For nsight compute
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
+# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DNDEBUG>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 add_definitions(-DASSET_DIR="${CMAKE_SOURCE_DIR}/assets/")
@@ -19,7 +20,7 @@ add_definitions(-DEXP_DIR="${CMAKE_SOURCE_DIR}/experiments/")
 # For Config
 add_compile_definitions(LINE_GAUSS_NUM=4)
 add_compile_definitions(TRI_GAUSS_NUM=6)
-add_compile_definitions(STEP_NUM=16) # number of time steps for history of each particle
+add_compile_definitions(STEP_NUM=32) # number of time steps for history of each particle
 
 ################################
 

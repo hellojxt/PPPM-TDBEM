@@ -59,7 +59,6 @@ __global__ void solve_far_field_kernel(PPPMSolver pppm)
 void direct_fdtd_far(PPPMSolver &pppm)
 {
     int res = pppm.fdtd.res;
-    auto his = pppm.particle_history;
     cuExecute3D(dim3(res, res, res), solve_far_field_kernel, pppm);
 }
 

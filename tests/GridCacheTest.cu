@@ -85,13 +85,13 @@ void test_cache_weight(PPPMSolver *solver)
 
     SECTION("check cache weight")
     {
-        CArr<BoundaryHistory> particle_history = solver->particle_history.cpu();
+        auto dirichlet = solver->dirichlet.cpu();
         int test_idx = 0;
-        for (int i = 0; i < particle_history.size(); i++)
+        for (int i = 0; i < dirichlet.size(); i++)
         {
-            particle_history[i].dirichlet[test_idx - 1] = 1;
+            dirichlet[i][test_idx - 1] = 1;
         }
-        solver->particle_history.assign(particle_history);
+        solver->dirichlet.assign(dirichlet);
 
         solver->solve_fdtd_far_simple();
         solver->solve_fdtd_near_simple();

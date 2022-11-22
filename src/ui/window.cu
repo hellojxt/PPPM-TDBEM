@@ -363,6 +363,7 @@ void CudaRender::update()
 void CudaRender::clear()
 {
     cuSafeCall(cudaGraphicsUnmapResources(1, &CudaResource, 0));
+    data.clear();
 }
 
 }  // namespace pppm

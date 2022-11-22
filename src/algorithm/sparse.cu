@@ -525,9 +525,9 @@ GArr<float> BiCGSTAB_Solver::solve(GArr<float> &b, int maxIterations, float tole
     int converge_iter_num =
         solve_BiCGStab_cusparse(cublasHandle, cusparseHandle, b.size(), matA, matM_lower, matM_upper, d_B, d_X, d_R0,
                                 d_R, d_P, d_P_aux, d_S, d_S_aux, d_V, d_T, d_tmp, d_bufferMV, maxIterations, tolerance);
-#ifndef NDEBUG
-    std::cout << "BiCGStab converged in " << converge_iter_num << " iterations" << std::endl;
-#endif
+    // #ifndef NDEBUG
+    //     std::cout << "BiCGStab converged in " << converge_iter_num << " iterations" << std::endl;
+    // #endif
     // X = X * b_norm
     thrust::transform(thrust::device, X.begin(), X.end(), X.begin(), multiply(b_norm));
     // b = b * b_norm

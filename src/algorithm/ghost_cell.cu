@@ -48,13 +48,15 @@ __global__ void construct_ghost_cell_list(GhostCellSolver solver)
     }
 }
 
-void GhostCellSolver::precompute_cell_data()
+void GhostCellSolver::precompute_cell_data(bool log_time)
 {
+    START_TIME(log_time)
     ghost_cell_num = fill_cell_data(grid, cell_data);
     ghost_cells.resize(ghost_cell_num);
     cuExecute3D(grid.grid_dim, construct_ghost_cell_list, *this);
     if (ghost_cell_num <= 0)
         LOG_ERROR("No ghost cell found!");
+    LOG_TIME("Precompute Cell Data")
 };
 
 __global__ void construct_phi_matrix_kernel(GArr3D<float> phi, GhostCellSolver solver)
@@ -166,9 +168,8 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
                 int3 coord = ghost_cell_coord + dcoord[i];
                 if (solver.cell_data(coord).type == AIR)
                 {
-                    solver.b[ghost_idx] =
-                        solver.neuuman_data[cell.nearest_particle_idx] * AIR_DENSITY * solver.grid_size() +
-                        solver.fdtd.grids[solver.fdtd.t](coord);  // p_g - p_n = l * rho * a_n
+                    solver.b[ghost_idx] = -solver.neuuman_data[cell.nearest_particle_idx] * solver.grid_size() +
+                                          solver.fdtd.grids[solver.fdtd.t](coord);  // p_g - p_n = l * rho * a_n
                     break;
                 }
             }
@@ -180,8 +181,7 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
         int3 base_coord = get_base_coord_for_reflect(ghost_cell, solver);
         float b_value = 0;
         if (CONSTRUCT_RHS)
-            b_value +=
-                solver.neuuman_data[ghost_cell.nearest_particle_idx] * AIR_DENSITY * ghost_cell.nearst_distance * 2;
+            b_value += -solver.neuuman_data[ghost_cell.nearest_particle_idx] * ghost_cell.nearst_distance * 2;
         for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
         {
             int3 dcoord = neighbor_idx_to_coord(i);
@@ -195,7 +195,7 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
                     float scale_factor =
                         solver.grid_size() / 2;  // correction factor as stencils are transformed to the [−1, 1]^3
                     b_value += solver.p_weight(ghost_idx, i) *
-                               (-scale_factor * solver.neuuman_data[ghost_cell.nearest_particle_idx] * AIR_DENSITY);
+                               (scale_factor * solver.neuuman_data[ghost_cell.nearest_particle_idx]);
                 }
             }
             else if (neighbor_cell.type == GHOST)  // other ghost cell, add matrix element
@@ -231,8 +231,9 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
     }
 }
 
-void GhostCellSolver::precompute_ghost_matrix()
+void GhostCellSolver::precompute_ghost_matrix(bool log_time)
 {
+    START_TIME(log_time)
     A.resize(ghost_cell_num, ghost_cell_num, ghost_cell_num * (GHOST_CELL_NEIGHBOR_NUM + 1));
     A.reset();  // set A to zero matrix
     p_weight.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM);
@@ -240,15 +241,19 @@ void GhostCellSolver::precompute_ghost_matrix()
     GArr3D<float> phi;
     phi.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM, GHOST_CELL_NEIGHBOR_NUM);
     cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this);
+    LOG_TIME("Construct phi matrix")
     auto svd_result = cusolver_svd(phi);
     svd_result.solve_inverse();
+    LOG_TIME("SVD")
     ghost_order.resize(ghost_cell_num);
     cuExecute(ghost_cell_num, precompute_p_weight_kernel, svd_result, *this);
+    LOG_TIME("Precompute p weight")
     auto construct_matrix_kernel = construct_equation_kernel<true, false>;
     cuExecute(ghost_cell_num, construct_matrix_kernel, *this);
     A.eliminate_zeros();
     A.sort_by_row();
     linear_solver.set_coo_matrix(A);
+    LOG_TIME("Construct matrix A")
     phi.clear();
     svd_result.clear();
 }
@@ -262,14 +267,17 @@ __global__ void update_ghost_cell_kernel(GArr<float> x, GhostCellSolver solver)
     solver.fdtd.grids[solver.fdtd.t](ghost_cell_coord) = x[ghost_idx];
 }
 
-void GhostCellSolver::solve_ghost_cell()
+void GhostCellSolver::solve_ghost_cell(bool log_time)
 {
+    START_TIME(log_time)
     b.reset();
     auto construct_rhs_kernel = construct_equation_kernel<false, true>;
     cuExecute(ghost_cell_num, construct_rhs_kernel, *this);
+    LOG_TIME("Construct rhs b")
     x.clear();
     x = linear_solver.solve(b, 100);
     cuExecute(ghost_cell_num, update_ghost_cell_kernel, x, *this);
+    LOG_TIME("Solve equation for ghost cell")
 }
 
 }  // namespace pppm

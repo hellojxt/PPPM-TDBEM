@@ -72,28 +72,16 @@ class PPPMCache
         }
 };
 
-class BoundaryHistory
-{
-    public:
-        History dirichlet;
-        History neumann;
-        friend std::ostream &operator<<(std::ostream &out, const BoundaryHistory &h)
-        {
-            out << "dirichlet: " << h.dirichlet << std::endl;
-            out << "neumann: " << h.neumann << std::endl;
-            return out;
-        }
-};
-
 class PPPMSolver
 {
     public:
         FDTD fdtd;  // The left corner of the fdtd grid is at (0,0,0)
         ParticleGrid pg;
-        GArr<BoundaryHistory> particle_history;  // history boundary data of particles
-        GridArr far_field;                       // far field potential of grid cells
-        TDBEM bem;                               // boundary element method solver
-        PPPMCache cache;                         // cache for near field computation weights
+        GArr<History> dirichlet;  // Dirichlet boundary condition
+        GArr<History> neumann;    // Neumann boundary condition
+        GridArr far_field;        // far field potential of grid cells
+        TDBEM bem;                // boundary element method solver
+        PPPMCache cache;          // cache for near field computation weights
 
         /**
          *   Constructor of PPPMSolver
@@ -136,14 +124,17 @@ class PPPMSolver
                 remove_current_mesh();
             pg.set_mesh(verts_, tris_);
             pg.construct_grid();
-            particle_history.resize(pg.particles.size());
-            particle_history.reset();
+            dirichlet.resize(pg.particles.size());
+            dirichlet.reset();
+            neumann.resize(pg.particles.size());
+            neumann.reset();
         }
 
         void remove_current_mesh()
         {
             pg.clear();
-            particle_history.clear();
+            dirichlet.clear();
+            neumann.clear();
             int t = fdtd.t;
             for (int i = 0; i < GRID_TIME_SIZE; i++)
                 far_field[t - i].assign(fdtd.grids[t - i]);
@@ -153,7 +144,8 @@ class PPPMSolver
         {
             fdtd.clear();
             pg.clear();
-            particle_history.clear();
+            dirichlet.clear();
+            neumann.clear();
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
                 far_field[i].clear();
@@ -165,7 +157,8 @@ class PPPMSolver
         {
             fdtd.reset();
             pg.reset();
-            particle_history.reset();
+            dirichlet.reset();
+            neumann.reset();
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
                 far_field[i].reset();
@@ -177,20 +170,21 @@ class PPPMSolver
             1. solve fdtd
             2. update far field
         */
-        void solve_fdtd_far_simple();
+        void solve_fdtd_far_simple(bool log_time = false);
 
-        void solve_fdtd_near_simple();
+        void solve_fdtd_near_simple(bool log_time = false);
 
-        void precompute_grid_cache();
+        void precompute_grid_cache(bool log_time = false);
 
-        void solve_fdtd_far_with_cache();
+        void solve_fdtd_far_with_cache(bool log_time = false);
 
-        void solve_fdtd_near_with_cache();
+        void solve_fdtd_near_with_cache(bool log_time = false);
 
-        void precompute_particle_cache();
-
+        void precompute_particle_cache(bool log_time = false);
         // update particle near field (using neighbor particles) + far field (interpolation from neighbor grid cells)
-        void update_particle_dirichlet();
+        void update_particle_dirichlet(bool log_time = false);
+
+        void set_neumann_condition(CArr<float> neuuman_condition);
 };
 
 }  // namespace pppm

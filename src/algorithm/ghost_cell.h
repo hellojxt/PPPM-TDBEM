@@ -66,11 +66,11 @@ class GhostCellSolver
 
         void set_condition_number_threshold(float threshold) { condition_number_threshold = threshold; }
 
-        void precompute_cell_data();
+        void precompute_cell_data(bool log_time = false);
 
-        void precompute_ghost_matrix();  // caclulate ghost matrix and p_weight matrix
+        void precompute_ghost_matrix(bool log_time = false);  // caclulate ghost matrix and p_weight matrix
 
-        void solve_ghost_cell();  // update right hand side of ghost cell solver and solve it
+        void solve_ghost_cell(bool log_time = false);  // update right hand side of ghost cell solver and solve it
 
         CGPU_FUNC float inline dt() { return fdtd.dt; }
 

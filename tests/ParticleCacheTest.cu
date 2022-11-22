@@ -20,8 +20,8 @@ __global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine)
     float dirichlet_amp = 1e10;
     float dt = pppm.fdtd.dt;
     float t = pppm.fdtd.t;
-    pppm.particle_history[particle_idx].neumann[t] = neumann_amp * sine(dt * t, (particle_idx + 1)).real();
-    pppm.particle_history[particle_idx].dirichlet[t] = dirichlet_amp * sine(dt * t, (particle_idx + 1)).imag();
+    pppm.neumann[particle_idx][t] = neumann_amp * sine(dt * t, (particle_idx + 1)).real();
+    pppm.dirichlet[particle_idx][t] = dirichlet_amp * sine(dt * t, (particle_idx + 1)).imag();
 }
 
 TEST_CASE("ParticleCache", "[pc]")
@@ -136,19 +136,21 @@ TEST_CASE("ParticleCache", "[pc]")
         solver->solve_fdtd_far_with_cache();
         cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
         solver->update_particle_dirichlet();
-        auto far_history = solver->particle_history.cpu();
-        particle_far_field_from_solver[i] = far_history[0].dirichlet[solver->fdtd.t];
-        far_history[0].dirichlet[solver->fdtd.t] = 0;
+        auto neumann = solver->neumann.cpu();
+        auto dirichlet = solver->dirichlet.cpu();
+        particle_far_field_from_solver[i] = dirichlet[0][solver->fdtd.t];
+        dirichlet[0][solver->fdtd.t] = 0;
         particle_far_field[i] =
-            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices),
-                                far_history[1].neumann, far_history[1].dirichlet, solver->fdtd.t) +
-            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
-                                far_history[0].neumann, far_history[0].dirichlet, solver->fdtd.t);
-        far_history.reset();
-        far_history[0].dirichlet[solver->fdtd.t] = 1;
+            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices), neumann[1],
+                                dirichlet[1], solver->fdtd.t) +
+            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices), neumann[0],
+                                dirichlet[0], solver->fdtd.t);
+        neumann.reset();
+        dirichlet.reset();
+        dirichlet[0][solver->fdtd.t] = 1;
         float factor =
             1.0f / 2 - solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
-                                           far_history[0].neumann, far_history[0].dirichlet, solver->fdtd.t);
+                                           neumann[0], dirichlet[0], solver->fdtd.t);
         particle_far_field[i] = particle_far_field[i] / factor;
         cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
         solver->solve_fdtd_near_with_cache();
@@ -176,19 +178,21 @@ TEST_CASE("ParticleCache", "[pc]")
         solver->solve_fdtd_far_with_cache();
         cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
         solver->update_particle_dirichlet();
-        auto near_history = solver->particle_history.cpu();
-        particle_near_field_from_solver[i] = near_history[0].dirichlet[solver->fdtd.t];
-        near_history[0].dirichlet[solver->fdtd.t] = 0;
+        auto neumann = solver->neumann.cpu();
+        auto dirichlet = solver->dirichlet.cpu();
+        particle_near_field_from_solver[i] = dirichlet[0][solver->fdtd.t];
+        dirichlet[0][solver->fdtd.t] = 0;
         particle_near_field[i] =
-            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices),
-                                near_history[1].neumann, near_history[1].dirichlet, solver->fdtd.t) +
-            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
-                                near_history[0].neumann, near_history[0].dirichlet, solver->fdtd.t);
-        near_history.reset();
-        near_history[0].dirichlet[solver->fdtd.t] = 1;
+            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices), neumann[1],
+                                dirichlet[1], solver->fdtd.t) +
+            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices), neumann[0],
+                                dirichlet[0], solver->fdtd.t);
+        neumann.reset();
+        dirichlet.reset();
+        dirichlet[0][solver->fdtd.t] = 1;
         float factor =
             1.0f / 2 - solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
-                                           near_history[0].neumann, near_history[0].dirichlet, solver->fdtd.t);
+                                           neumann[0], dirichlet[0], solver->fdtd.t);
         particle_near_field[i] = particle_near_field[i] / factor;
         cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
         solver->solve_fdtd_near_with_cache();

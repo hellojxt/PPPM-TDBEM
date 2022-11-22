@@ -61,6 +61,16 @@ class GArr3D
             return data[b_i * rows * cols + i * cols + j];
         }
 
+        CPU_FUNC inline const T operator()(const to_cpu idx) const
+        {
+            return data[to_cpu(idx.x * rows * cols + idx.y * cols + idx.z)];
+        }
+
+        CPU_FUNC inline T operator()(const to_cpu idx)
+        {
+            return data[to_cpu(idx.x * rows * cols + idx.y * cols + idx.z)];
+        }
+
         GPU_FUNC inline const T &operator()(const int3 index) const
         {
             return data[index.x * rows * cols + index.y * cols + index.z];

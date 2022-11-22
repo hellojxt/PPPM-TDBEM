@@ -54,11 +54,13 @@ class FDTD
          * @brief step forward in time,
          * t++ first, then compute the FDTD kernel
          */
-        void step()
+        void step(bool log_time = false)
         {
+            START_TIME(log_time)
             step_inner_grid();
             step_boundary_grid();
             t++;
+            LOG_TIME("FDTD")
         }
 
         void clear()

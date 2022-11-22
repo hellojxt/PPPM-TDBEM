@@ -58,7 +58,11 @@ class GArr2D
 
         GPU_FUNC inline const T &operator()(const uint i, const uint j) const { return data[i * cols + j]; }
 
+        CPU_FUNC inline const T operator()(const to_cpu idx) const { return data[to_cpu(idx.x * cols + idx.y)]; }
+
         GPU_FUNC inline T &operator()(const uint i, const uint j) { return data[i * cols + j]; }
+
+        CPU_FUNC inline T &operator()(const to_cpu idx) { return data[to_cpu(idx.x * cols + idx.y)]; }
 
         CGPU_FUNC inline int index(const uint i, const uint j) const { return i * cols + j; }
 

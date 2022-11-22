@@ -24,9 +24,8 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp
     int t = pppm.fdtd.t;
     float dt = pppm.fdtd.dt;
     if (SET_DIRICHLET)
-        pppm.particle_history[particle_id].dirichlet[t] = (mp.dirichlet(p.pos) * sine(dt * t)).real();
-    pppm.particle_history[particle_id].neumann[t] =
-        (mp.neumann(p.pos, p.normal) * sine(dt * t)).real() * (t < STEP_NUM * 5);
+        pppm.dirichlet[particle_id][t] = (mp.dirichlet(p.pos) * sine(dt * t)).real();
+    pppm.neumann[particle_id][t] = (mp.neumann(p.pos, p.normal) * sine(dt * t)).real() * (t < STEP_NUM * 5);
 }
 
 int main()

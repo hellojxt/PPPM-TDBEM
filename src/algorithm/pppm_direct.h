@@ -27,9 +27,8 @@ GPU_FUNC inline float near_field(PPPMSolver &pppm, int3 src_center, int3 dst_gri
                 for (int i = r.start; i < r.end; i++)
                 {
                     Particle &e = pppm.pg.particles[i];  // source boundary element
-                    near_field_value +=
-                        pppm.bem.laplace(pppm.pg.vertices.data(), PairInfo(e.indices, dst_point),
-                                         pppm.particle_history[i].neumann, pppm.particle_history[i].dirichlet, t);
+                    near_field_value += pppm.bem.laplace(pppm.pg.vertices.data(), PairInfo(e.indices, dst_point),
+                                                         pppm.neumann[i], pppm.dirichlet[i], t);
                 }
             }
     return near_field_value;

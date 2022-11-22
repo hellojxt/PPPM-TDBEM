@@ -22,8 +22,8 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine)
     float dirichlet_amp = 1e4;
     int t = pppm.fdtd.t;
     float dt = pppm.fdtd.dt;
-    pppm.particle_history[0].neumann[t] = neumann_amp * sine(dt * t).real();
-    pppm.particle_history[0].dirichlet[t] = dirichlet_amp * sine(dt * t).real();
+    pppm.neumann[0][t] = neumann_amp * sine(dt * t).real();
+    pppm.dirichlet[0][t] = dirichlet_amp * sine(dt * t).real();
 }
 
 int main()
