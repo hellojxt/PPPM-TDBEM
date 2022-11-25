@@ -25,6 +25,10 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine
     solver.precompute_grid_cache(true);
     solver.precompute_particle_cache(true);
 
+    std::ofstream ofs1(dirname + "/particle_data.txt", std::ios::out);
+    ofs1 << solver.cache.particle_data;
+    ofs1.close();
+
     CArr<float> neuuman_condition;
     neuuman_condition.resize(solver.pg.particles.size());
     auto particles = solver.pg.particles.cpu();
@@ -69,9 +73,9 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine
 
     write_to_txt(dirname + "pppm_solution.txt", pppm_solution);
     // print cost time to "cost_time.txt"
-    std::ofstream ofs(dirname + "cost_time.txt", std::ios::out);
-    ofs << "pppm = " << cost_time << std::endl;
-    ofs.close();
+    std::ofstream ofs2(dirname + "cost_time.txt", std::ios::out);
+    ofs2 << "pppm = " << cost_time << std::endl;
+    ofs2.close();
 }
 
 void Ghost_cell_test(GhostCellSolver &solver,
@@ -145,7 +149,7 @@ int main()
 {
     std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045};
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    auto filename = ASSET_DIR + std::string("cube_rot.obj");
+    auto filename = ASSET_DIR + std::string("sphere4.obj");
     auto mesh = Mesh::loadOBJ(filename, true);
     auto check_point = make_float3(0.15f, 0.0f, 0.0f);
 

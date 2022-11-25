@@ -520,12 +520,12 @@ __global__ void solve_particle_near_field_fast_kernel(PPPMSolver pppm, GArr<floa
     {
         auto &data = pppm.cache.particle_data[i];
         auto &neumann = pppm.neumann[data.particle_id];
-        // auto &dirichlet = pppm.dirichlet[data.particle_id];
+        auto &dirichlet = pppm.dirichlet[data.particle_id];
 #pragma unroll
         for (int k = 0; k < STEP_NUM; k++)
         {
             near_part_sum +=
-                -data.weight.single_layer[k] * neumann[t - k];  //+ data.weight.double_layer[k] * dirichlet[t - k];
+                -data.weight.single_layer[k] * neumann[t - k] + data.weight.double_layer[k] * dirichlet[t - k];
         }
         factor_num += data.weight.double_layer[0];  // "lumped mass" for G_t, the factor is small compared to 0.5
     }
@@ -575,15 +575,11 @@ void solve_particle_from_cache_fast(PPPMSolver &pppm)
     particle_far_field.reset();
     particle_near_field.reset();
     particle_factor.reset();
-    START_TIME(true)
     cuExecute(particle_num, solve_particle_far_field_fast_kernel, pppm, particle_far_field);
-    LOG_TIME("solve_particle_far_field_fast_kernel")
     cuExecuteBlock(particle_num, PARTICLE_NEAR_BLOCK_SIZE, solve_particle_near_field_fast_kernel, pppm,
                    particle_near_field, particle_factor);
-    LOG_TIME("solve_particle_near_field_fast_kernel")
     cuExecute(particle_num, solve_dirichlet_fast_kernel, pppm, particle_far_field, particle_near_field,
               particle_factor);
-    LOG_TIME("solve_dirichlet_fast_kernel")
 }
 
 }  // namespace pppm

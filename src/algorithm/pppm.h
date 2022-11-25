@@ -4,6 +4,7 @@
 #include "bem.h"
 #include "fdtd.h"
 #include "particle_grid.h"
+#include <fstream>
 
 namespace pppm
 {
@@ -46,6 +47,20 @@ class BEMCache
         friend bool operator==(const BEMCache &a, const BEMCache &b)
         {
             return a.particle_id == b.particle_id && a.weight == b.weight;
+        }
+
+        friend std::ofstream &operator<<(std::ofstream &fs, const BEMCache &cache)
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                fs << cache.weight.single_layer[i] << " ";
+            }
+            fs << std::endl;
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                fs << cache.weight.double_layer[i] << " ";
+            }
+            return fs;
         }
 };
 

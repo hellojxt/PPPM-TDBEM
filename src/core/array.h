@@ -6,6 +6,8 @@
 #include "macro.h"
 #include <thrust/remove.h>
 #include <thrust/execution_policy.h>
+#include <fstream>
+
 namespace pppm
 {
 
@@ -127,6 +129,19 @@ class CArr
 
             return out;
         }
+
+#define MAX_FS_SIZE 1000
+        friend std::ofstream &operator<<(std::ofstream &out, const CArr<T> &cArray)
+        {
+            auto size_new = min(cArray.size(), MAX_FS_SIZE);
+            for (uint i = 0; i < size_new; i++)
+            {
+                out << cArray[i] << std::endl;
+            }
+
+            return out;
+        }
+
         inline GArr<T> gpu() { return GArr<T>(*this); }
 
         inline T sum() const
@@ -283,6 +298,14 @@ class GArr
 
             out << hArray;
 
+            return out;
+        }
+
+        friend std::ofstream &operator<<(std::ofstream &out, const GArr<T> &dArray)
+        {
+            CArr<T> hArray;
+            hArray.assign(dArray);
+            out << hArray;
             return out;
         }
 
