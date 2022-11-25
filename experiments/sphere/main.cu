@@ -39,7 +39,7 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine
 
 #ifdef USE_UI
     RenderElement re(solver.pg, "PPPM");
-    re.set_params(make_int3(0, 0, solver.res() / 2), UI_FRAME_NUM, 0.5f);
+    re.set_params(make_int3(solver.res() / 2, 0, 0), UI_FRAME_NUM, 0.5f);
 #endif
 
     for (int i = 0; i < all_step; i++)
@@ -99,7 +99,7 @@ void Ghost_cell_test(GhostCellSolver &solver,
 
 #ifdef USE_UI
     RenderElement re(solver.grid, "GhostCell");
-    re.set_params(make_int3(0, 0, solver.res() / 2), UI_FRAME_NUM, 0.5f);
+    re.set_params(make_int3(solver.res() / 2, 0, 0), UI_FRAME_NUM, 0.5f);
 #endif
 
     for (int i = 0; i < all_step; i++)
@@ -149,46 +149,51 @@ int main()
 {
     std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045};
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    auto filename = ASSET_DIR + std::string("sphere4.obj");
+    auto filename = ASSET_DIR + std::string("sphere3.obj");
     auto mesh = Mesh::loadOBJ(filename, true);
-    auto check_point = make_float3(0.15f, 0.0f, 0.0f);
+    auto check_point = make_float3(0.2f, 0.0f, 0.0f);
 
-    for (auto grid_size : grid_size_list)
+    for (float scale = 5.0f; scale <= 7.0f; scale += 0.5f)
     {
-        float dt = grid_size / (std::sqrt(3) * AIR_WAVE_SPEED * 1.1);
-        int res = 0.7 / grid_size + 2;
-        float3 center = make_float3(res * grid_size / 2);
-        int3 check_cell = make_int3((check_point + center) / grid_size);
-        auto sine = SineSource(2 * PI * 1000);
-        float wave_number = sine.omega / AIR_WAVE_SPEED;
-        auto mp = MonoPole(center, wave_number);
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(3) << grid_size;
-        auto dirname = OUTPUT_DIR + stream.str() + "/";
-        if (!std::filesystem::exists(dirname))
-            std::filesystem::create_directories(dirname);
-        // PPPM
-        PPPMSolver pppm(res, grid_size, dt);
-        mesh.stretch_to(pppm.size().x / 7.0f);
-        mesh.move_to(pppm.center());
-        PPPM_test(pppm, mesh, check_cell, sine, mp, dirname);
-        pppm.clear();
+        for (auto grid_size : grid_size_list)
+        {
+            float dt = grid_size / (std::sqrt(3) * AIR_WAVE_SPEED * 1.1);
+            int res = 0.7 / grid_size + 2;
+            float3 center = make_float3(res * grid_size / 2);
+            int3 check_cell = make_int3((check_point + center) / grid_size);
+            auto sine = SineSource(2 * PI * 1000);
+            float wave_number = sine.omega / AIR_WAVE_SPEED;
+            auto mp = MonoPole(center, wave_number);
+            std::stringstream stream1;
+            stream1 << std::fixed << std::setprecision(1) << scale << "/";
+            std::stringstream stream2;
+            stream1 << std::fixed << std::setprecision(3) << grid_size << "/";
+            auto dirname = OUTPUT_DIR + stream1.str() + stream2.str();
+            if (!std::filesystem::exists(dirname))
+                std::filesystem::create_directories(dirname);
+            // PPPM
+            PPPMSolver pppm(res, grid_size, dt);
+            mesh.stretch_to(pppm.size().x / scale);
+            mesh.move_to(pppm.center());
+            PPPM_test(pppm, mesh, check_cell, sine, mp, dirname);
+            pppm.clear();
 
-        // First order Ghost cell
-        GhostCellSolver solver1(min_pos, grid_size, res, dt);
-        solver1.set_condition_number_threshold(0.0f);
-        Ghost_cell_test(solver1, mesh, check_cell, sine, mp, dirname, AccuracyOrder::FIRST_ORDER);
-        solver1.clear();
+            // First order Ghost cell
+            GhostCellSolver solver1(min_pos, grid_size, res, dt);
+            solver1.set_condition_number_threshold(0.0f);
+            Ghost_cell_test(solver1, mesh, check_cell, sine, mp, dirname, AccuracyOrder::FIRST_ORDER);
+            solver1.clear();
 
-        // Second order Ghost cell
-        GhostCellSolver solver2(min_pos, grid_size, res, dt);
-        solver2.set_condition_number_threshold(25.0f);
-        Ghost_cell_test(solver2, mesh, check_cell, sine, mp, dirname, AccuracyOrder::SECOND_ORDER);
-        solver2.clear();
+            // Second order Ghost cell
+            GhostCellSolver solver2(min_pos, grid_size, res, dt);
+            solver2.set_condition_number_threshold(25.0f);
+            Ghost_cell_test(solver2, mesh, check_cell, sine, mp, dirname, AccuracyOrder::SECOND_ORDER);
+            solver2.clear();
 
-        // AnalyticalSolution
-        int all_step = ALL_TIME / dt;
-        auto trg_pos = pppm.pg.getCenter(check_cell);
-        Analytical_test(sine, mp, trg_pos, all_step, dt, dirname);
+            // AnalyticalSolution
+            int all_step = ALL_TIME / dt;
+            auto trg_pos = pppm.pg.getCenter(check_cell);
+            Analytical_test(sine, mp, trg_pos, all_step, dt, dirname);
+        }
     }
 }
