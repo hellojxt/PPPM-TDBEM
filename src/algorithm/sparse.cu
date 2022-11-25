@@ -488,7 +488,11 @@ void BiCGSTAB_Solver::clear_cache()
 
 void BiCGSTAB_Solver::clear()
 {
-    clear_cache();
+    if (cache_stored)
+    {
+        clear_cache();
+        cache_stored = false;
+    }
     CHECK_CUSPARSE(cusparseDestroy(cusparseHandle))
     CHECK_CUBLAS(cublasDestroy(cublasHandle))
 }
@@ -506,18 +510,16 @@ struct multiply
         CGPU_FUNC float operator()(const float &x) const { return a * x; }
 };
 
-GArr<float> BiCGSTAB_Solver::solve(GArr<float> &b, int maxIterations, float tolerance)
+void BiCGSTAB_Solver::solve(GArr<float> &b, GArr<float> &x, int maxIterations, float tolerance)
 {
-    GArr<float> X;
-    X.resize(b.size());
-    X.reset();
-    d_X.ptr = X.data();
+    x.reset();
+    d_X.ptr = x.data();
     d_B.ptr = b.data();
     // b_num = (\sum_i b_i^2)^0.5
     float b_norm = std::sqrt(
         thrust::transform_reduce(thrust::device, b.begin(), b.end(), square(), 0.0f, thrust::plus<float>()) / b.size());
     if (b_norm == 0.0f)
-        return X;
+        return;
     // b = b / b_norm
     thrust::transform(thrust::device, b.begin(), b.end(), b.begin(), multiply(1.0f / b_norm));
     CHECK_CUSPARSE(cusparseCreateDnVec(&d_B.vec, b.size(), d_B.ptr, CUDA_R_32F))
@@ -529,10 +531,9 @@ GArr<float> BiCGSTAB_Solver::solve(GArr<float> &b, int maxIterations, float tole
     //     std::cout << "BiCGStab converged in " << converge_iter_num << " iterations" << std::endl;
     // #endif
     // X = X * b_norm
-    thrust::transform(thrust::device, X.begin(), X.end(), X.begin(), multiply(b_norm));
+    thrust::transform(thrust::device, x.begin(), x.end(), x.begin(), multiply(b_norm));
     // b = b * b_norm
     thrust::transform(thrust::device, b.begin(), b.end(), b.begin(), multiply(b_norm));
-    return X;
 }
 
 __global__ void eliminate_zeros_kernel(GArr<int> index,

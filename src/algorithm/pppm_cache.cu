@@ -37,6 +37,7 @@ __global__ void fill_grid_info(PPPMSolver pppm)
         return;
     PPPMCache &cache = pppm.cache;
     int3 center = make_int3(x, y, z);
+    int grid_index = cache.grid_neighbor_nonzero(center) - 1;
     int range_end = cache.grid_neighbor_num(center);
     int range_start = range_end;
 
@@ -49,13 +50,14 @@ __global__ void fill_grid_info(PPPMSolver pppm)
                 for (int i = r.start; i < r.end; i++)
                 {
                     range_start--;
-                    cache.grid_data[range_start].particle_id = i;       // fill particle id
+                    cache.grid_data[range_start].particle_id = i;  // fill particle id
+                    cache.grid_data[range_start].trg_coord = center;
                     cache.grid_fdtd_data[range_start].particle_id = i;  // fill particle id
+                    cache.grid_fdtd_data[range_start].trg_coord = center;
                 }
             }
     if (range_start != range_end)
     {
-        int grid_index = cache.grid_neighbor_nonzero(center) - 1;
         cache.grid_map[grid_index] = GridMap(center, Range(range_start, range_end));
     }
 }
@@ -137,10 +139,39 @@ __global__ void precompute_grid_data(PPPMSolver pppm)
     }
 }
 
+__global__ void precompute_grid_data_fast(PPPMSolver pppm)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= pppm.cache.grid_data.size())
+        return;
+    int3 coord = pppm.cache.grid_data[i].trg_coord;
+    float c = pppm.fdtd.c, dt = pppm.fdtd.dt;
+    BEMCache e;
+    e.particle_id = pppm.cache.grid_data[i].particle_id;
+    e.weight.reset();
+    add_grid_near_field(pppm, e, coord, 2, -1);
+    add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
+    add_grid_near_field(pppm, e, coord, -1, -2);
+    // auto simple = pppm.far_field[0](coord);
+    // if ((e.weight.double_layer[1] - simple) / simple > 1e-3)
+    // printf("coord: (%d, %d, %d), double: %e, simple: %e\n", coord.x, coord.y, coord.z, e.weight.double_layer[1],
+    //        simple);
+    pppm.cache.grid_fdtd_data[i] = e;
+    e.weight.reset();
+    add_grid_near_field(pppm, e, coord, 1, 0);
+    pppm.cache.grid_data[i] = e;
+}
+
 void cache_grid_data(PPPMSolver &pppm)
 {
-    int total_num = pppm.cache.grid_data.size();
+    int total_num = pppm.cache.grid_map.size();
     cuExecute(total_num, precompute_grid_data, pppm);
+}
+
+void cache_grid_data_fast(PPPMSolver &pppm)
+{
+    int total_num = pppm.cache.grid_data.size();
+    cuExecute(total_num, precompute_grid_data_fast, pppm);
 }
 
 __global__ void solve_fdtd_far_field_from_cache_kernel(PPPMSolver pppm)
@@ -301,6 +332,8 @@ __global__ void fill_particle_info(PPPMSolver pppm)
                 {
                     range_start--;
                     pppm.cache.particle_data[range_start].particle_id = i;
+                    pppm.cache.particle_data[range_start].particle_map = &pppm.cache.particle_map[particle_id];
+                    pppm.cache.particle_data[range_start].trg_particle_id = particle_id;
                 }
             }
     pppm.cache.particle_map[particle_id].range = Range(range_start, range_end);
@@ -366,10 +399,45 @@ __global__ void precompute_cache_data(PPPMSolver pppm)
     }
 }
 
+__global__ void precompute_cache_data_fast(PPPMSolver pppm)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= pppm.cache.particle_data.size())
+        return;
+    LayerWeight w;
+    w.reset();
+    auto bemcache = pppm.cache.particle_data[i];
+    auto pm = bemcache.particle_map;
+    auto neighbor_particle_id = bemcache.particle_id;
+    auto current_particle_id = bemcache.trg_particle_id;
+    auto &current_particle = pppm.pg.particles[current_particle_id];
+    Particle &neighbor_particle = pppm.pg.particles[neighbor_particle_id];
+    add_particle_near_field(pppm, w, neighbor_particle.indices, current_particle.indices, 1, 0);
+    for (int dx = 0; dx < 2; dx++)
+        for (int dy = 0; dy < 2; dy++)
+            for (int dz = 0; dz < 2; dz++)
+            {
+                int weight_idx = dx * 4 + dy * 2 + dz;
+                int3 coord = pm->base_coord + make_int3(dx, dy, dz);
+                auto center = pppm.pg.getCenter(coord);
+                if (length(center - neighbor_particle.pos) > pppm.pg.grid_size * 1.5)
+                {
+                    add_particle_near_field(pppm, w, neighbor_particle.indices, center, -pm->weight[weight_idx], 0);
+                }
+            }
+    pppm.cache.particle_data[i].weight = w;
+}
+
 void cache_particle_data(PPPMSolver &pppm)
 {
     int particle_num = pppm.pg.particles.size();
     cuExecute(particle_num, precompute_cache_data, pppm);
+}
+
+void cache_particle_data_fast(PPPMSolver &pppm)
+{
+    int total_num = pppm.cache.particle_data.size();
+    cuExecute(total_num, precompute_cache_data_fast, pppm);
 }
 
 __global__ void solve_particle_from_cache_kernel(PPPMSolver pppm)
@@ -412,6 +480,110 @@ void solve_particle_from_cache(PPPMSolver &pppm)
 {
     int particle_num = pppm.pg.particles.size();
     cuExecute(particle_num, solve_particle_from_cache_kernel, pppm);
+}
+
+__global__ void solve_particle_far_field_fast_kernel(PPPMSolver pppm, GArr<float> far_field)
+{
+    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (particle_id >= pppm.pg.particles.size())
+        return;
+    ParticleMap &pm = pppm.cache.particle_map[particle_id];
+    int t = pppm.fdtd.t;
+    float far_sum = 0;
+    // caculate the far field from interpolation
+    for (int dx = 0; dx < 2; dx++)
+        for (int dy = 0; dy < 2; dy++)
+            for (int dz = 0; dz < 2; dz++)
+            {
+                int weight_idx = dx * 4 + dy * 2 + dz;
+                int3 coord = pm.base_coord + make_int3(dx, dy, dz);
+                far_sum += pm.weight[weight_idx] * pppm.far_field[t](coord);
+            }
+    far_field[particle_id] = far_sum;
+    pppm.dirichlet[particle_id][pppm.fdtd.t] = 0;
+}
+
+#define PARTICLE_NEAR_BLOCK_SIZE 64
+__global__ void solve_particle_near_field_fast_kernel(PPPMSolver pppm, GArr<float> near_field, GArr<float> factor)
+{
+    int particle_id = blockIdx.x;
+    if (particle_id >= pppm.pg.particles.size())
+        return;
+
+    Particle &current_particle = pppm.pg.particles[particle_id];
+    ParticleMap &pm = pppm.cache.particle_map[particle_id];
+    Range r = pm.range;
+    float factor_num = 0;
+    float near_part_sum = 0;
+    auto t = pppm.fdtd.t;
+    for (int i = threadIdx.x + r.start; i < r.end; i += blockDim.x)
+    {
+        auto &data = pppm.cache.particle_data[i];
+        auto &neumann = pppm.neumann[data.particle_id];
+        // auto &dirichlet = pppm.dirichlet[data.particle_id];
+#pragma unroll
+        for (int k = 0; k < STEP_NUM; k++)
+        {
+            near_part_sum +=
+                -data.weight.single_layer[k] * neumann[t - k];  //+ data.weight.double_layer[k] * dirichlet[t - k];
+        }
+        factor_num += data.weight.double_layer[0];  // "lumped mass" for G_t, the factor is small compared to 0.5
+    }
+    __shared__ float shared_near_part_sum[PARTICLE_NEAR_BLOCK_SIZE];
+    __shared__ float shared_factor_num[PARTICLE_NEAR_BLOCK_SIZE];
+    shared_near_part_sum[threadIdx.x] = near_part_sum;
+    shared_factor_num[threadIdx.x] = factor_num;
+    __syncthreads();
+#pragma unroll
+    for (int i = PARTICLE_NEAR_BLOCK_SIZE / 2; i > 0; i /= 2)
+    {
+        if (threadIdx.x < i)
+        {
+            shared_near_part_sum[threadIdx.x] += shared_near_part_sum[threadIdx.x + i];
+            shared_factor_num[threadIdx.x] += shared_factor_num[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+    if (threadIdx.x == 0)
+    {
+        near_field[particle_id] = shared_near_part_sum[0];
+        factor[particle_id] = shared_factor_num[0];
+    }
+}
+
+__global__ void solve_dirichlet_fast_kernel(PPPMSolver pppm,
+                                            GArr<float> far_field,
+                                            GArr<float> near_field,
+                                            GArr<float> factor)
+{
+    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (particle_id >= pppm.pg.particles.size())
+        return;
+    Particle &p = pppm.pg.particles[particle_id];
+    auto particle_area = 0.5 * jacobian(pppm.pg.vertices.data(), p.indices);
+    // Equation (2.12) in Paper:https://epubs.siam.org/doi/pdf/10.1137/090775981
+    pppm.dirichlet[particle_id][pppm.fdtd.t] =
+        (far_field[particle_id] * 0.84 + near_field[particle_id]) / (0.5 * particle_area - factor[particle_id]);
+}
+
+void solve_particle_from_cache_fast(PPPMSolver &pppm)
+{
+    int particle_num = pppm.pg.particles.size();
+    auto &particle_far_field = pppm.cache.particle_far_field;
+    auto &particle_near_field = pppm.cache.particle_near_field;
+    auto &particle_factor = pppm.cache.particle_factor;
+    particle_far_field.reset();
+    particle_near_field.reset();
+    particle_factor.reset();
+    START_TIME(true)
+    cuExecute(particle_num, solve_particle_far_field_fast_kernel, pppm, particle_far_field);
+    LOG_TIME("solve_particle_far_field_fast_kernel")
+    cuExecuteBlock(particle_num, PARTICLE_NEAR_BLOCK_SIZE, solve_particle_near_field_fast_kernel, pppm,
+                   particle_near_field, particle_factor);
+    LOG_TIME("solve_particle_near_field_fast_kernel")
+    cuExecute(particle_num, solve_dirichlet_fast_kernel, pppm, particle_far_field, particle_near_field,
+              particle_factor);
+    LOG_TIME("solve_dirichlet_fast_kernel")
 }
 
 }  // namespace pppm

@@ -313,6 +313,7 @@ void CudaRender::add_mesh_to_images(GArr<float3> vertices,
 
 void CudaRender::init()
 {
+    is_inited = true;
     glEnable(GL_TEXTURE_2D);
     glGenTextures(1, &image);
     glBindTexture(GL_TEXTURE_2D, image);
@@ -362,7 +363,8 @@ void CudaRender::update()
 
 void CudaRender::clear()
 {
-    cuSafeCall(cudaGraphicsUnmapResources(1, &CudaResource, 0));
+    if (is_inited)
+        cuSafeCall(cudaGraphicsUnmapResources(1, &CudaResource, 0));
     data.clear();
 }
 

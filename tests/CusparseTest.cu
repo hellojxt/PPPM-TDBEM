@@ -125,12 +125,12 @@ void test_BiCGStab_solver()
         mat.sort_by_row();
 
         b_vals.assign(b);
+        x_vals.resize(b_vals.size());
         solver.set_coo_matrix(mat);
         for (int _test_inner = 0; _test_inner < TEST_NUM; _test_inner++)
         {
-            x_vals = solver.solve(b_vals);
+            solver.solve(b_vals, x_vals);
             auto x_vals_cpu = x_vals.cpu();
-            x_vals.clear();
             for (int i = 0; i < m; i++)
             {
                 REQUIRE(x_vals_cpu[i] == Approx(x[i]).margin(5e-3));

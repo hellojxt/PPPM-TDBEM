@@ -29,6 +29,7 @@ class CudaRender : public Window
         int frame_idx_last;
         int update_frame_count;
         float play_speed;
+        bool is_inited = false;
         CudaRender() { this->title = "CudaRender"; }
         CudaRender(const char *str) { this->title = str; }
 

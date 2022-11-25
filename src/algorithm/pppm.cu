@@ -21,12 +21,21 @@ void PPPMSolver::solve_fdtd_near_simple(bool log_time)
     LOG_TIME("Direct Near Solve")
 }
 
-void PPPMSolver::precompute_grid_cache(bool log_time)
+void PPPMSolver::precompute_grid_cache_simple(bool log_time)
 {
     START_TIME(log_time)
     set_grid_cache_size(*this);
     LOG_TIME("Set Grid Cache Size")
     cache_grid_data(*this);
+    LOG_TIME("Cache Grid Data")
+}
+
+void PPPMSolver::precompute_grid_cache(bool log_time)
+{
+    START_TIME(log_time)
+    set_grid_cache_size(*this);
+    LOG_TIME("Set Grid Cache Size")
+    cache_grid_data_fast(*this);
     LOG_TIME("Cache Grid Data")
 }
 
@@ -46,7 +55,7 @@ void PPPMSolver::solve_fdtd_near_with_cache(bool log_time)
     LOG_TIME("Near Solve from Cache")
 }
 
-void PPPMSolver::precompute_particle_cache(bool log_time)
+void PPPMSolver::precompute_particle_cache_simple(bool log_time)
 {
     START_TIME(log_time)
     set_particle_cache_size(*this);
@@ -55,13 +64,28 @@ void PPPMSolver::precompute_particle_cache(bool log_time)
     LOG_TIME("Cache Particle Data")
 }
 
-void PPPMSolver::update_particle_dirichlet(bool log_time)
+void PPPMSolver::precompute_particle_cache(bool log_time)
+{
+    START_TIME(log_time)
+    set_particle_cache_size(*this);
+    LOG_TIME("Set Particle Cache Size")
+    cache_particle_data_fast(*this);
+    LOG_TIME("Cache Particle Data")
+}
+
+void PPPMSolver::update_particle_dirichlet_simple(bool log_time)
 {
     START_TIME(log_time)
     solve_particle_from_cache(*this);
     LOG_TIME("Particle Solve from Cache")
 }
 
+void PPPMSolver::update_particle_dirichlet(bool log_time)
+{
+    START_TIME(log_time)
+    solve_particle_from_cache_fast(*this);
+    LOG_TIME("Particle Solve from Cache")
+}
 __global__ void set_neumann_condition_kernel(GArr<History> neumann, GArr<float> neuuman_condition, int t)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;

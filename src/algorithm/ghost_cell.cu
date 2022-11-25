@@ -238,6 +238,7 @@ void GhostCellSolver::precompute_ghost_matrix(bool log_time)
     A.reset();  // set A to zero matrix
     p_weight.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM);
     b.resize(ghost_cell_num);
+    x.resize(ghost_cell_num);
     GArr3D<float> phi;
     phi.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM, GHOST_CELL_NEIGHBOR_NUM);
     cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this);
@@ -248,12 +249,15 @@ void GhostCellSolver::precompute_ghost_matrix(bool log_time)
     ghost_order.resize(ghost_cell_num);
     cuExecute(ghost_cell_num, precompute_p_weight_kernel, svd_result, *this);
     LOG_TIME("Precompute p weight")
-    auto construct_matrix_kernel = construct_equation_kernel<true, false>;
-    cuExecute(ghost_cell_num, construct_matrix_kernel, *this);
-    A.eliminate_zeros();
-    A.sort_by_row();
-    linear_solver.set_coo_matrix(A);
-    LOG_TIME("Construct matrix A")
+    if (condition_number_threshold > 0.0f)
+    {
+        auto construct_matrix_kernel = construct_equation_kernel<true, false>;
+        cuExecute(ghost_cell_num, construct_matrix_kernel, *this);
+        A.eliminate_zeros();
+        A.sort_by_row();
+        linear_solver.set_coo_matrix(A);
+        LOG_TIME("Construct matrix A")
+    }
     phi.clear();
     svd_result.clear();
 }
@@ -274,10 +278,16 @@ void GhostCellSolver::solve_ghost_cell(bool log_time)
     auto construct_rhs_kernel = construct_equation_kernel<false, true>;
     cuExecute(ghost_cell_num, construct_rhs_kernel, *this);
     LOG_TIME("Construct rhs b")
-    x.clear();
-    x = linear_solver.solve(b, 100);
-    cuExecute(ghost_cell_num, update_ghost_cell_kernel, x, *this);
-    LOG_TIME("Solve equation for ghost cell")
+    if (condition_number_threshold == 0.0f)
+    {
+        cuExecute(ghost_cell_num, update_ghost_cell_kernel, b, *this);
+    }
+    else
+    {
+        linear_solver.solve(b, x, 100);
+        cuExecute(ghost_cell_num, update_ghost_cell_kernel, x, *this);
+        LOG_TIME("Solve equation for ghost cell")
+    }
 }
 
 }  // namespace pppm

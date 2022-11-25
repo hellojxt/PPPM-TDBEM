@@ -230,6 +230,11 @@ static std::ostream &operator<<(std::ostream &o, int4 const &a)
     return o << "(" << a.x << ", " << a.y << ", " << a.z << ", " << a.w << ")";
 }
 
+static bool operator==(int3 const &a, int3 const &b)
+{
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
 class Range
 {
     public:
@@ -243,6 +248,7 @@ class Range
             os << "[" << r.start << "," << r.end << ")";
             return os;
         }
+        friend bool operator==(const Range &a, const Range &b) { return a.start == b.start && a.end == b.end; }
 };
 
 class dim2

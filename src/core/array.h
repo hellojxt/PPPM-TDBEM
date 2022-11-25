@@ -4,7 +4,8 @@
 #include <memory>
 #include <vector>
 #include "macro.h"
-
+#include <thrust/remove.h>
+#include <thrust/execution_policy.h>
 namespace pppm
 {
 
@@ -46,6 +47,16 @@ class CircularArray
             for (int i = 0; i < N; i++)
                 out << h[i] << " ";
             return out;
+        }
+
+        friend bool operator==(const CircularArray &a, const CircularArray &b)
+        {
+            for (int i = 0; i < N; i++)
+            {
+                if (a[i] != b[i])
+                    return false;
+            }
+            return true;
         }
 };
 
@@ -170,6 +181,8 @@ class GArr
          *	\brief	Free allocated memory.	Should be called before the object is deleted.
          */
         void clear();
+
+        void remove(const T &val) { m_totalNum = thrust::remove(m_data, m_data + m_totalNum, val) - m_data; }
 
         CGPU_FUNC inline const T *begin() const { return m_data; }
         CGPU_FUNC inline T *begin() { return m_data; }

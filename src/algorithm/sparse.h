@@ -112,7 +112,7 @@ class BiCGSTAB_Solver
         void set_coo_matrix(GArr<int> &A_rows, GArr<int> &A_cols, GArr<float> &A_vals, int num_rows, int num_cols);
         void set_coo_matrix(COOMatrix &A) { set_coo_matrix(A.rows, A.cols, A.vals, A.rows_num, A.cols_num); }
 
-        GArr<float> solve(GArr<float> &b, int maxIterations = 100, float tolerance = 1e-6);
+        void solve(GArr<float> &b, GArr<float> &x, int maxIterations = 100, float tolerance = 1e-6);
 
         void clear_cache();
 

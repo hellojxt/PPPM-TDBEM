@@ -2,6 +2,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include "ghost_cell.h"
 #include "pppm.h"
+#include "objIO.h"
 
 using namespace pppm;
 
@@ -12,6 +13,17 @@ static PPPMSolver *empty_pppm(int res)
     float dt = 8e-6f;
     PPPMSolver *pppm = new PPPMSolver(res, grid_size, dt);
     return pppm;
+}
+
+static PPPMSolver *bunny_pppm(int res)
+{
+    PPPMSolver *solver = empty_pppm(res);
+    auto filename = ASSET_DIR + std::string("sphere.obj");
+    auto mesh = Mesh::loadOBJ(filename, true);
+    mesh.stretch_to(solver->size().x / 4.0f);
+    mesh.move_to(solver->center());
+    solver->set_mesh(mesh.vertices, mesh.triangles);
+    return solver;
 }
 
 static PPPMSolver *random_pppm(int triangle_count, int res = 64)

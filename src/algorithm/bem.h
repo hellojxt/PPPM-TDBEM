@@ -52,7 +52,7 @@ class PairInfo
         CGPU_FUNC PairInfo(int3 src, float3 dst_point) : src(src), dst_point(dst_point), pair_type(FACE_TO_POINT) {}
 };
 
-typedef CircularArray<float, STEP_NUM * 2> History;
+typedef CircularArray<float, STEP_NUM> History;
 
 class LayerWeight
 {
@@ -130,6 +130,18 @@ class LayerWeight
             {
                 printf("weight.single[%d]:%e, .double[%d]:%e\n", i, single_layer[i], i, double_layer[i]);
             }
+        }
+
+        friend bool operator==(const LayerWeight &a, const LayerWeight &b)
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                if (a.single_layer[i] != b.single_layer[i] || a.double_layer[i] != b.double_layer[i])
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 };
 

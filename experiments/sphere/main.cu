@@ -13,9 +13,10 @@
 #include <fstream>
 #include "ghost_cell.h"
 
-#define ALL_TIME 0.05f
+#define ALL_TIME 0.02f
 #define OUTPUT_DIR (EXP_DIR + std::string("sphere/output/"))
-// #define USE_UI
+#define USE_UI
+#define UI_FRAME_NUM 256
 using namespace pppm;
 
 void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine, MonoPole &mp, std::string dirname)
@@ -34,7 +35,7 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine
 
 #ifdef USE_UI
     RenderElement re(solver.pg, "PPPM");
-    re.set_params(make_int3(0, 0, solver.res() / 2), 512, 0.5f);
+    re.set_params(make_int3(0, 0, solver.res() / 2), UI_FRAME_NUM, 0.5f);
 #endif
 
     for (int i = 0; i < all_step; i++)
@@ -51,21 +52,19 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine
         solver.solve_fdtd_near_with_cache(i == all_step - 1);
         pppm_solution[i] = solver.fdtd.grids[i](to_cpu(check_cell));
 #ifdef USE_UI
-        if (i < 512)
+        if (i < UI_FRAME_NUM)
             re.assign(i, solver.fdtd.grids[i]);
-        else
-            break;
 #endif
     }
     float cost_time = TOCK_VALUE(PPPM);
+    LOG("PPPM cost time: " << cost_time)
 
     LOG("PPPM save to " + dirname);
 
 #ifdef USE_UI
     re.update_mesh();
-    re.render();
+    re.write_image(UI_FRAME_NUM - 1, dirname + "/pppm.png");
     re.clear();
-    return;
 #endif
 
     write_to_txt(dirname + "pppm_solution.txt", pppm_solution);
@@ -96,7 +95,7 @@ void Ghost_cell_test(GhostCellSolver &solver,
 
 #ifdef USE_UI
     RenderElement re(solver.grid, "GhostCell");
-    re.set_params(make_int3(0, 0, solver.res() / 2), 512, 0.5f);
+    re.set_params(make_int3(0, 0, solver.res() / 2), UI_FRAME_NUM, 0.5f);
 #endif
 
     for (int i = 0; i < all_step; i++)
@@ -111,22 +110,21 @@ void Ghost_cell_test(GhostCellSolver &solver,
         solver.solve_ghost_cell(i == all_step - 1);
         ghost_cell_solution[i] = solver.fdtd.grids[i](to_cpu(check_cell));
 #ifdef USE_UI
-        if (i < 512)
+        if (i < UI_FRAME_NUM)
             re.assign(i, solver.fdtd.grids[i]);
-        else
-            break;
 #endif
     }
     float cost_time = TOCK_VALUE(GhostCell);
-    LOG(order << " ghost cell save to " + dirname);
+    LOG("GhostCell cost time: " << cost_time)
 
+    LOG(order << " ghost cell save to " + dirname);
+    std::string order_str = (order == AccuracyOrder::FIRST_ORDER) ? "1st" : "2nd";
 #ifdef USE_UI
     re.update_mesh();
-    re.render();
+    re.write_image(UI_FRAME_NUM - 1, dirname + "/ghost_cell_" + order_str + ".png");
     re.clear();
-    return;
 #endif
-    std::string order_str = (order == AccuracyOrder::FIRST_ORDER) ? "1st" : "2nd";
+
     write_to_txt(dirname + "ghost_cell_" + order_str + ".txt", ghost_cell_solution);
     // append cost time to "cost_time.txt"
     std::ofstream ofs(dirname + "cost_time.txt", std::ios::app);
@@ -145,11 +143,11 @@ void Analytical_test(SineSource &sine, MonoPole &mp, float3 check_point, int all
 
 int main()
 {
-    std::vector<float> grid_size_list = {0.02, 0.025, 0.03, 0.035, 0.04, 0.045};
+    std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045};
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    auto filename = ASSET_DIR + std::string("bunny.obj");
+    auto filename = ASSET_DIR + std::string("cube_rot.obj");
     auto mesh = Mesh::loadOBJ(filename, true);
-    auto check_point = make_float3(0.2f, 0.0f, 0.0f);
+    auto check_point = make_float3(0.15f, 0.0f, 0.0f);
 
     for (auto grid_size : grid_size_list)
     {
@@ -157,15 +155,17 @@ int main()
         int res = 0.7 / grid_size + 2;
         float3 center = make_float3(res * grid_size / 2);
         int3 check_cell = make_int3((check_point + center) / grid_size);
-        auto sine = SineSource(2 * PI * 2000);
+        auto sine = SineSource(2 * PI * 1000);
         float wave_number = sine.omega / AIR_WAVE_SPEED;
         auto mp = MonoPole(center, wave_number);
-        auto dirname = OUTPUT_DIR + std::to_string(grid_size) + "/";
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(3) << grid_size;
+        auto dirname = OUTPUT_DIR + stream.str() + "/";
         if (!std::filesystem::exists(dirname))
             std::filesystem::create_directories(dirname);
         // PPPM
         PPPMSolver pppm(res, grid_size, dt);
-        mesh.stretch_to(pppm.size().x / 4.0f);
+        mesh.stretch_to(pppm.size().x / 7.0f);
         mesh.move_to(pppm.center());
         PPPM_test(pppm, mesh, check_cell, sine, mp, dirname);
         pppm.clear();

@@ -99,7 +99,11 @@ class RenderElement
         }
 
         void write_image(int idx, std::string filename);
-        void clear() { data.clear(); }
+        void clear()
+        {
+            data.clear();
+            render_window.clear();
+        }
 };
 
 static inline void renderArray(RenderElement &e)
