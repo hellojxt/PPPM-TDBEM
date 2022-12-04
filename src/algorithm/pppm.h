@@ -64,6 +64,44 @@ class BEMCache
         }
 };
 
+class CommonVertex
+{
+    public:
+        int common_vertex_num;
+        int particle_data_id;
+        CGPU_FUNC CommonVertex() : common_vertex_num(0), particle_data_id(-1) {}
+        CGPU_FUNC CommonVertex(int common_vertex_num_, int particle_data_id_)
+            : common_vertex_num(common_vertex_num_), particle_data_id(particle_data_id_)
+        {}
+};
+
+struct CacheInfo
+{
+        int particle_id;
+        int neighbor_particle_id;
+        int particle_data_id;
+        float max_weight_single;
+        float max_weight_double;
+};
+class FastBEMCache
+{
+    public:
+        GArr<CacheInfo> cache_info;
+        GArr<LayerWeightHalf> weight;
+
+        FastBEMCache() {}
+        void resize(int size)
+        {
+            cache_info.resize(size);
+            weight.resize(size);
+        }
+        void clear()
+        {
+            cache_info.clear();
+            weight.clear();
+        }
+};
+
 class PPPMCache
 {
     public:
@@ -83,9 +121,11 @@ class PPPMCache
         // All particles have neighbors
         GArr<int> particle_neighbor_num;
 
-        GArr<float> particle_far_field;   // cache of particle far field
-        GArr<float> particle_near_field;  // cache of particle near field
-        GArr<float> particle_factor;      // cache of particle factor
+        GArr<float> particle_far_field;    // cache of particle far field
+        GArr<float> particle_near_field;   // cache of particle near field
+        GArr<float> particle_factor;       // cache of particle factor
+        GArr<CommonVertex> common_vertex;  // cache of common vertex
+        FastBEMCache fast_particle_data;   // cache of fast particle data
 
         void clear()
         {
@@ -100,6 +140,8 @@ class PPPMCache
             particle_far_field.clear();
             particle_near_field.clear();
             particle_factor.clear();
+            common_vertex.clear();
+            fast_particle_data.clear();
         }
 
         void reset()
@@ -115,6 +157,8 @@ class PPPMCache
             particle_far_field.reset();
             particle_near_field.reset();
             particle_factor.reset();
+            common_vertex.reset();
+            fast_particle_data.clear();
         }
 };
 
@@ -174,12 +218,6 @@ class PPPMSolver
             dirichlet.reset();
             neumann.resize(pg.particles.size());
             neumann.reset();
-            cache.particle_factor.resize(pg.particles.size());
-            cache.particle_factor.reset();
-            cache.particle_far_field.resize(pg.particles.size());
-            cache.particle_far_field.reset();
-            cache.particle_near_field.resize(pg.particles.size());
-            cache.particle_near_field.reset();
         }
 
         void remove_current_mesh()

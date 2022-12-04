@@ -54,6 +54,21 @@ class PairInfo
 
 typedef CircularArray<float, STEP_NUM> History;
 
+class LayerWeightHalf
+{
+    public:
+        half single_layer[STEP_NUM];
+        half double_layer[STEP_NUM];
+        inline CGPU_FUNC void reset()
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                single_layer[i] = 0;
+                double_layer[i] = 0;
+            }
+        }
+};
+
 class LayerWeight
 {
     public:
@@ -220,7 +235,7 @@ class TDBEM
             {
                 v[k] = conj(v[STEP_NUM - k]);
             }
-            scaledIDFT(v, weight);
+            scaledFFT(v, weight);
         }
 
         CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight *weight)

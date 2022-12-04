@@ -66,6 +66,12 @@ __global__ void grid_dense_map_post_kernel(GArr<Particle> particles,
 
     Particle particle = particles[grid_dense_map[idx].start];
     uint3 coord = particle.cell_coord;
+#ifndef NDEBUG
+    if (coord.x >= grid_hash_map.size.x || coord.y >= grid_hash_map.size.y || coord.z >= grid_hash_map.size.z ||
+        coord.x < 0 || coord.y < 0 || coord.z < 0)
+        printf("coord: %d %d %d exceed grid_hash_map size: %d %d %d in grid_dense_map_post_kernel\n", coord.x, coord.y,
+               coord.z, grid_hash_map.size.x, grid_hash_map.size.y, grid_hash_map.size.z);
+#endif
     grid_hash_map(coord.x, coord.y, coord.z) = grid_dense_map[idx];
 }
 

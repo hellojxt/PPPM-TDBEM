@@ -44,7 +44,7 @@ void check_grid_cache()
 
 void check_particle_cache()
 {
-    auto solver = bunny_pppm(32);
+    auto solver = bunny_pppm(64);
     LOG("Simple algorithm");
     solver->precompute_particle_cache_simple(true);
     auto particle_map_simple = solver->cache.particle_map.cpu();
@@ -53,8 +53,22 @@ void check_particle_cache()
     solver->precompute_particle_cache(true);
     auto particle_map = solver->cache.particle_map.cpu();
     auto particle_data = solver->cache.particle_data.cpu();
-    check_same(particle_map, particle_map_simple);
-    check_same(particle_data, particle_data_simple);
+    for (int i = 0; i < particle_map_simple.size(); ++i)
+    {
+        REQUIRE(particle_map_simple[i] == particle_map[i]);
+    }
+    for (int i = 0; i < particle_data_simple.size(); ++i)
+    {
+        for (int j = 0; j < STEP_NUM; j++)
+        {
+            // printf("%d %d: %e %e\n", i, j, particle_data_simple[i].weight.single_layer[j],
+            //        particle_data[i].weight.single_layer[j]);
+            REQUIRE(particle_data_simple[i].weight.single_layer[j] ==
+                    Approx(particle_data[i].weight.single_layer[j]).margin(1e-11));
+            REQUIRE(particle_data_simple[i].weight.double_layer[j] ==
+                    Approx(particle_data[i].weight.double_layer[j]).epsilon(1e-11));
+        }
+    }
     solver->clear();
 }
 
@@ -96,7 +110,7 @@ void check_particle_solver()
     {
         for (int j = 0; j < 2 * STEP_NUM; j++)
         {
-            REQUIRE(dirichlet_solved[i][j] == Approx(dirichlet_solved_simple[i][j]));
+            REQUIRE(dirichlet_solved[i][j] == Approx(dirichlet_solved_simple[i][j]).margin(1e-3));
         }
     }
     solver->clear();

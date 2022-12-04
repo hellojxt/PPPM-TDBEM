@@ -32,7 +32,7 @@ int main()
 {
     int res = 50;
     PPPMSolver *solver = empty_pppm(res);
-    auto filename = ASSET_DIR + std::string("sphere.obj");
+    auto filename = ASSET_DIR + std::string("sphere3.obj");
     auto mesh = Mesh::loadOBJ(filename, true);
     mesh.stretch_to(solver->size().x / 4.0f);
     LOG("stretch to " << mesh.get_scale())

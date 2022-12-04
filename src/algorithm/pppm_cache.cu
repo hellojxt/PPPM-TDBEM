@@ -334,6 +334,11 @@ __global__ void fill_particle_info(PPPMSolver pppm)
                     pppm.cache.particle_data[range_start].particle_id = i;
                     pppm.cache.particle_data[range_start].particle_map = &pppm.cache.particle_map[particle_id];
                     pppm.cache.particle_data[range_start].trg_particle_id = particle_id;
+                    auto particle = pppm.pg.particles[particle_id];
+                    auto particle_neighbor = pppm.pg.particles[i];
+                    pppm.cache.common_vertex[range_start].common_vertex_num =
+                        triangle_common_vertex_num(particle.indices, particle_neighbor.indices);
+                    pppm.cache.common_vertex[range_start].particle_data_id = range_start;
                 }
             }
     pppm.cache.particle_map[particle_id].range = Range(range_start, range_end);
@@ -351,6 +356,10 @@ void set_particle_cache_size(PPPMSolver &pppm)
                            thrust::plus<int>());  // calculate the prefix sum of neighbor_nums
     int total_num = cache.particle_neighbor_num.last_item();
     cache.particle_data.resize(total_num);
+    cache.common_vertex.resize(total_num);
+    cache.particle_near_field.resize(total_num);
+    cache.particle_far_field.resize(particle_num);
+    cache.particle_factor.resize(total_num);
     cuExecute(particle_num, fill_particle_info, pppm);
 }
 
@@ -398,15 +407,15 @@ __global__ void precompute_cache_data(PPPMSolver pppm)
         pppm.cache.particle_data[i].weight = w;
     }
 }
-
 __global__ void precompute_cache_data_fast(PPPMSolver pppm)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= pppm.cache.particle_data.size())
+    if (i >= pppm.cache.common_vertex.size())
         return;
+    auto &cv = pppm.cache.common_vertex[i];
     LayerWeight w;
     w.reset();
-    auto bemcache = pppm.cache.particle_data[i];
+    auto bemcache = pppm.cache.particle_data[cv.particle_data_id];
     auto pm = bemcache.particle_map;
     auto neighbor_particle_id = bemcache.particle_id;
     auto current_particle_id = bemcache.trg_particle_id;
@@ -425,7 +434,29 @@ __global__ void precompute_cache_data_fast(PPPMSolver pppm)
                     add_particle_near_field(pppm, w, neighbor_particle.indices, center, -pm->weight[weight_idx], 0);
                 }
             }
-    pppm.cache.particle_data[i].weight = w;
+    // pppm.cache.particle_data[cv.particle_data_id].weight = w;
+    LayerWeightHalf w_half;
+    w_half.reset();
+    float max_weight_single = 0;
+    float max_weight_double = 0;
+    for (int idx = 0; idx < STEP_NUM; idx++)
+    {
+        max_weight_single = max(max_weight_single, abs(w.single_layer[idx]));
+        max_weight_double = max(max_weight_double, abs(w.double_layer[idx]));
+    }
+    for (int idx = 0; idx < STEP_NUM; idx++)
+    {
+        if (max_weight_single != 0)
+            w_half.single_layer[idx] = w.single_layer[idx] / max_weight_single;
+        if (max_weight_double != 0)
+            w_half.double_layer[idx] = w.double_layer[idx] / max_weight_double;
+    }
+    pppm.cache.fast_particle_data.weight[cv.particle_data_id] = w_half;
+    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].particle_data_id = cv.particle_data_id;
+    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].neighbor_particle_id = neighbor_particle_id;
+    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].particle_id = current_particle_id;
+    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].max_weight_single = max_weight_single;
+    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].max_weight_double = max_weight_double;
 }
 
 void cache_particle_data(PPPMSolver &pppm)
@@ -434,9 +465,31 @@ void cache_particle_data(PPPMSolver &pppm)
     cuExecute(particle_num, precompute_cache_data, pppm);
 }
 
+struct compare_common_vertex
+{
+        __host__ __device__ bool operator()(const CommonVertex &a, const CommonVertex &b)
+        {
+            return a.common_vertex_num < b.common_vertex_num;
+        }
+};
+
+struct compare_fast_cache_info
+{
+        __host__ __device__ bool operator()(const CacheInfo &a, const CacheInfo &b)
+        {
+            return a.neighbor_particle_id < b.neighbor_particle_id;
+        }
+};
+
 void cache_particle_data_fast(PPPMSolver &pppm)
 {
     int total_num = pppm.cache.particle_data.size();
+    thrust::sort(thrust::device, pppm.cache.common_vertex.begin(), pppm.cache.common_vertex.end(),
+                 compare_common_vertex());
+    pppm.cache.fast_particle_data.resize(total_num);
+    auto &fcache = pppm.cache.fast_particle_data;
+    thrust::sort_by_key(thrust::device, fcache.cache_info.begin(), fcache.cache_info.end(), fcache.weight.begin(),
+                        compare_fast_cache_info());
     cuExecute(total_num, precompute_cache_data_fast, pppm);
 }
 
@@ -482,17 +535,21 @@ void solve_particle_from_cache(PPPMSolver &pppm)
     cuExecute(particle_num, solve_particle_from_cache_kernel, pppm);
 }
 
-__global__ void solve_particle_far_field_fast_kernel(PPPMSolver pppm, GArr<float> far_field)
+__global__ void solve_particle_far_field_fast_kernel(PPPMSolver pppm)
 {
     int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (particle_id >= pppm.pg.particles.size())
         return;
     ParticleMap &pm = pppm.cache.particle_map[particle_id];
+    auto &far_field = pppm.cache.particle_far_field;
     int t = pppm.fdtd.t;
     float far_sum = 0;
     // caculate the far field from interpolation
+#pragma unroll
     for (int dx = 0; dx < 2; dx++)
+#pragma unroll
         for (int dy = 0; dy < 2; dy++)
+#pragma unroll
             for (int dz = 0; dz < 2; dz++)
             {
                 int weight_idx = dx * 4 + dy * 2 + dz;
@@ -503,83 +560,65 @@ __global__ void solve_particle_far_field_fast_kernel(PPPMSolver pppm, GArr<float
     pppm.dirichlet[particle_id][pppm.fdtd.t] = 0;
 }
 
-#define PARTICLE_NEAR_BLOCK_SIZE 64
-__global__ void solve_particle_near_field_fast_kernel(PPPMSolver pppm, GArr<float> near_field, GArr<float> factor)
+__global__ void solve_particle_near_field_fast_kernel(PPPMSolver pppm)
 {
-    int particle_id = blockIdx.x;
-    if (particle_id >= pppm.pg.particles.size())
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= pppm.cache.particle_data.size())
         return;
-
-    Particle &current_particle = pppm.pg.particles[particle_id];
-    ParticleMap &pm = pppm.cache.particle_map[particle_id];
-    Range r = pm.range;
-    float factor_num = 0;
-    float near_part_sum = 0;
+    auto &fcache = pppm.cache.fast_particle_data;
+    int particle_id = fcache.cache_info[i].particle_id;
+    int neighbor_id = fcache.cache_info[i].neighbor_particle_id;
+    int particle_data_id = fcache.cache_info[i].particle_data_id;
+    float max_weight_single_layer = fcache.cache_info[i].max_weight_single;
+    float max_weight_double_layer = fcache.cache_info[i].max_weight_double;
+    auto &weight = fcache.weight[particle_data_id];
+    auto &neumann = pppm.neumann[neighbor_id];
     auto t = pppm.fdtd.t;
-    for (int i = threadIdx.x + r.start; i < r.end; i += blockDim.x)
-    {
-        auto &data = pppm.cache.particle_data[i];
-        auto &neumann = pppm.neumann[data.particle_id];
-        auto &dirichlet = pppm.dirichlet[data.particle_id];
+    auto &dirichlet = pppm.dirichlet[neighbor_id];
+    float near_part_sum = 0;
 #pragma unroll
-        for (int k = 0; k < STEP_NUM; k++)
-        {
-            near_part_sum +=
-                -data.weight.single_layer[k] * neumann[t - k] + data.weight.double_layer[k] * dirichlet[t - k];
-        }
-        factor_num += data.weight.double_layer[0];  // "lumped mass" for G_t, the factor is small compared to 0.5
-    }
-    __shared__ float shared_near_part_sum[PARTICLE_NEAR_BLOCK_SIZE];
-    __shared__ float shared_factor_num[PARTICLE_NEAR_BLOCK_SIZE];
-    shared_near_part_sum[threadIdx.x] = near_part_sum;
-    shared_factor_num[threadIdx.x] = factor_num;
-    __syncthreads();
-#pragma unroll
-    for (int i = PARTICLE_NEAR_BLOCK_SIZE / 2; i > 0; i /= 2)
+    for (int k = 0; k < STEP_NUM; k++)
     {
-        if (threadIdx.x < i)
-        {
-            shared_near_part_sum[threadIdx.x] += shared_near_part_sum[threadIdx.x + i];
-            shared_factor_num[threadIdx.x] += shared_factor_num[threadIdx.x + i];
-        }
-        __syncthreads();
+        near_part_sum += -(float)weight.single_layer[k] * neumann[t - k] * max_weight_single_layer +
+                         (float)weight.double_layer[k] * dirichlet[t - k] * max_weight_double_layer;
     }
-    if (threadIdx.x == 0)
-    {
-        near_field[particle_id] = shared_near_part_sum[0];
-        factor[particle_id] = shared_factor_num[0];
-    }
+
+    pppm.cache.particle_near_field[particle_data_id] = near_part_sum;
+    pppm.cache.particle_factor[particle_data_id] = (float)weight.double_layer[0] * max_weight_double_layer;
 }
 
-__global__ void solve_dirichlet_fast_kernel(PPPMSolver pppm,
-                                            GArr<float> far_field,
-                                            GArr<float> near_field,
-                                            GArr<float> factor)
+__global__ void solve_dirichlet_fast_kernel(PPPMSolver pppm)
 {
     int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (particle_id >= pppm.pg.particles.size())
         return;
     Particle &p = pppm.pg.particles[particle_id];
+    ParticleMap &pm = pppm.cache.particle_map[particle_id];
+    Range r = pm.range;
     auto particle_area = 0.5 * jacobian(pppm.pg.vertices.data(), p.indices);
     // Equation (2.12) in Paper:https://epubs.siam.org/doi/pdf/10.1137/090775981
+
+    float near_field_sum = 0, factor_sum = 0;
+    for (int i = r.start; i < r.end; i++)
+    {
+        near_field_sum += pppm.cache.particle_near_field[i];
+        factor_sum += pppm.cache.particle_factor[i];
+    }
     pppm.dirichlet[particle_id][pppm.fdtd.t] =
-        (far_field[particle_id] * 0.84 + near_field[particle_id]) / (0.5 * particle_area - factor[particle_id]);
+        (pppm.cache.particle_far_field[particle_id] * 0.84 + near_field_sum) / (0.5 * particle_area - factor_sum);
 }
 
-void solve_particle_from_cache_fast(PPPMSolver &pppm)
+void solve_particle_from_cache_fast(PPPMSolver &pppm, bool log_time)
 {
     int particle_num = pppm.pg.particles.size();
-    auto &particle_far_field = pppm.cache.particle_far_field;
-    auto &particle_near_field = pppm.cache.particle_near_field;
-    auto &particle_factor = pppm.cache.particle_factor;
-    particle_far_field.reset();
-    particle_near_field.reset();
-    particle_factor.reset();
-    cuExecute(particle_num, solve_particle_far_field_fast_kernel, pppm, particle_far_field);
-    cuExecuteBlock(particle_num, PARTICLE_NEAR_BLOCK_SIZE, solve_particle_near_field_fast_kernel, pppm,
-                   particle_near_field, particle_factor);
-    cuExecute(particle_num, solve_dirichlet_fast_kernel, pppm, particle_far_field, particle_near_field,
-              particle_factor);
+    int particle_data_num = pppm.cache.particle_data.size();
+    START_TIME(log_time);
+    cuExecute(particle_num, solve_particle_far_field_fast_kernel, pppm);
+    LOG_TIME("solve_particle_far_field_fast_kernel");
+    cuExecute(particle_data_num, solve_particle_near_field_fast_kernel, pppm);
+    LOG_TIME("solve_particle_near_field_fast_kernel");
+    cuExecute(particle_num, solve_dirichlet_fast_kernel, pppm);
+    LOG_TIME("solve_dirichlet_fast_kernel");
 }
 
 }  // namespace pppm

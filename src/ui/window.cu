@@ -15,6 +15,7 @@
 #include "imgui_internal.h"
 #include "macro.h"
 #include "window.h"
+#include "array_writer.h"
 
 namespace pppm
 {
@@ -353,6 +354,15 @@ void CudaRender::update()
     ImGui::SliderInt("Frame", &frame_idx, 0, frame_num - 1);
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetWindowSize().x * 0.15f);
     ImGui::SliderFloat("Speed", &play_speed, 0.05f, 1.0f);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetWindowSize().x * 0.15f);
+    // add a text box for input file name
+    ImGui::InputText("File Name", img_file_name, 256);
+    // add a button for saving image
+    if (ImGui::Button("Save Image"))
+    {
+        save_frame(img_file_name);
+    }
+
     if (ImGui::IsItemActive() && update_frame_count % (int)(1.0f / play_speed) == 0)
     {
         frame_idx += 1;
@@ -361,10 +371,16 @@ void CudaRender::update()
     }
 }
 
+void CudaRender::save_frame(char *filename)
+{
+    auto image = data[frame_idx].cpu();
+    write_to_png(filename, image);
+}
+
 void CudaRender::clear()
 {
-    if (is_inited)
-        cuSafeCall(cudaGraphicsUnmapResources(1, &CudaResource, 0));
+    // if (is_inited)
+    //     cuSafeCall(cudaGraphicsUnmapResources(1, &CudaResource, 0));
     data.clear();
 }
 

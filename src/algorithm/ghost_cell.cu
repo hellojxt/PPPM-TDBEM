@@ -51,7 +51,7 @@ __global__ void construct_ghost_cell_list(GhostCellSolver solver)
 void GhostCellSolver::precompute_cell_data(bool log_time)
 {
     START_TIME(log_time)
-    ghost_cell_num = fill_cell_data(grid, cell_data);
+    ghost_cell_num = fill_cell_data(grid, cell_data, (condition_number_threshold == 0));
     ghost_cells.resize(ghost_cell_num);
     cuExecute3D(grid.grid_dim, construct_ghost_cell_list, *this);
     if (ghost_cell_num <= 0)

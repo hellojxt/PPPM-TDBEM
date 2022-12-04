@@ -17,6 +17,6 @@ void cache_particle_data_fast(PPPMSolver &pppm);
 void solve_fdtd_far_field_from_cache(PPPMSolver &pppm);
 void solve_fdtd_near_field_from_cache(PPPMSolver &pppm);
 void solve_particle_from_cache(PPPMSolver &pppm);
-void solve_particle_from_cache_fast(PPPMSolver &pppm);
+void solve_particle_from_cache_fast(PPPMSolver &pppm, bool log_time = false);
 
 }  // namespace pppm

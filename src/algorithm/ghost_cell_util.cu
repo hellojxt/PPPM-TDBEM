@@ -4,7 +4,7 @@
 namespace pppm
 {
 
-__global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid grid)
+__global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid grid, bool thin_shell)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -50,6 +50,8 @@ __global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
         float direction = dot(nearest_particle.normal, grid_center - result.nearst_point);
         result.type = (direction > 0) ? AIR : SOLID;
     }
+    if (thin_shell && grid.grid_hash_map(x, y, z).length() > 0)
+        result.type = SOLID;
     cell_data(x, y, z) = result;
     return;
 }
@@ -110,9 +112,9 @@ __global__ void apply_cell_type_kernel(GArr3D<CellInfo> cell_data,
     }
 }
 
-int fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data)
+int fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data, bool thin_shell)
 {
-    cuExecute3D(grid.grid_dim, fill_in_nearest_kernel, cell_data, grid);
+    cuExecute3D(grid.grid_dim, fill_in_nearest_kernel, cell_data, grid, thin_shell);
     GArr3D<CellType> type_arr;
     GArr3D<int> ghost_idx_arr;
     type_arr.resize(grid.grid_dim);

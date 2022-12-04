@@ -30,6 +30,7 @@ class CudaRender : public Window
         int update_frame_count;
         float play_speed;
         bool is_inited = false;
+        char img_file_name[100];
         CudaRender() { this->title = "CudaRender"; }
         CudaRender(const char *str) { this->title = str; }
 
@@ -53,6 +54,7 @@ class CudaRender : public Window
         void init();
         void update();
         void clear();
+        void save_frame(char *filename);
 };
 
 }  // namespace pppm
