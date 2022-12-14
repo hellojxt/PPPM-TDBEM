@@ -1,8 +1,8 @@
 add_library(alglib 
         fdtd.cu 
         pppm.cu
-        pppm_direct.cu
         pppm_cache.cu
+        pppm_direct.cu
         particle_grid.cu
         sparse.cu
         ghost_cell_util.cu

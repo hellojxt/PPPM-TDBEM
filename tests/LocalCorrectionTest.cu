@@ -6,6 +6,7 @@
 #include "fdtd.h"
 #include "sound_source.h"
 
+// FIXME: need to be fixed for new PPPM
 int main()
 {
 #define TEST_MAX_STEP 256

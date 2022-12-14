@@ -12,7 +12,7 @@
 
 #define ALL_STEP 512
 #define SET_DIRICHLET false
-
+// FIXME: need to be fixed for new PPPM
 using namespace pppm;
 
 __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp)

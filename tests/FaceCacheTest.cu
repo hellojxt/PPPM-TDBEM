@@ -11,6 +11,7 @@
 #include "sound_source.h"
 #include "window.h"
 
+// FIXME: need to be fixed for new PPPM
 using Catch::Approx;
 
 __global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine)
@@ -24,7 +25,7 @@ __global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine)
     pppm.dirichlet[particle_idx][t] = dirichlet_amp * sine(dt * t, (particle_idx + 1)).imag();
 }
 
-TEST_CASE("ParticleCache", "[pc]")
+TEST_CASE("FaceCache", "[pc]")
 {
     using namespace pppm;
     PPPMSolver *solver = random_pppm(1024, 32);

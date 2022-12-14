@@ -10,7 +10,7 @@ __global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int z = blockIdx.z * blockDim.z + threadIdx.z;
     // here we assume grid_dim is (a, a, a).
-    int grid_dim = grid.grid_dim.x;
+    int grid_dim = grid.grid_dim;
     if (x < 0 || x >= grid_dim || y < 0 || y >= grid_dim || z < 0 || z >= grid_dim)
         return;
 
@@ -28,10 +28,11 @@ __global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
                     coord.z >= grid_dim)
                     continue;
 
-                Range &neighbors = grid.grid_hash_map(coord);
-                for (int i = neighbors.start; i < neighbors.end; i++)
+                auto &neighbor_list = grid.grid_face_list(coord);
+                for (int i = 0; i < neighbor_list.size(); i++)
                 {
-                    int3 triID = grid.particles[i].indices;
+                    int face_idx = neighbor_list[i];
+                    int3 triID = grid.triangles[face_idx].indices;
                     float3 nearest_point = get_nearest_triangle_point(grid_center, grid.vertices[triID.x],
                                                                       grid.vertices[triID.y], grid.vertices[triID.z]);
                     float curr_len = length(grid_center - nearest_point);
@@ -39,18 +40,18 @@ __global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
                     {
                         result.nearst_distance = curr_len;
                         result.nearst_point = nearest_point;
-                        result.nearest_particle_idx = i;
+                        result.nearest_particle_idx = face_idx;
                         result.reflect_point = 2 * nearest_point - grid_center;
                     }
                 }
             }
     if (result.nearst_distance < MAX_FLOAT)
     {
-        auto nearest_particle = grid.particles[result.nearest_particle_idx];
+        auto nearest_particle = grid.triangles[result.nearest_particle_idx];
         float direction = dot(nearest_particle.normal, grid_center - result.nearst_point);
         result.type = (direction > 0) ? AIR : SOLID;
     }
-    if (thin_shell && grid.grid_hash_map(x, y, z).length() > 0)
+    if (thin_shell && grid.grid_face_list(x, y, z).size() > 0)
         result.type = SOLID;
     cell_data(x, y, z) = result;
     return;
@@ -114,14 +115,15 @@ __global__ void apply_cell_type_kernel(GArr3D<CellInfo> cell_data,
 
 int fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data, bool thin_shell)
 {
-    cuExecute3D(grid.grid_dim, fill_in_nearest_kernel, cell_data, grid, thin_shell);
+    auto grid_dim_3D = make_int3(grid.grid_dim, grid.grid_dim, grid.grid_dim);
+    cuExecute3D(grid_dim_3D, fill_in_nearest_kernel, cell_data, grid, thin_shell);
     GArr3D<CellType> type_arr;
     GArr3D<int> ghost_idx_arr;
-    type_arr.resize(grid.grid_dim);
-    ghost_idx_arr.resize(grid.grid_dim);
-    cuExecute3D(grid.grid_dim, cell_classfication_kernel, cell_data, grid, type_arr, ghost_idx_arr);
+    type_arr.resize(grid_dim_3D);
+    ghost_idx_arr.resize(grid_dim_3D);
+    cuExecute3D(grid_dim_3D, cell_classfication_kernel, cell_data, grid, type_arr, ghost_idx_arr);
     thrust::inclusive_scan(thrust::device, ghost_idx_arr.begin(), ghost_idx_arr.end(), ghost_idx_arr.begin());
-    cuExecute3D(grid.grid_dim, apply_cell_type_kernel, cell_data, grid, type_arr, ghost_idx_arr);
+    cuExecute3D(grid_dim_3D, apply_cell_type_kernel, cell_data, grid, type_arr, ghost_idx_arr);
     int ghost_cell_num = ghost_idx_arr.data.last_item();
     type_arr.clear();
     ghost_idx_arr.clear();

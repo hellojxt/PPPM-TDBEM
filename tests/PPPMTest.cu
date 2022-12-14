@@ -27,7 +27,7 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp
         pppm.dirichlet[particle_id][t] = (mp.dirichlet(p.pos) * sine(dt * t)).real();
     pppm.neumann[particle_id][t] = (mp.neumann(p.pos, p.normal) * sine(dt * t)).real();
 }
-
+// FIXME: need to be fixed for new PPPM
 int main()
 {
     int res = 50;

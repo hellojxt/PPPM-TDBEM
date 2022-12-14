@@ -31,6 +31,7 @@ void view_cell_data(GhostCellSolver *solver)
     re.update_mesh();
     re.render();
 }
+// FIXME: need to be fixed for new PPPM
 #define MAX_STEP 128
 #define USE_UI
 int main(int argc, char *argv[])

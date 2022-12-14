@@ -7,6 +7,7 @@
 #include <thrust/remove.h>
 #include <thrust/execution_policy.h>
 #include <fstream>
+#include <assert.h>
 
 namespace pppm
 {
@@ -211,37 +212,17 @@ class GArr
         GPU_FUNC inline T &operator[](unsigned int id)
         {
 #ifdef MEMORY_CHECK
-            if (id >= m_totalNum)
-            {
-                printf("Error: GArr::operator[]: id = %d, m_totalNum = %d\n in (Block %d, Thread %d)", id, m_totalNum,
-                       blockIdx.x, threadIdx.x);
-                return m_data[0];
-            }
-            else
-            {
-                return m_data[id];
-            }
-#else
-            return m_data[id];
+            assert(id < m_totalNum);
 #endif
+            return m_data[id];
         }
 
         GPU_FUNC inline T &operator[](unsigned int id) const
         {
 #ifdef MEMORY_CHECK
-            if (id >= m_totalNum)
-            {
-                printf("Error: GArr::operator[]: id = %d, m_totalNum = %d\n in (Block %d, Thread %d)", id, m_totalNum,
-                       blockIdx.x, threadIdx.x);
-                return m_data[0];
-            }
-            else
-            {
-                return m_data[id];
-            }
-#else
-            return m_data[id];
+            assert(id < m_totalNum);
 #endif
+            return m_data[id];
         }
 
         CPU_FUNC inline T operator[](to_cpu idx) const

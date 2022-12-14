@@ -2,72 +2,193 @@
 #include "array3D.h"
 #include "helper_math.h"
 #include "macro.h"
-#include "morton.h"
+#include "fdtd.h"
 
 namespace pppm
 {
+#define BUFFER_SIZE_FACE_NUM_PER_CELL 8
+#define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 128
+#define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 256
 
-class Particle
+// attention: need to be used as reference for performance
+template <typename T, int N>
+class GridElementList
 {
     public:
-        uint3 cell_coord;
-        float3 pos;
-        float3 normal;
+        int num;
+        T list[N];
+        CGPU_FUNC GridElementList() : num(0) {}
+        GPU_FUNC inline int atomic_append(T i)
+        {
+            int index = atomicAdd(&num, 1);
+#ifdef MEMORY_CHECK
+            assert(index < N);
+#endif
+            list[index] = i;
+            return index;
+        }
+        CGPU_FUNC T &operator[](int i) const { return list[i]; }
+        CGPU_FUNC T &operator[](int i) { return list[i]; }
+        CGPU_FUNC int size() const { return num; }
+        CGPU_FUNC void clear() { num = 0; }
+};
+
+using FaceList = GridElementList<int, BUFFER_SIZE_FACE_NUM_PER_CELL>;
+using Neighbor3SquareList = GridElementList<int, BUFFER_SIZE_NEIGHBOR_NUM_3_3_3>;
+using Neighbor4SquareList = GridElementList<int, BUFFER_SIZE_NEIGHBOR_NUM_4_4_4>;
+
+struct NeighborNum
+{
+        int3 coord;
+        int num;
+};
+
+class CompactCoordArray
+{
+    public:
+        GArr<NeighborNum> data;
+        int non_zero_size;
+        CompactCoordArray() {}
+        void reserve(int size_)
+        {
+            data.resize(size_);
+            non_zero_size = 0;
+        }
+        struct is_zero
+        {
+                CGPU_FUNC bool operator()(const NeighborNum &x) const { return x.num == 0; }
+        };
+        void remove_zero()
+        {
+            NeighborNum *new_end = thrust::remove_if(thrust::device, data.begin(), data.end(), is_zero());
+            non_zero_size = new_end - data.begin();
+        }
+        GPU_FUNC int3 coord(int i) const { return data[i].coord; }
+        GPU_FUNC int num(int i) const { return data[i].num; }
+        GPU_FUNC void set(int i, int3 coord, int num)
+        {
+            data[i].coord = coord;
+            data[i].num = num;
+        }
+        GPU_FUNC NeighborNum &operator[](int i) { return data[i]; }
+        CGPU_FUNC int size() const { return non_zero_size; }
+        void clear()
+        {
+            non_zero_size = 0;
+            data.clear();
+        }
+};
+
+class Triangle
+{
+    public:
         int3 indices;
-        int4 __only_for_align__;  // align to 64 bytes
-        CGPU_FUNC Particle() {}
-        friend std::ostream &operator<<(std::ostream &out, const Particle &be);
+        float3 normal;
+        float3 center;
+        int3 grid_coord;
+        int grid_index;
+        int3 grid_base_coord;
+        int grid_base_index;
+        float area;
+        CGPU_FUNC Triangle() {}
 };
 
 class ParticleGrid
 {
     public:
-        GArr<float3> vertices;
-        GArr<int3> triangles;
+        FDTD fdtd;
         float3 min_pos;
         float3 max_pos;
         float grid_size;
-        int3 grid_dim;
-        GArr<Particle> particles;     // particles sorted by morton code
-        GArr<Range> grid_dense_map;   // grid_dense_map(i) is the index range (index for particles) of
-                                      // the elements in the i-th non-empty grid cell. Range is [start, end) and grid is
-                                      // sorted by morton code
-        GArr3D<Range> grid_hash_map;  // grid_hash_map(i,j,k) is the index range (index for particles) of the elements
-                                      // in the grid cells. If the grid cell is empty, the range is [0,0).
+        int grid_dim;
+        float delta_t;
+        bool empty_grid = true;
+        GArr<float3> vertices;                  // vertex position
+        GArr<int3> faces;                       // directly store the indices of vertices
+        GArr<Triangle> triangles;               // store the triangle information
+        GArr3D<FaceList> grid_face_list;        // grid_face_list(i,j,k) contain the index of all the faces in the cell
+        GArr3D<FaceList> base_coord_face_list;  // base_coord_face_list(i,j,k) contain the index of the faces in
+                                                // the interpolation cube (with 2*2*2 neighbor cell centers as vertices)
+        CompactCoordArray base_coord_nonempty;  // contain the index of the nonempty base_coord_face_list(i,j,k)
+        GArr3D<Neighbor3SquareList> neighbor_3_square_list;  // neighbor_3_square_list(i,j,k) contain the index of the
+                                                             // neighbor triangles in the 3x3x3 square
+        CompactCoordArray neighbor_3_square_nonempty;        // contain the index of the nonempty neighbors (3*3)
+        GArr3D<Neighbor4SquareList> neighbor_4_square_list;  // neighbor_4_square_list(i,j,k) contain the index of the
+                                                             // neighbor triangles in the 4x4x4 square
+        int face_list_fresh_cycle = 1;
+        int mesh_update_counter = 0;
 
-        void init(float3 min_pos_, float grid_size_, int grid_dim_)
+        void init(float3 min_pos_, float grid_size_, int grid_dim_, float delta_t_)
         {
             min_pos = min_pos_;
             grid_size = grid_size_;
-            grid_dim = make_int3(grid_dim_, grid_dim_, grid_dim_);
-            max_pos = min_pos + make_float3(grid_dim.x, grid_dim.y, grid_dim.z) * grid_size;
+            grid_dim = grid_dim_;
+            delta_t = delta_t_;
+            max_pos = min_pos + make_float3(grid_dim, grid_dim, grid_dim) * grid_size;
+            fdtd.init(grid_dim, grid_size, delta_t);
+            grid_face_list.resize(grid_dim, grid_dim, grid_dim);
+            grid_face_list.reset();
+            base_coord_face_list.resize(grid_dim, grid_dim, grid_dim);
+            base_coord_face_list.reset();
+            neighbor_3_square_list.resize(grid_dim, grid_dim, grid_dim);
+            neighbor_3_square_list.reset();
+            neighbor_4_square_list.resize(grid_dim, grid_dim, grid_dim);
+            neighbor_4_square_list.reset();
+            base_coord_nonempty.reserve(grid_dim * grid_dim * grid_dim);
+            neighbor_3_square_nonempty.reserve(grid_dim * grid_dim * grid_dim);
         }
 
-        void set_mesh(CArr<float3> vertices_, CArr<int3> triangles_)
+        void set_face_list_fresh_cycle(int cycle) { face_list_fresh_cycle = cycle; }
+
+        void set_mesh(CArr<float3> vertices_, CArr<int3> faces_)
         {
             vertices.assign(vertices_);
-            triangles.assign(triangles_);
+            faces.assign(faces_);
+            triangles.resize(faces.size());
+            grid_face_list.reset();
+            construct_grid();
+            empty_grid = false;
+        }
+
+        void update_mesh(CArr<float3> vertices_)
+        {
+            vertices.assign(vertices_);
+            construct_grid();
         }
 
         void clear()
         {
+            fdtd.clear();
             vertices.clear();
+            faces.clear();
             triangles.clear();
-            particles.clear();
-            grid_dense_map.clear();
-            grid_hash_map.clear();
+            grid_face_list.reset();
+            base_coord_face_list.reset();
+            neighbor_3_square_list.reset();
+            neighbor_4_square_list.reset();
+            base_coord_nonempty.clear();
+            neighbor_3_square_nonempty.clear();
+            empty_grid = true;
         }
 
-        void reset() { clear(); }
-
         void construct_grid();
+
+        void construct_neighbor_lists();
 
         CGPU_FUNC inline float3 getCenter(int i, int j, int k) const
         {
             return make_float3((i + 0.5f) * grid_size, (j + 0.5f) * grid_size, (k + 0.5f) * grid_size) + min_pos;
         }
-
         CGPU_FUNC inline float3 getCenter(int3 c) const { return getCenter(c.x, c.y, c.z); }
         CGPU_FUNC inline float3 getCenter(uint3 c) const { return getCenter(c.x, c.y, c.z); }
+        CGPU_FUNC inline int3 getGridCoord(float3 pos) const { return make_int3((pos - min_pos) / grid_size); }
+        // lower left corner of the 2*2*2  neighbor cell centers, used for far field interpolation
+        CGPU_FUNC inline int3 getGridBaseCoord(float3 pos) const
+        {
+            int3 c = getGridCoord(pos);
+            float3 diff = pos - getCenter(c);
+            return c - make_int3(diff.x < 0, diff.y < 0, diff.z < 0);
+        }
+        CGPU_FUNC inline int time_idx() const { return fdtd.t; }
 };
 }  // namespace pppm

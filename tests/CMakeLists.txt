@@ -19,8 +19,8 @@ target_link_libraries(FarFieldCacheTest PRIVATE uilib alglib utillib)
 add_executable(GridCacheTest GridCacheTest.cu)
 target_link_libraries(GridCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
-add_executable(ParticleCacheTest ParticleCacheTest.cu)
-target_link_libraries(ParticleCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
+add_executable(FaceCacheTest FaceCacheTest.cu)
+target_link_libraries(FaceCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
 add_executable(FFTTest FFTTest.cu)
 target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
@@ -43,8 +43,5 @@ target_link_libraries(CusparseTest PRIVATE Catch2::Catch2WithMain alglib utillib
 add_executable(SVDTest SVDTest.cu)
 target_link_libraries(SVDTest PRIVATE Catch2::Catch2WithMain alglib utillib)
 
-add_executable(CatchTest ParticleGridTest.cu TDBEMTest.cu GridCacheTest.cu ParticleCacheTest.cu FFTTest.cu CusparseTest.cu SVDTest.cu)
+add_executable(CatchTest ParticleGridTest.cu TDBEMTest.cu GridCacheTest.cu FaceCacheTest.cu FFTTest.cu CusparseTest.cu SVDTest.cu)
 target_link_libraries(CatchTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
-
-add_executable(FastCacheTest FastCacheTest.cu)
-target_link_libraries(FastCacheTest PRIVATE Catch2::Catch2WithMain uilib alglib utillib)

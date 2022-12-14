@@ -25,7 +25,7 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine)
     pppm.neumann[0][t] = neumann_amp * sine(dt * t).real();
     pppm.dirichlet[0][t] = dirichlet_amp * sine(dt * t).real();
 }
-
+// FIXME: need to be fixed for new PPPM
 int main()
 {
     int res = 65;

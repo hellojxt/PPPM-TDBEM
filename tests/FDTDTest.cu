@@ -27,9 +27,9 @@ int main()
 
     for (int i = 0; i < step_num; i++)
     {
-        solver->fdtd.step();
-        cuExecuteBlock(1, 1, set_center_signal, solver->fdtd, s);
-        re.assign(i, solver->fdtd.grids[i]);
+        solver->pg.fdtd.step();
+        cuExecuteBlock(1, 1, set_center_signal, solver->pg.fdtd, s);
+        re.assign(i, solver->pg.fdtd.grids[i]);
     }
     renderArray(re);
 }
