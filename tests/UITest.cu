@@ -6,10 +6,10 @@
 #include "window.h"
 
 using namespace pppm;
-// FIXME: need to be fixed for new PPPM
+
 int main()
 {
-    auto filename = std::string(ASSET_DIR) + std::string("/sphere.obj");
+    auto filename = std::string(ASSET_DIR) + std::string("/sphere3.obj");
     auto mesh = Mesh::loadOBJ(filename);
     int res = 33;
     auto solver = empty_pppm(res);
@@ -32,5 +32,5 @@ int main()
         re.assign(i, solver->pg.fdtd.grids[i]);
     }
     re.update_mesh();
-    renderArray(re);
+    re.render();
 }

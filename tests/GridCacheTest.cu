@@ -12,7 +12,7 @@
 #include "window.h"
 
 using Catch::Approx;
-
+// !!!!!!!!!!!!!!!!!!----- History size must be 2*STEP_NUM for this test -----!!!!!!!!!!!!!!!!!!!!!
 TEST_CASE("GridCache", "[gc]")
 {
     using namespace pppm;

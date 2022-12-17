@@ -187,7 +187,9 @@ __global__ void update_particle_cache_kernel(FaceCache pc, ParticleGrid pg, TDBE
                         int weight_idx = dx * 4 + dy * 2 + dz;
                         int3 coord = base_coord + make_int3(dx, dy, dz);
                         auto center = pg.getCenter(coord);
-                        if (length(center - neighbor_face.center) > pg.grid_size * 1.5)
+                        if (abs(center.x - neighbor_face.center.x) > pg.grid_size * 1.5 ||
+                            abs(center.y - neighbor_face.center.y) > pg.grid_size * 1.5 ||
+                            abs(center.z - neighbor_face.center.z) > pg.grid_size * 1.5)
                         {
                             add_particle_near_field(pg, bem, w, neighbor_face.indices, center,
                                                     -pc.interpolation_weight(center_face_idx, weight_idx), 0);

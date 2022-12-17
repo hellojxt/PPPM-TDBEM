@@ -6,7 +6,6 @@
 #include "fdtd.h"
 #include "sound_source.h"
 
-// FIXME: need to be fixed for new PPPM
 int main()
 {
 #define TEST_MAX_STEP 256
@@ -18,9 +17,9 @@ int main()
     bem.init(fdtd.dt);
     int3 coord = make_int3(32, 32, 32);
     float3 center = fdtd.getCenter(coord);
-    float3 vertices[3] = {center + make_float3(0.3f, 0.0f, 0.0f) * fdtd.dl,
-                          center + make_float3(0.3f, 0.0f, 0.1f) * fdtd.dl,
-                          center + make_float3(0.3f, 0.1f, 0.0f) * fdtd.dl};
+    float3 vertices[3] = {center + make_float3(0.4f, 0.0f, 0.0f) * fdtd.dl,
+                          center + make_float3(0.4f, 0.0f, 0.1f) * fdtd.dl,
+                          center + make_float3(0.4f, 0.1f, 0.0f) * fdtd.dl};
     int3 src_face = make_int3(0, 1, 2);
     History neumann;
     History dirichlet;
@@ -28,12 +27,12 @@ int main()
     dirichlet.reset();
     float neumann_amp = 0.01f;
     float dirichlet_amp = 0.01f;
-    float omega = 2.0f * M_PI * 4000.0f;
+    float omega = 2.0f * M_PI * 2000.0f;
     SineSource sine(omega);
 
     float check_fdtd[TEST_MAX_STEP];
     float check_bem[TEST_MAX_STEP];
-    int3 check_coord = make_int3(30, 32, 28);
+    int3 check_coord = make_int3(30, 32, 31);  // STEP_NUM needs to be large enough (32)
 
     while (fdtd.t + 1 < TEST_MAX_STEP)
     {

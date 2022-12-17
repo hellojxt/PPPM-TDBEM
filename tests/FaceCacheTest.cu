@@ -11,67 +11,35 @@
 #include "sound_source.h"
 #include "window.h"
 
-// FIXME: need to be fixed for new PPPM
 using Catch::Approx;
 
 __global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine)
 {
-    int particle_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int face_idx = blockIdx.x * blockDim.x + threadIdx.x;
     float neumann_amp = 1e10;
     float dirichlet_amp = 1e10;
-    float dt = pppm.fdtd.dt;
-    float t = pppm.fdtd.t;
-    pppm.neumann[particle_idx][t] = neumann_amp * sine(dt * t, (particle_idx + 1)).real();
-    pppm.dirichlet[particle_idx][t] = dirichlet_amp * sine(dt * t, (particle_idx + 1)).imag();
+    float dt = pppm.dt();
+    float t = pppm.time_idx();
+    pppm.neumann[face_idx][t] = neumann_amp * sine(dt * t, (face_idx + 1)).real();
+    pppm.dirichlet[face_idx][t] = dirichlet_amp * sine(dt * t, (face_idx + 1)).imag();
 }
 
 TEST_CASE("FaceCache", "[pc]")
 {
     using namespace pppm;
     PPPMSolver *solver = random_pppm(1024, 32);
-    solver->precompute_particle_cache();
-    auto particle_map = solver->cache.particle_map.cpu();
-    auto particle_data = solver->cache.particle_data.cpu();
-    auto particles = solver->pg.particles.cpu();
+    auto triangles = solver->pg.triangles.cpu();
     auto vertices = solver->pg.vertices.cpu();
-    REQUIRE(particle_map.size() == particles.size());
+    auto cache = solver->face_cache;
 
-    for (int i = 0; i < particles.size(); i++)
+    auto cache_data = cache.cache.cpu();
+    auto cache_size = cache.cache_size.cpu();
+    auto cache_index = cache.cache_index.cpu();
+    auto interpolation_weight = cache.interpolation_weight.cpu();
+    for (int i = 0; i < triangles.size(); i++)
     {
-        auto particle = particles[i];
-        auto r = particle_map[i].range;
-        auto base_coord = particle_map[i].base_coord;
-        auto dcoord = particle.pos - solver->pg.getCenter(base_coord);
-        SECTION("test particle cache info (cache size and neighbor list)")
-        {
-
-            REQUIRE((dcoord.x >= 0 && dcoord.x <= solver->fdtd.dl));
-            REQUIRE((dcoord.y >= 0 && dcoord.y <= solver->fdtd.dl));
-            REQUIRE((dcoord.z >= 0 && dcoord.z <= solver->fdtd.dl));
-            float3 center = (solver->pg.getCenter(base_coord) + solver->pg.getCenter(base_coord + 1)) / 2;
-            int neighbor_number = 0;
-            for (int j = 0; j < particles.size(); j++)
-            {
-                auto other_particle = particles[j];
-                auto other_dcoord = other_particle.pos - center;
-                auto max_dim_length = std::max(std::max(abs(other_dcoord.x), abs(other_dcoord.y)), abs(other_dcoord.z));
-                if (max_dim_length < solver->fdtd.dl * 2)
-                {
-                    int same_particle_id_num = 0;
-                    for (int k = r.start; k < r.end; k++)
-                    {
-                        if (particle_data[k].particle_id == j)
-                        {
-                            same_particle_id_num++;
-                        }
-                    }
-                    REQUIRE(same_particle_id_num == 1);
-                    neighbor_number++;
-                }
-            }
-            REQUIRE(r.end - r.start == neighbor_number);
-        }
-        SECTION("test weights in particle cahe")
+        auto &tri = triangles[i];
+        SECTION("test interpolation weights")
         {
             float func_params[8];
             for (int j = 0; j < 8; j++)
@@ -83,17 +51,15 @@ TEST_CASE("FaceCache", "[pc]")
                 return func_params[0] * x + func_params[1] * y + func_params[2] * z + func_params[3] * x * y +
                        func_params[4] * x * z + func_params[5] * y * z + func_params[6] * x * y * z + func_params[7];
             };
-            auto &weights = particle_map[i].weight;
             float interpolation_value = 0;
             for (int j = 0; j < 8; j++)
             {
-                int3 coord = base_coord + make_int3((j >> 2) & 1, (j >> 1) & 1, j & 1);
-                interpolation_value += func(solver->pg.getCenter(coord)) * weights[j];
+                int3 coord = tri.grid_base_coord + make_int3((j >> 2) & 1, (j >> 1) & 1, j & 1);
+                interpolation_value += func(solver->pg.getCenter(coord)) * interpolation_weight(i, j);
             }
             float guass_x[TRI_GAUSS_NUM][2] = TRI_GAUSS_XS;
             float guass_w[TRI_GAUSS_NUM] = TRI_GAUSS_WS;
-            float3 dst_v[3] = {
-                {vertices[particle.indices.x]}, {vertices[particle.indices.y]}, {vertices[particle.indices.z]}};
+            float3 dst_v[3] = {{vertices[tri.indices.x]}, {vertices[tri.indices.y]}, {vertices[tri.indices.z]}};
             float trg_jacobian = jacobian(dst_v);
             float ground_truth = 0;
             for (int i = 0; i < TRI_GAUSS_NUM; i++)
@@ -105,15 +71,8 @@ TEST_CASE("FaceCache", "[pc]")
         }
     }
 
-    float3 center_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * 0.3;
-    float3 center = make_float3(16, 16, 16) + center_offset;
-    float3 near_test_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * (1.4 + RAND_F * 0.5);
-    float3 near_test = make_float3(16, 16, 16) + near_test_offset;
-    float3 far_test_offset = make_float3(RAND_SIGN, RAND_SIGN, RAND_SIGN) * (4.3 + RAND_F * 0.5);
-    float3 far_test = make_float3(16, 16, 16) + far_test_offset;
-    LOG("center:" << center);
-    LOG("near_test:" << near_test);
-    LOG("far_test:" << far_test);
+    float3 center = make_float3(16, 16, 16) + make_float3(1, 1, 1) * 0.1;
+    float3 near_test = make_float3(16, 16, 16) + make_float3(1, 1, 1) * (1.8);
     solver->clear();
     solver = empty_pppm(32);
     float frequency = 3000;
@@ -121,84 +80,48 @@ TEST_CASE("FaceCache", "[pc]")
     SineSource source(omega);
 
 #define PRECOMPUTE_STEP 128
-    CArr<float> particle_far_field(PRECOMPUTE_STEP);
-    CArr<float> particle_far_field_from_solver(PRECOMPUTE_STEP);
-    GArr3D<float> visual_data_far_field(PRECOMPUTE_STEP, 32, 32);
-
-    add_small_triangles(solver, {center, far_test}, 0.1);
-    vertices = solver->pg.vertices.cpu();
-    particles = solver->pg.particles.cpu();
-    solver->precompute_grid_cache();
-    solver->precompute_particle_cache();
-    particle_far_field.reset();
-    particle_far_field_from_solver.reset();
-    for (int i = 0; i < PRECOMPUTE_STEP; i++)
-    {
-        solver->solve_fdtd_far_with_cache();
-        cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
-        solver->update_particle_dirichlet();
-        auto neumann = solver->neumann.cpu();
-        auto dirichlet = solver->dirichlet.cpu();
-        particle_far_field_from_solver[i] = dirichlet[0][solver->fdtd.t];
-        dirichlet[0][solver->fdtd.t] = 0;
-        particle_far_field[i] =
-            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices), neumann[1],
-                                dirichlet[1], solver->fdtd.t) +
-            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices), neumann[0],
-                                dirichlet[0], solver->fdtd.t);
-        neumann.reset();
-        dirichlet.reset();
-        dirichlet[0][solver->fdtd.t] = 1;
-        float factor =
-            1.0f / 2 - solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
-                                           neumann[0], dirichlet[0], solver->fdtd.t);
-        particle_far_field[i] = particle_far_field[i] / factor;
-        cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
-        solver->solve_fdtd_near_with_cache();
-        visual_data_far_field[i].assign(solver->far_field[i][15]);
-        // printf("%d: far field: %e, %e\n", i, particle_far_field[i], particle_far_field_from_solver[i]);
-    }
-    write_to_txt("particle_far_field.txt", particle_far_field);
-    write_to_txt("particle_far_field_from_solver.txt", particle_far_field_from_solver);
-    // renderArray(RenderElement(visual_data_far_field, 2e10f, "far_field"));
+    CArr<float> face_far_field(PRECOMPUTE_STEP);
+    CArr<float> face_far_field_from_solver(PRECOMPUTE_STEP);
 
     solver->clear();
     solver = empty_pppm(32);
-    CArr<float> particle_near_field(PRECOMPUTE_STEP);
-    CArr<float> particle_near_field_from_solver(PRECOMPUTE_STEP);
+    CArr<float> face_near_field(PRECOMPUTE_STEP);
+    CArr<float> face_near_field_from_solver(PRECOMPUTE_STEP);
 
     add_small_triangles(solver, {center, near_test}, 0.1);
     vertices = solver->pg.vertices.cpu();
-    particles = solver->pg.particles.cpu();
-    solver->precompute_grid_cache();
-    solver->precompute_particle_cache();
-    particle_near_field.reset();
-    particle_near_field_from_solver.reset();
+    triangles = solver->pg.triangles.cpu();
+    face_near_field.reset();
+    face_near_field_from_solver.reset();
     for (int i = 0; i < PRECOMPUTE_STEP; i++)
     {
-        solver->solve_fdtd_far_with_cache();
+        // printf("step: %d\n", i);
+        solver->pg.fdtd.step();
+        solver->solve_fdtd_far();
         cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
-        solver->update_particle_dirichlet();
+        solver->update_dirichlet();
         auto neumann = solver->neumann.cpu();
         auto dirichlet = solver->dirichlet.cpu();
-        particle_near_field_from_solver[i] = dirichlet[0][solver->fdtd.t];
-        dirichlet[0][solver->fdtd.t] = 0;
-        particle_near_field[i] =
-            solver->bem.laplace(vertices.data(), PairInfo(particles[1].indices, particles[0].indices), neumann[1],
-                                dirichlet[1], solver->fdtd.t) +
-            solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices), neumann[0],
-                                dirichlet[0], solver->fdtd.t);
+        face_near_field_from_solver[i] = dirichlet[0][solver->time_idx()];
+        dirichlet[0][solver->time_idx()] = 0;
+        float near1 = solver->bem.laplace(vertices.data(), PairInfo(triangles[1].indices, triangles[0].indices),
+                                          neumann[1], dirichlet[1], solver->time_idx());
+        float near2 = solver->bem.laplace(vertices.data(), PairInfo(triangles[0].indices, triangles[0].indices),
+                                          neumann[0], dirichlet[0], solver->time_idx());
+        face_near_field[i] = near1 + near2;
         neumann.reset();
         dirichlet.reset();
-        dirichlet[0][solver->fdtd.t] = 1;
-        float factor =
-            1.0f / 2 - solver->bem.laplace(vertices.data(), PairInfo(particles[0].indices, particles[0].indices),
-                                           neumann[0], dirichlet[0], solver->fdtd.t);
-        particle_near_field[i] = particle_near_field[i] / factor;
+        dirichlet[0][solver->time_idx()] = 1;
+        float factor = 0.5f * triangles[0].area -
+                       solver->bem.laplace(vertices.data(), PairInfo(triangles[0].indices, triangles[0].indices),
+                                           neumann[0], dirichlet[0], solver->time_idx());
+        // printf("factor: %e, self: %e, other: %e, dirichlet: %e\n", factor, near2, near1, face_near_field[i] /
+        // factor);
+        face_near_field[i] = face_near_field[i] / factor;
         cuExecuteBlock(1, 2, set_signal_kernel, *solver, source);
-        solver->solve_fdtd_near_with_cache();
-        // printf("%d: near field: %e, %e\n", i, particle_near_field[i], particle_near_field_from_solver[i]);
+        solver->solve_fdtd_near();
+        // break;
     }
-    write_to_txt("particle_near_field.txt", particle_near_field);
-    write_to_txt("particle_near_field_from_solver.txt", particle_near_field_from_solver);
+    write_to_txt("face_near_field.txt", face_near_field);
+    write_to_txt("face_near_field_from_solver.txt", face_near_field_from_solver);
 }
