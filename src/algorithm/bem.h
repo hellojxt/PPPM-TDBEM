@@ -125,6 +125,20 @@ class LayerWeight
             return result;
         }
 
+        inline CGPU_FUNC void move(int offset)
+        {
+            for (int i = STEP_NUM - 1; i >= -offset; i--)
+            {
+                single_layer[i] = single_layer[i + offset];
+                double_layer[i] = double_layer[i + offset];
+            }
+            for (int i = -offset - 1; i >= 0; i--)
+            {
+                single_layer[i] = 0;
+                double_layer[i] = 0;
+            }
+        }
+
         inline CGPU_FUNC void print()
         {
             for (int i = 0; i < STEP_NUM; i++)
@@ -231,6 +245,33 @@ class TDBEM
             // printf("weight[0]: %e %e, pair: %d %d %d, %d %d %d, %e %e %e\n", weight->single_layer[0],
             //        weight->double_layer[0], pair.src.x, pair.src.y, pair.src.z, pair.dst_face.x, pair.dst_face.y,
             //        pair.dst_face.z, pair.dst_point.x, pair.dst_point.y, pair.dst_point.z);
+        }
+
+        CGPU_FUNC inline void laplace_weight(const float3 *vertices,
+                                             PairInfo pair,
+                                             PotentialType potential_type,
+                                             cpx *v)
+        {
+            for (int k = 0; k <= STEP_NUM / 2; k++)
+            {
+                v[k] = pair_integrand(vertices, pair, wave_numbers[k], potential_type);
+            }
+            for (int k = STEP_NUM / 2 + 1; k < STEP_NUM; k++)
+            {
+                v[k] = conj(v[STEP_NUM - k]);
+            }
+        }
+
+        CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight<cpx> *weight)
+        {
+            laplace_weight(vertices, pair, SINGLE_LAYER, weight->single_layer);
+            laplace_weight(vertices, pair, DOUBLE_LAYER, weight->double_layer);
+        }
+
+        CGPU_FUNC inline void scaledFFT(LayerWeight<cpx> *in, LayerWeight<float> *out)
+        {
+            scaledFFT(in->single_layer, out->single_layer);
+            scaledFFT(in->double_layer, out->double_layer);
         }
 
         CGPU_FUNC inline float laplace(const float3 *vertices,

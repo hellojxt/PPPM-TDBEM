@@ -6,27 +6,50 @@ namespace pppm
 {
 
 #define RECOMPUTE_THRESHOLD 0.01
-
+#define GRID_CACHE_SIZE 27
 class GridCache
 {
     public:
         struct CacheElement
         {
-                LayerWeight<float> fdtd_near_weight[27];
-                LayerWeight<float> bem_near_weight[27];
+                LayerWeight<float> fdtd_near_weight[GRID_CACHE_SIZE];
+                LayerWeight<float> bem_near_weight[GRID_CACHE_SIZE];
                 float3 center;
                 float3 normal;
                 float area;
         };
+        struct FaceIndex
+        {
+                int face_idx;
+                bool need_recompute;
+                CGPU_FUNC bool is_zero() const { return need_recompute == false; }
+        };
+
+        CompactIndexArray<FaceIndex> recompute_list;
         GArr<CacheElement> cache;
         bool empty_cache = true;
-        void init(int triangle_num) { cache.resize(triangle_num); }
-        void update_cache(const ParticleGrid &pg, const TDBEM &bem);
+        void init(int triangle_num)
+        {
+            cache.resize(triangle_num);
+            recompute_list.reserve(triangle_num);
+        }
+        void update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time = false);
 
         GPU_FUNC int weight_idx(int3 grid_coord, int3 tri_coord)
         {
             int3 coord = grid_coord - tri_coord + make_int3(1, 1, 1);
             return coord.x + coord.y * 3 + coord.z * 9;
+        }
+
+        GPU_FUNC int3 weight_coord(int weight_idx)
+        {
+            int3 coord;
+            coord.z = weight_idx / 9;
+            weight_idx -= coord.z * 9;
+            coord.y = weight_idx / 3;
+            weight_idx -= coord.y * 3;
+            coord.x = weight_idx;
+            return coord - make_int3(1, 1, 1);
         }
 
         GPU_FUNC LayerWeight<float> &fdtd_near_weight(int tri_idx, int3 tri_coord, int3 grid_coord)
@@ -49,10 +72,11 @@ class GridCache
         {
             empty_cache = true;
             cache.clear();
+            recompute_list.clear();
         }
 };
 
-#define PARTICLE_CACHE_SIZE 256
+#define PARTICLE_CACHE_SIZE 512
 #define INTERPOLATION_WEIGHT_SIZE 8
 class FaceCache
 {
@@ -64,20 +88,35 @@ class FaceCache
                 float distance;
                 bool empty_cache;
         };
+        struct FacePairIndex
+        {
+                int src_idx;
+                int dst_idx;
+                int common_vertex;
+                bool need_recompute;
+                CGPU_FUNC bool is_zero() const { return need_recompute == false; }
+                CGPU_FUNC bool operator<(const FacePairIndex &other) const
+                {
+                    return common_vertex < other.common_vertex;
+                }
+        };
         GArr2D<int> cache_index;
         GArr<int> cache_size;
         GArr2D<CacheElement> cache;
         GArr2D<float> interpolation_weight;
+        CompactIndexArray<FacePairIndex> recompute_list;
+
         void init(int triangle_num)
         {
             cache_index.resize(triangle_num, triangle_num);
             cache_index.reset_minus_one();
             cache.resize(triangle_num, PARTICLE_CACHE_SIZE);
+            recompute_list.reserve(triangle_num * PARTICLE_CACHE_SIZE);
             cache_size.resize(triangle_num);
             cache_size.reset();
             interpolation_weight.resize(triangle_num, INTERPOLATION_WEIGHT_SIZE);
         }
-        void update_cache(const ParticleGrid &pg, const TDBEM &bem);
+        void update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time = false);
 
         GPU_FUNC LayerWeight<float> &face2face_weight(int i, int j) { return cache(i, cache_index(i, j)).weight; }
 
@@ -109,6 +148,7 @@ class FaceCache
             cache_size.clear();
             cache.clear();
             interpolation_weight.clear();
+            recompute_list.clear();
         }
 };
 

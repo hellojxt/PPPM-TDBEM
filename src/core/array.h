@@ -68,6 +68,44 @@ class CArr;
 template <typename T>
 class GArr;
 
+template <typename Index>
+class CompactIndexArray
+{
+    public:
+        GArr<Index> data;
+        int non_zero_size;
+        CompactIndexArray() {}
+        void reserve(int size_)
+        {
+            data.resize(size_);
+            non_zero_size = 0;
+        }
+        struct is_zero
+        {
+                CGPU_FUNC bool operator()(const Index &x) const { return x.is_zero(); }
+        };
+        void remove_zeros()
+        {
+            Index *new_end = thrust::remove_if(thrust::device, data.begin(), data.end(), is_zero());
+            non_zero_size = new_end - data.begin();
+        }
+
+        void sort() { thrust::sort(thrust::device, data.begin(), data.begin() + non_zero_size); }
+
+        GPU_FUNC Index &operator[](int i) { return data[i]; }
+        CGPU_FUNC int size() const { return non_zero_size; }
+        void clear()
+        {
+            non_zero_size = 0;
+            data.clear();
+        }
+        void reset()
+        {
+            non_zero_size = 0;
+            data.reset();
+        }
+};
+
 template <typename T>
 class CArr
 {

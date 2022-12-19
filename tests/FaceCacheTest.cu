@@ -27,7 +27,7 @@ __global__ void set_signal_kernel(PPPMSolver pppm, SineSource sine)
 TEST_CASE("FaceCache", "[pc]")
 {
     using namespace pppm;
-    PPPMSolver *solver = random_pppm(1024, 32);
+    PPPMSolver *solver = random_pppm(512, 32);
     auto triangles = solver->pg.triangles.cpu();
     auto vertices = solver->pg.vertices.cpu();
     auto cache = solver->face_cache;
@@ -71,8 +71,8 @@ TEST_CASE("FaceCache", "[pc]")
         }
     }
 
-    float3 center = make_float3(16, 16, 16) + make_float3(1, 1, 1) * 0.1;
-    float3 near_test = make_float3(16, 16, 16) + make_float3(1, 1, 1) * (1.8);
+    float3 center = make_float3(16, 16, 16) + make_float3(1, 1, 1) * 0.2;
+    float3 near_test = make_float3(16, 16, 16) + make_float3(1, 1, 1) * (1.7);
     solver->clear();
     solver = empty_pppm(32);
     float frequency = 3000;

@@ -13,12 +13,20 @@ TEST_CASE("Particle Grid", "[pg]")
     PPPMSolver *solver = random_pppm(1024);
     auto &pg = solver->pg;
     int res = solver->res();
-    float3 min_pos = pg.min_pos;
     float grid_size = pg.grid_size;
-
-    auto triangles = pg.triangles.cpu();
     auto vertices = pg.vertices.cpu();
+    // randomly move the vertices
+    for (int t = 0; t < 5; t++)
+    {
+        for (int i = 0; i < vertices.size(); i++)
+        {
+            vertices[i] += make_float3(RAND_F, RAND_F, RAND_F) * grid_size * 0.1;
+        }
+        solver->update_mesh(vertices);
+    }
+    auto triangles = pg.triangles.cpu();
     auto indices = pg.faces.cpu();
+
     // check the triangles
     for (int i = 0; i < triangles.size(); i++)
     {
@@ -29,15 +37,15 @@ TEST_CASE("Particle Grid", "[pg]")
         REQUIRE(tri.indices.x == indices[i].x);
         REQUIRE(tri.indices.y == indices[i].y);
         REQUIRE(tri.indices.z == indices[i].z);
-        REQUIRE(tri.area == Approx(0.5f * length(cross(v2 - v1, v3 - v1))));
+        REQUIRE(tri.area == Approx(0.5f * length(cross(v2 - v1, v3 - v1))).epsilon(1e-3));
         auto normal = normalize(cross(v2 - v1, v3 - v1));
-        REQUIRE(tri.normal.x == Approx(normal.x));
-        REQUIRE(tri.normal.y == Approx(normal.y));
-        REQUIRE(tri.normal.z == Approx(normal.z));
+        REQUIRE(tri.normal.x == Approx(normal.x).epsilon(1e-3));
+        REQUIRE(tri.normal.y == Approx(normal.y).epsilon(1e-3));
+        REQUIRE(tri.normal.z == Approx(normal.z).epsilon(1e-3));
         auto center = (v1 + v2 + v3) / 3.0f;
-        REQUIRE(tri.center.x == Approx(center.x));
-        REQUIRE(tri.center.y == Approx(center.y));
-        REQUIRE(tri.center.z == Approx(center.z));
+        REQUIRE(tri.center.x == Approx(center.x).epsilon(1e-3));
+        REQUIRE(tri.center.y == Approx(center.y).epsilon(1e-3));
+        REQUIRE(tri.center.z == Approx(center.z).epsilon(1e-3));
     }
 
     // check the grid face list
@@ -50,11 +58,17 @@ TEST_CASE("Particle Grid", "[pg]")
             for (int z = 0; z < grid_face_list.size.z; z++)
             {
                 auto &grid = grid_face_list(x, y, z);
+                // printf("x: %d, y: %d, z: %d, face num: %d\n", x, y, z, grid.size());
                 for (int i = 0; i < grid.size(); i++)
                 {
                     auto &tri = triangles[grid[i]];
                     auto pos = tri.center;
                     auto center = pg.getCenter(x, y, z);
+                    // printf("x: %d, y: %d, z: %d, face num: %d\n", x, y, z, grid.size());
+                    // printf("grid[%d]: %d\n", i, grid[i]);
+                    // printf("pos.x: %f, center.x: %f, grid_size: %f\n", pos.x, center.x, grid_size);
+                    // printf("pos.y: %f, center.y: %f, grid_size: %f\n", pos.y, center.y, grid_size);
+                    // printf("pos.z: %f, center.z: %f, grid_size: %f\n", pos.z, center.z, grid_size);
                     REQUIRE(pos.x >= center.x - grid_size / 2.0f);
                     REQUIRE(pos.x < center.x + grid_size / 2.0f);
                     REQUIRE(pos.y >= center.y - grid_size / 2.0f);

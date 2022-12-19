@@ -93,6 +93,7 @@ class GhostCellSolver
             grid.clear();
             A.clear();
             b.clear();
+            x.clear();
             p_weight.clear();
             ghost_cells.clear();
             ghost_order.clear();

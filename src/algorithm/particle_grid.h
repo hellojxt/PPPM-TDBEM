@@ -6,9 +6,9 @@
 
 namespace pppm
 {
-#define BUFFER_SIZE_FACE_NUM_PER_CELL 8
-#define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 128
-#define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 256
+#define BUFFER_SIZE_FACE_NUM_PER_CELL 32
+#define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 256
+#define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 512
 
 // attention: need to be used as reference for performance
 template <typename T, int N>
@@ -41,43 +41,10 @@ struct NeighborNum
 {
         int3 coord;
         int num;
+        CGPU_FUNC bool is_zero() const { return num == 0; }
 };
 
-class CompactCoordArray
-{
-    public:
-        GArr<NeighborNum> data;
-        int non_zero_size;
-        CompactCoordArray() {}
-        void reserve(int size_)
-        {
-            data.resize(size_);
-            non_zero_size = 0;
-        }
-        struct is_zero
-        {
-                CGPU_FUNC bool operator()(const NeighborNum &x) const { return x.num == 0; }
-        };
-        void remove_zero()
-        {
-            NeighborNum *new_end = thrust::remove_if(thrust::device, data.begin(), data.end(), is_zero());
-            non_zero_size = new_end - data.begin();
-        }
-        GPU_FUNC int3 coord(int i) const { return data[i].coord; }
-        GPU_FUNC int num(int i) const { return data[i].num; }
-        GPU_FUNC void set(int i, int3 coord, int num)
-        {
-            data[i].coord = coord;
-            data[i].num = num;
-        }
-        GPU_FUNC NeighborNum &operator[](int i) { return data[i]; }
-        CGPU_FUNC int size() const { return non_zero_size; }
-        void clear()
-        {
-            non_zero_size = 0;
-            data.clear();
-        }
-};
+using CompactCoordArray = CompactIndexArray<NeighborNum>;
 
 class Triangle
 {
@@ -115,8 +82,6 @@ class ParticleGrid
         CompactCoordArray neighbor_3_square_nonempty;        // contain the index of the nonempty neighbors (3*3)
         GArr3D<Neighbor4SquareList> neighbor_4_square_list;  // neighbor_4_square_list(i,j,k) contain the index of the
                                                              // neighbor triangles in the 4x4x4 square
-        int face_list_fresh_cycle = 1;
-        int mesh_update_counter = 0;
 
         void init(float3 min_pos_, float grid_size_, int grid_dim_, float delta_t_)
         {
@@ -137,8 +102,6 @@ class ParticleGrid
             base_coord_nonempty.reserve(grid_dim * grid_dim * grid_dim);
             neighbor_3_square_nonempty.reserve(grid_dim * grid_dim * grid_dim);
         }
-
-        void set_face_list_fresh_cycle(int cycle) { face_list_fresh_cycle = cycle; }
 
         void set_mesh(CArr<float3> vertices_, CArr<int3> faces_)
         {

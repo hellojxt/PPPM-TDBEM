@@ -59,7 +59,7 @@ __global__ void update_grid_list_kernel(ParticleGrid pg)
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.z * blockDim.z + threadIdx.z;
-    if (i >= pg.grid_size || j >= pg.grid_size || k >= pg.grid_size)
+    if (i >= pg.grid_dim || j >= pg.grid_dim || k >= pg.grid_dim)
         return;
     int3 coord = make_int3(i, j, k);
     auto &face_list = pg.grid_face_list(coord);
@@ -72,7 +72,11 @@ __global__ void update_grid_list_kernel(ParticleGrid pg)
         if (face_idx != -1)
         {
             if (idx != face_list_size)
+            {
                 face_list[face_list_size] = face_idx;
+                pg.triangles[face_idx].grid_index = face_list_size;
+            }
+
             face_list_size++;
         }
     }
@@ -83,7 +87,10 @@ __global__ void update_grid_list_kernel(ParticleGrid pg)
         if (face_idx != -1)
         {
             if (idx != base_coord_face_list_size)
+            {
                 base_coord_face_list[base_coord_face_list_size] = face_idx;
+                pg.triangles[face_idx].grid_base_index = base_coord_face_list_size;
+            }
             base_coord_face_list_size++;
         }
     }
@@ -93,9 +100,7 @@ __global__ void update_grid_list_kernel(ParticleGrid pg)
 void ParticleGrid::construct_grid()
 {
     cuExecute(faces.size(), update_triangles_kernel, *this);
-    if (mesh_update_counter % face_list_fresh_cycle == 0)
-        cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), update_grid_list_kernel, *this);
-    mesh_update_counter++;
+    cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), update_grid_list_kernel, *this);
 }
 
 __global__ void init_neigbor_list_size_kernel(ParticleGrid pg)
@@ -116,8 +121,10 @@ __global__ void init_neigbor_list_size_kernel(ParticleGrid pg)
                 neighbor_3_num += face_list.size();
             }
     int coord_idx = pg.neighbor_3_square_list.index(i, j, k);
-    pg.neighbor_3_square_nonempty.set(coord_idx, coord, neighbor_3_num);
-    pg.base_coord_nonempty.set(coord_idx, coord, pg.base_coord_face_list(coord).size());
+    pg.neighbor_3_square_nonempty[coord_idx].coord = coord;
+    pg.neighbor_3_square_nonempty[coord_idx].num = neighbor_3_num;
+    pg.base_coord_nonempty[coord_idx].coord = coord;
+    pg.base_coord_nonempty[coord_idx].num = pg.base_coord_face_list(coord).size();
 }
 
 // 3x3x3 neighbor list (-1, -1, -1) -> (1, 1, 1)
@@ -126,7 +133,7 @@ __global__ void fill_neighbor_list_3_kernel(ParticleGrid pg)
     int i = blockIdx.x;
     if (i >= pg.neighbor_3_square_nonempty.size())
         return;
-    int3 coord = pg.neighbor_3_square_nonempty.coord(i);
+    int3 coord = pg.neighbor_3_square_nonempty[i].coord;
     auto &neighbor_list = pg.neighbor_3_square_list(coord);
     int neighbor_num_prefix_sum[27];
     int neighbor_num_sum = 0;
@@ -154,7 +161,7 @@ __global__ void fill_neighbor_list_4_kernel(ParticleGrid pg)
     int i = blockIdx.x;
     if (i >= pg.base_coord_nonempty.size())
         return;
-    int3 coord = pg.base_coord_nonempty.coord(i);
+    int3 coord = pg.base_coord_nonempty[i].coord;
     auto &neighbor_list = pg.neighbor_4_square_list(coord);
     int neighbor_num_prefix_sum[64];
     int neighbor_num_sum = 0;
@@ -183,9 +190,11 @@ struct empty_neighbor_num
 
 void ParticleGrid::construct_neighbor_lists()
 {
+    neighbor_3_square_nonempty.reset();
+    base_coord_nonempty.reset();
     cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), init_neigbor_list_size_kernel, *this);
-    neighbor_3_square_nonempty.remove_zero();
-    base_coord_nonempty.remove_zero();
+    neighbor_3_square_nonempty.remove_zeros();
+    base_coord_nonempty.remove_zeros();
     cuExecuteBlock(neighbor_3_square_nonempty.size(), 32, fill_neighbor_list_3_kernel, *this);
     cuExecuteBlock(base_coord_nonempty.size(), 64, fill_neighbor_list_4_kernel, *this);
 }

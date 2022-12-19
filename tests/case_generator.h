@@ -38,8 +38,8 @@ static PPPMSolver *random_pppm(int triangle_count, int res = 64)
         float3 v0 = make_float3(0.0f, 0.0f, 1.0f) * RAND_F * RAND_SIGN;
         float3 v1 = make_float3(1.0f, 0.0f, 0.0f) * RAND_F * RAND_SIGN;
         float3 v2 = make_float3(0.0f, 1.0f, 0.0f) * RAND_F * RAND_SIGN;
-        float3 offset = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(pppm->res() - 4) * pppm->pg.grid_size +
-                        make_float3(2.0f, 2.0f, 2.0f) * pppm->pg.grid_size;
+        float3 offset = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(pppm->res() - 8) * pppm->pg.grid_size +
+                        make_float3(4.0f, 4.0f, 4.0f) * pppm->pg.grid_size;
         vertices[i * 3 + 0] = v0 * pppm->pg.grid_size + offset;
         vertices[i * 3 + 1] = v1 * pppm->pg.grid_size + offset;
         vertices[i * 3 + 2] = v2 * pppm->pg.grid_size + offset;

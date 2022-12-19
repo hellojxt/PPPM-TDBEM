@@ -113,7 +113,7 @@ __global__ void solve_face_near_kernel(PPPMSolver solver)
     int base_coord_idx = blockIdx.x;
     if (base_coord_idx >= solver.pg.base_coord_nonempty.size())
         return;
-    int3 base_coord = solver.pg.base_coord_nonempty.coord(base_coord_idx);
+    int3 base_coord = solver.pg.base_coord_nonempty[base_coord_idx].coord;
     auto &neighbor_list = solver.pg.neighbor_4_square_list(base_coord);
     auto &center_triangle_list = solver.pg.base_coord_face_list(base_coord);
     int center_num = center_triangle_list.size();

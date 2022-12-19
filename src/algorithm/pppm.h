@@ -63,14 +63,17 @@ class PPPMSolver
         CGPU_FUNC int inline time_idx() { return pg.time_idx(); }
 
         // set mesh for the particle grid
-        void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_)
+        void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_, bool log_time = false)
         {
+            START_TIME(log_time)
             pg.set_mesh(verts_, tris_);
+            LOG_TIME("particle grid: set_mesh")
             pg.construct_neighbor_lists();
+            LOG_TIME("particle grid: construct_neighbor_lists")
             grid_cache.init(tris_.size());
             face_cache.init(tris_.size());
-            grid_cache.update_cache(pg, bem);
-            face_cache.update_cache(pg, bem);
+            grid_cache.update_cache(pg, bem, log_time);
+            face_cache.update_cache(pg, bem, log_time);
             dirichlet.resize(tris_.size());
             dirichlet.reset();
             neumann.resize(tris_.size());
@@ -80,12 +83,15 @@ class PPPMSolver
             face_factor.resize(tris_.size(), BUFFER_SIZE_NEIGHBOR_NUM_4_4_4);
         }
 
-        void update_mesh(CArr<float3> &verts_)
+        void update_mesh(CArr<float3> &verts_, bool log_time = false)
         {
+            START_TIME(log_time)
             pg.update_mesh(verts_);
+            LOG_TIME("particle grid: update_mesh")
             pg.construct_neighbor_lists();
-            grid_cache.update_cache(pg, bem);
-            face_cache.update_cache(pg, bem);
+            LOG_TIME("particle grid: construct_neighbor_lists")
+            grid_cache.update_cache(pg, bem, log_time);
+            face_cache.update_cache(pg, bem, log_time);
         }
 
         void clear()
@@ -93,6 +99,10 @@ class PPPMSolver
             pg.clear();
             dirichlet.clear();
             neumann.clear();
+            current_neumann.clear();
+            face_far_field.clear();
+            face_near_field.clear();
+            face_factor.clear();
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
                 grid_far_field[i].clear();
