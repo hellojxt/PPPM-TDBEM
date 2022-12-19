@@ -52,28 +52,14 @@ class PairInfo
         CGPU_FUNC PairInfo(int3 src, float3 dst_point) : src(src), dst_point(dst_point), pair_type(FACE_TO_POINT) {}
 };
 
-typedef CircularArray<float, STEP_NUM> History;
+typedef CircularArray<float, STEP_NUM * 2> History;
 
-class LayerWeightHalf
-{
-    public:
-        half single_layer[STEP_NUM];
-        half double_layer[STEP_NUM];
-        inline CGPU_FUNC void reset()
-        {
-            for (int i = 0; i < STEP_NUM; i++)
-            {
-                single_layer[i] = 0;
-                double_layer[i] = 0;
-            }
-        }
-};
-
+template <typename real = float>
 class LayerWeight
 {
     public:
-        float single_layer[STEP_NUM];
-        float double_layer[STEP_NUM];
+        real single_layer[STEP_NUM];
+        real double_layer[STEP_NUM];
         inline CGPU_FUNC LayerWeight() {}
         inline CGPU_FUNC void reset()
         {
@@ -88,7 +74,7 @@ class LayerWeight
          * offset have to be in range [-STEP_NUM, 0].
          * some last weight will be ignored.
          */
-        inline CGPU_FUNC void add(const LayerWeight &other, float weight = 1, int offset = 0)
+        inline CGPU_FUNC void add(const LayerWeight<real> &other, real weight = 1, int offset = 0)
         {
             for (int i = -offset; i < STEP_NUM; i++)
             {
@@ -97,7 +83,7 @@ class LayerWeight
             }
         }
 
-        inline CGPU_FUNC void add(float k)
+        inline CGPU_FUNC void add(real k)
         {
             for (int i = 0; i < STEP_NUM; i++)
             {
@@ -106,7 +92,7 @@ class LayerWeight
             }
         }
 
-        inline CGPU_FUNC void divide(float k)
+        inline CGPU_FUNC void divide(real k)
         {
             for (int i = 0; i < STEP_NUM; i++)
             {
@@ -115,7 +101,7 @@ class LayerWeight
             }
         }
 
-        inline CGPU_FUNC void multiply(float k)
+        inline CGPU_FUNC void multiply(real k)
         {
             for (int i = 0; i < STEP_NUM; i++)
             {
@@ -125,9 +111,9 @@ class LayerWeight
         }
 
         template <int SKIP = 0>
-        inline CGPU_FUNC float convolution(History &neumann, History &dirichlet, int t)
+        inline CGPU_FUNC real convolution(History &neumann, History &dirichlet, int t)
         {
-            float result = 0;
+            real result = 0;
             for (int k = 0; k < SKIP; k++)
             {
                 result += -single_layer[k] * neumann[t - k];
@@ -137,6 +123,20 @@ class LayerWeight
                 result += -single_layer[k] * neumann[t - k] + double_layer[k] * dirichlet[t - k];
             }
             return result;
+        }
+
+        inline CGPU_FUNC void move(int offset)
+        {
+            for (int i = STEP_NUM - 1; i >= -offset; i--)
+            {
+                single_layer[i] = single_layer[i + offset];
+                double_layer[i] = double_layer[i + offset];
+            }
+            for (int i = -offset - 1; i >= 0; i--)
+            {
+                single_layer[i] = 0;
+                double_layer[i] = 0;
+            }
         }
 
         inline CGPU_FUNC void print()
@@ -157,6 +157,48 @@ class LayerWeight
                 }
             }
             return true;
+        }
+};
+
+class LayerWeightHalf
+{
+    public:
+        half single_layer[STEP_NUM];
+        float max_single_layer_abs;
+        half double_layer[STEP_NUM];
+        float max_double_layer_abs;
+        inline CGPU_FUNC LayerWeightHalf() {}
+        inline CGPU_FUNC void set(LayerWeight<float> &other)
+        {
+            max_single_layer_abs = 0;
+            max_double_layer_abs = 0;
+#pragma unroll
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                max_single_layer_abs = max(max_single_layer_abs, abs(other.single_layer[i]));
+                max_double_layer_abs = max(max_double_layer_abs, abs(other.double_layer[i]));
+            }
+            if (max_single_layer_abs == 0)
+                max_single_layer_abs = 1;
+            if (max_double_layer_abs == 0)
+                max_double_layer_abs = 1;
+#pragma unroll
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                single_layer[i] = other.single_layer[i] / max_single_layer_abs;
+                double_layer[i] = other.double_layer[i] / max_double_layer_abs;
+            }
+        }
+        inline CGPU_FUNC float convolution(History &neumann, History &dirichlet, int t)
+        {
+            float result = 0;
+#pragma unroll
+            for (int k = 0; k < STEP_NUM; k++)
+            {
+                result += -(float)single_layer[k] * max_single_layer_abs * neumann[t - k] +
+                          (float)double_layer[k] * max_double_layer_abs * dirichlet[t - k];
+            }
+            return result;
         }
 };
 
@@ -238,13 +280,40 @@ class TDBEM
             scaledFFT(v, weight);
         }
 
-        CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight *weight)
+        CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight<float> *weight)
         {
             laplace_weight(vertices, pair, SINGLE_LAYER, weight->single_layer);
             laplace_weight(vertices, pair, DOUBLE_LAYER, weight->double_layer);
             // printf("weight[0]: %e %e, pair: %d %d %d, %d %d %d, %e %e %e\n", weight->single_layer[0],
             //        weight->double_layer[0], pair.src.x, pair.src.y, pair.src.z, pair.dst_face.x, pair.dst_face.y,
             //        pair.dst_face.z, pair.dst_point.x, pair.dst_point.y, pair.dst_point.z);
+        }
+
+        CGPU_FUNC inline void laplace_weight(const float3 *vertices,
+                                             PairInfo pair,
+                                             PotentialType potential_type,
+                                             cpx *v)
+        {
+            for (int k = 0; k <= STEP_NUM / 2; k++)
+            {
+                v[k] = pair_integrand(vertices, pair, wave_numbers[k], potential_type);
+            }
+            for (int k = STEP_NUM / 2 + 1; k < STEP_NUM; k++)
+            {
+                v[k] = conj(v[STEP_NUM - k]);
+            }
+        }
+
+        CGPU_FUNC inline void laplace_weight(const float3 *vertices, PairInfo pair, LayerWeight<cpx> *weight)
+        {
+            laplace_weight(vertices, pair, SINGLE_LAYER, weight->single_layer);
+            laplace_weight(vertices, pair, DOUBLE_LAYER, weight->double_layer);
+        }
+
+        CGPU_FUNC inline void scaledFFT(LayerWeight<cpx> *in, LayerWeight<float> *out)
+        {
+            scaledFFT(in->single_layer, out->single_layer);
+            scaledFFT(in->double_layer, out->double_layer);
         }
 
         CGPU_FUNC inline float laplace(const float3 *vertices,

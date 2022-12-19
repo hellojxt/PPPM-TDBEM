@@ -23,12 +23,13 @@ GPU_FUNC inline float near_field(PPPMSolver &pppm, int3 src_center, int3 dst_gri
                 int3 src = src_center + make_int3(dx, dy, dz);
                 if ((src.x == dst_grid.x) && (src.y == dst_grid.y) && (src.z == dst_grid.z))
                     continue;  // skip the center grid and the destination grid
-                Range r = pppm.pg.grid_hash_map(src);
-                for (int i = r.start; i < r.end; i++)
+                auto lst = pppm.pg.grid_face_list(src);
+                for (int i = 0; i < lst.size(); i++)
                 {
-                    Particle &e = pppm.pg.particles[i];  // source boundary element
+                    int tri_idx = lst[i];
+                    auto &e = pppm.pg.triangles[tri_idx];  // source boundary element
                     near_field_value += pppm.bem.laplace(pppm.pg.vertices.data(), PairInfo(e.indices, dst_point),
-                                                         pppm.neumann[i], pppm.dirichlet[i], t);
+                                                         pppm.neumann[tri_idx], pppm.dirichlet[tri_idx], t);
                 }
             }
     return near_field_value;
@@ -53,7 +54,7 @@ GPU_FUNC inline float laplacian_near_field(PPPMSolver &pppm, int3 src_center, in
     result += near_field(pppm, src_center, dst_grid + make_int3(0, 0, -1), t);
     result += near_field(pppm, src_center, dst_grid + make_int3(0, 0, 1), t);
     result -= 6 * near_field(pppm, src_center, dst_grid, t);
-    return result / (pppm.fdtd.dl * pppm.fdtd.dl);
+    return result / (pppm.dl() * pppm.dl());
 }
 
 void direct_correction_fdtd_near(PPPMSolver &pppm);

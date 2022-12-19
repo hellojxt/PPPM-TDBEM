@@ -4,249 +4,122 @@
 
 namespace pppm
 {
-__global__ void get_involved_grid(PPPMSolver pppm)
+
+template <typename T>
+GPU_FUNC inline void
+add_grid_near_field(ParticleGrid &pg, TDBEM &bem, LayerWeight<T> &w, int src_face_id, int3 dst, float scale, int offset)
 {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int res = pppm.fdtd.res;
-    if (x >= res - 1 || x < 1 || y >= res - 1 || y < 1 || z >= res - 1 || z < 1)
+    Triangle &tri = pg.triangles[src_face_id];
+    if (tri.grid_coord.x == dst.x && tri.grid_coord.y == dst.y && tri.grid_coord.z == dst.z)
         return;
-    int neighbor_particle_num = 0;
-    int3 center = make_int3(x, y, z);
-    for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
-            for (int dz = -1; dz <= 1; dz++)  // iterate over all the 3x3x3 grids
-            {
-                int3 coord = make_int3(x + dx, y + dy, z + dz);
-                Range r = pppm.pg.grid_hash_map(coord);
-                neighbor_particle_num += r.length();
-            }
-    pppm.cache.grid_neighbor_num(center) = neighbor_particle_num;
-    pppm.cache.grid_neighbor_nonzero(center) = neighbor_particle_num > 0;
+    float3 dst_point = pg.getCenter(dst);  // use the center of the grid cell as destination point
+    LayerWeight<T> w_current;
+    bem.laplace_weight(pg.vertices.data(), PairInfo(tri.indices, dst_point), &w_current);
+    w.add(w_current, scale, offset);
 }
 
-__global__ void fill_grid_info(PPPMSolver pppm)
+GPU_FUNC inline void batch_grid_near_field(ParticleGrid &pg,
+                                           TDBEM &bem,
+                                           LayerWeight<cpx> &w,
+                                           int src_face_id,
+                                           TargetCoordArray &dst)
 {
+    Triangle &tri = pg.triangles[src_face_id];
+    for (int k = 0; k <= STEP_NUM / 2; k++)
+    {
+        w.single_layer[k] =
+            face2PointIntegrand(pg.vertices.data(), tri.indices, dst, bem.wave_numbers[k], SINGLE_LAYER);
+        w.double_layer[k] =
+            face2PointIntegrand(pg.vertices.data(), tri.indices, dst, bem.wave_numbers[k], DOUBLE_LAYER);
+    }
+    for (int k = STEP_NUM / 2 + 1; k < STEP_NUM; k++)
+    {
+        w.single_layer[k] = conj(w.single_layer[STEP_NUM - k]);
+        w.double_layer[k] = conj(w.double_layer[STEP_NUM - k]);
+    }
+}
 
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int res = pppm.fdtd.res;
-    if (x >= res - 1 || x < 1 || y >= res - 1 || y < 1 || z >= res - 1 || z < 1)
+__global__ void construct_compute_list_kernel(GridCache gc, ParticleGrid pg)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= gc.cache.size())
         return;
-    PPPMCache &cache = pppm.cache;
-    int3 center = make_int3(x, y, z);
-    int grid_index = cache.grid_neighbor_nonzero(center) - 1;
-    int range_end = cache.grid_neighbor_num(center);
-    int range_start = range_end;
-
-    for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
-            for (int dz = -1; dz <= 1; dz++)  // iterate over all the 3x3x3 grids
-            {
-                int3 coord = make_int3(x + dx, y + dy, z + dz);
-                Range r = pppm.pg.grid_hash_map(coord);
-                for (int i = r.start; i < r.end; i++)
-                {
-                    range_start--;
-                    cache.grid_data[range_start].particle_id = i;  // fill particle id
-                    cache.grid_data[range_start].trg_coord = center;
-                    cache.grid_fdtd_data[range_start].particle_id = i;  // fill particle id
-                    cache.grid_fdtd_data[range_start].trg_coord = center;
-                }
-            }
-    if (range_start != range_end)
-    {
-        cache.grid_map[grid_index] = GridMap(center, Range(range_start, range_end));
-    }
+    GridCache::CacheElement &e = gc.cache[idx];
+    Triangle &tri = pg.triangles[idx];
+    gc.recompute_list[idx].face_idx = idx;
+    gc.recompute_list[idx].need_recompute = gc.empty_cache || gc.need_recompute(e, tri, pg.grid_size);
 }
 
-void set_grid_cache_size(PPPMSolver &pppm)
+__global__ void update_grid_cache_kernel(GridCache gc, ParticleGrid pg, TDBEM bem)
 {
-    int res = pppm.fdtd.res;
-    PPPMCache &cache = pppm.cache;
-    cache.grid_neighbor_nonzero.resize(res, res, res);
-    cache.grid_neighbor_nonzero.reset();
-    cache.grid_neighbor_num.resize(res, res, res);
-    cache.grid_neighbor_num.reset();
-    cuExecute3D(dim3(res, res, res), get_involved_grid, pppm);
-    thrust::inclusive_scan(thrust::device, cache.grid_neighbor_num.begin(), cache.grid_neighbor_num.end(),
-                           cache.grid_neighbor_num.begin(),
-                           thrust::plus<int>());               // calculate the prefix sum of neighbor_nums
-    int total_num = cache.grid_neighbor_num.data.last_item();  // last item is the total number of neighbor particles
-    thrust::inclusive_scan(thrust::device, cache.grid_neighbor_nonzero.begin(), cache.grid_neighbor_nonzero.end(),
-                           cache.grid_neighbor_nonzero.begin(),
-                           thrust::plus<int>());  // calculate the prefix sum of non-zero-neighbor particle
-    int total_nonzero =
-        cache.grid_neighbor_nonzero.data.last_item();  // last item is the total number of particles have neighbors
-    cache.grid_map.resize(total_nonzero);
-    cache.grid_data.resize(total_num);
-    cache.grid_fdtd_data.resize(total_num);
-    cuExecute3D(dim3(res, res, res), fill_grid_info, pppm);
-}
-
-GPU_FUNC inline void add_grid_near_field(PPPMSolver &pppm, BEMCache &e, int3 dst, float scale, int offset)
-{
-    Particle &particle = pppm.pg.particles[e.particle_id];
-    int3 src = make_int3(particle.cell_coord);
-    if (src.x == dst.x && src.y == dst.y && src.z == dst.z)
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= GRID_CACHE_SIZE * gc.recompute_list.size())
         return;
-    float3 dst_point = pppm.pg.getCenter(dst);  // use the center of the grid cell as destination point
-    LayerWeight w;
-    pppm.bem.laplace_weight(pppm.pg.vertices.data(), PairInfo(particle.indices, dst_point), &w);
-    e.weight.add(w, scale, offset);
-}
-
-GPU_FUNC inline void add_laplacian_near_field(PPPMSolver &pppm, BEMCache &e, int3 dst, float scale = 1, int offset = 0)
-{
-    scale = scale / (pppm.fdtd.dl * pppm.fdtd.dl);
-    add_grid_near_field(pppm, e, dst + make_int3(-1, 0, 0), scale, offset);
-    add_grid_near_field(pppm, e, dst + make_int3(1, 0, 0), scale, offset);
-    add_grid_near_field(pppm, e, dst + make_int3(0, -1, 0), scale, offset);
-    add_grid_near_field(pppm, e, dst + make_int3(0, 1, 0), scale, offset);
-    add_grid_near_field(pppm, e, dst + make_int3(0, 0, -1), scale, offset);
-    add_grid_near_field(pppm, e, dst + make_int3(0, 0, 1), scale, offset);
-    add_grid_near_field(pppm, e, dst, -6 * scale, offset);
-}
-
-__global__ void precompute_grid_data(PPPMSolver pppm)
-{
-    int grid_id = blockIdx.x * blockDim.x + threadIdx.x;
-    PPPMCache &cache = pppm.cache;
-    if (grid_id >= cache.grid_map.size())
-        return;
-    GridMap grid_map = cache.grid_map[grid_id];
-    int3 coord = grid_map.coord;
-    Range r = grid_map.range;
-    float c = pppm.fdtd.c, dt = pppm.fdtd.dt;
-    for (int i = r.start; i < r.end; i++)
+    float c = AIR_WAVE_SPEED, dt = pg.delta_t;
+    int face_idx = gc.recompute_list[idx / GRID_CACHE_SIZE].face_idx;
+    GridCache::CacheElement &e = gc.cache[face_idx];
+    Triangle &tri = pg.triangles[face_idx];
+    int3 tri_coord = tri.grid_coord;
+    int weight_idx = idx % GRID_CACHE_SIZE;
+    int3 neighbor_coord = tri_coord + gc.weight_coord(weight_idx);
+    LayerWeight<float> w;
+    w.reset();
+    LayerWeight<cpx> w_original;
+    w_original.reset();
+    TargetCoordArray dst;
+    dst.size = 0;
+    int3 dst_coord[8] = {neighbor_coord,
+                         neighbor_coord + make_int3(-1, 0, 0),
+                         neighbor_coord + make_int3(1, 0, 0),
+                         neighbor_coord + make_int3(0, -1, 0),
+                         neighbor_coord + make_int3(0, 1, 0),
+                         neighbor_coord + make_int3(0, 0, -1),
+                         neighbor_coord + make_int3(0, 0, 1),
+                         neighbor_coord};
+    float scale = c * c * dt * dt / (pg.grid_size * pg.grid_size);
+    float dst_scale[8] = {2, scale, scale, scale, scale, scale, scale, -6 * scale};
+    for (int i = 0; i < 8; i++)
     {
-        BEMCache e;
-        e.particle_id = cache.grid_data[i].particle_id;
-        e.weight.reset();
-        add_grid_near_field(pppm, e, coord, 2, -1);
-        add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
-        add_grid_near_field(pppm, e, coord, -1, -2);
-        // auto simple = pppm.far_field[0](coord);
-        // if ((e.weight.double_layer[1] - simple) / simple > 1e-3)
-        // printf("coord: (%d, %d, %d), double: %e, simple: %e\n", coord.x, coord.y, coord.z, e.weight.double_layer[1],
-        //        simple);
-        pppm.cache.grid_fdtd_data[i] = e;
-        e.weight.reset();
-        add_grid_near_field(pppm, e, coord, 1, 0);
-        pppm.cache.grid_data[i] = e;
+        if (dst_coord[i].x != tri_coord.x || dst_coord[i].y != tri_coord.y || dst_coord[i].z != tri_coord.z)
+        {
+            dst.data[dst.size] = pg.getCenter(dst_coord[i]);
+            dst.scale[dst.size] = dst_scale[i];
+            dst.size++;
+        }
+    }
+    batch_grid_near_field(pg, bem, w_original, face_idx, dst);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord, 2, 0);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord + make_int3(-1, 0, 0), scale, 0);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord + make_int3(1, 0, 0), scale, 0);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord + make_int3(0, -1, 0), scale, 0);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord + make_int3(0, 1, 0), scale, 0);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord + make_int3(0, 0, -1), scale, 0);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord + make_int3(0, 0, 1), scale, 0);
+    // add_grid_near_field(pg, bem, w_original, face_idx, neighbor_coord, -6 * scale, 0);
+    bem.scaledFFT(&w_original, &w);
+    w.move(-1);
+    add_grid_near_field(pg, bem, w, face_idx, neighbor_coord, -1, -2);
+    e.fdtd_near_weight[weight_idx].set(w);
+    w.reset();
+    add_grid_near_field(pg, bem, w, face_idx, neighbor_coord, 1, 0);
+    e.bem_near_weight[weight_idx].set(w);
+    if (weight_idx == 0)
+    {
+        e.area = tri.area;
+        e.center = tri.center;
+        e.normal = tri.normal;
     }
 }
 
-__global__ void precompute_grid_data_fast(PPPMSolver pppm)
+void GridCache::update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= pppm.cache.grid_data.size())
-        return;
-    int3 coord = pppm.cache.grid_data[i].trg_coord;
-    float c = pppm.fdtd.c, dt = pppm.fdtd.dt;
-    BEMCache e;
-    e.particle_id = pppm.cache.grid_data[i].particle_id;
-    e.weight.reset();
-    add_grid_near_field(pppm, e, coord, 2, -1);
-    add_laplacian_near_field(pppm, e, coord, c * c * dt * dt, -1);
-    add_grid_near_field(pppm, e, coord, -1, -2);
-    // auto simple = pppm.far_field[0](coord);
-    // if ((e.weight.double_layer[1] - simple) / simple > 1e-3)
-    // printf("coord: (%d, %d, %d), double: %e, simple: %e\n", coord.x, coord.y, coord.z, e.weight.double_layer[1],
-    //        simple);
-    pppm.cache.grid_fdtd_data[i] = e;
-    e.weight.reset();
-    add_grid_near_field(pppm, e, coord, 1, 0);
-    pppm.cache.grid_data[i] = e;
-}
-
-void cache_grid_data(PPPMSolver &pppm)
-{
-    int total_num = pppm.cache.grid_map.size();
-    cuExecute(total_num, precompute_grid_data, pppm);
-}
-
-void cache_grid_data_fast(PPPMSolver &pppm)
-{
-    int total_num = pppm.cache.grid_data.size();
-    cuExecute(total_num, precompute_grid_data_fast, pppm);
-}
-
-__global__ void solve_fdtd_far_field_from_cache_kernel(PPPMSolver pppm)
-{
-    int grid_id = blockIdx.x;
-    PPPMCache &cache = pppm.cache;
-    if (grid_id >= cache.grid_map.size())
-        return;
-    GridMap grid_map = cache.grid_map[grid_id];
-    int3 coord = grid_map.coord;
-    Range r = grid_map.range;
-    int t = pppm.fdtd.t;
-    __shared__ float fdtd_near_field;
-    if (threadIdx.x == 0)
-    {
-        fdtd_near_field = 0;
-    }
-    __syncthreads();
-    for (int i = threadIdx.x; i < r.end - r.start; i += blockDim.x)
-    {
-        BEMCache e = cache.grid_fdtd_data[r.start + i];
-        auto &neumann = pppm.neumann[e.particle_id];
-        auto &dirichlet = pppm.dirichlet[e.particle_id];
-        atomicAdd_block(&fdtd_near_field, e.weight.convolution(neumann, dirichlet, t));
-    }
-    __syncthreads();
-    if (threadIdx.x == 0)
-    {
-        float far_field = pppm.fdtd.grids[t](coord) - fdtd_near_field;
-        pppm.far_field[t](coord) = far_field;  // far field of empty grid need to be initialized with FDTD solution
-    }
-}
-
-__global__ void solve_fdtd_near_field_from_cache_kernel(PPPMSolver pppm)
-{
-    int grid_id = blockIdx.x;
-    PPPMCache &cache = pppm.cache;
-    if (grid_id >= cache.grid_map.size())
-        return;
-    GridMap grid_map = cache.grid_map[grid_id];
-    int3 coord = grid_map.coord;
-    Range r = grid_map.range;
-    int t = pppm.fdtd.t;
-    __shared__ float accurate_near_field;
-    if (threadIdx.x == 0)
-    {
-        accurate_near_field = 0;
-    }
-    __syncthreads();
-    for (int i = threadIdx.x; i < r.end - r.start; i += blockDim.x)
-    {
-        BEMCache e = cache.grid_data[r.start + i];
-        auto &neumann = pppm.neumann[e.particle_id];
-        auto &dirichlet = pppm.dirichlet[e.particle_id];
-        atomicAdd_block(&accurate_near_field, e.weight.convolution(neumann, dirichlet, t));
-    }
-    __syncthreads();
-    if (threadIdx.x == 0)
-    {
-        pppm.fdtd.grids[t](coord) = pppm.far_field[t](coord) + accurate_near_field;
-    }
-}
-
-void solve_fdtd_far_field_from_cache(PPPMSolver &pppm)
-{
-    int total_num = pppm.cache.grid_map.size();
-    int t = pppm.fdtd.t;
-    pppm.far_field[t].assign(pppm.fdtd.grids[t]);
-    cuExecuteBlock(total_num, 64, solve_fdtd_far_field_from_cache_kernel, pppm);
-}
-
-void solve_fdtd_near_field_from_cache(PPPMSolver &pppm)
-{
-    int total_num = pppm.cache.grid_map.size();
-    cuExecuteBlock(total_num, 64, solve_fdtd_near_field_from_cache_kernel, pppm);
+    START_TIME(log_time)
+    cuExecute(pg.triangles.size(), construct_compute_list_kernel, *this, pg);
+    recompute_list.remove_zeros();
+    LOG_TIME("construct compute list")
+    cuExecute(GRID_CACHE_SIZE * recompute_list.size(), update_grid_cache_kernel, *this, pg, bem);
+    LOG_TIME("update grid cache")
+    empty_cache = false;
 }
 
 // https://en.wikipedia.org/wiki/Trilinear_interpolation
@@ -270,355 +143,143 @@ CGPU_FUNC inline void weight_add(float *w, float scale, float *out)
         out[i] += scale * w[i];
 }
 
-__global__ void get_particle_neighbor_sum(PPPMSolver pppm)
+__global__ void update_interpolation_weight_kernel(FaceCache pc, ParticleGrid pg)
 {
-    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (particle_id >= pppm.pg.particles.size())
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= pg.triangles.size())
         return;
-    float sum = 0;
-    Particle &p = pppm.pg.particles[particle_id];
-    // calculate the base coordinate (lowest coord) of the 2*2*2 grids
-    float3 diff = p.pos - pppm.pg.getCenter(p.cell_coord);
-    int3 base_coord = make_int3(p.cell_coord) - make_int3((diff.x < 0), (diff.y < 0), (diff.z < 0));
-    ParticleMap pm;
-    pm.base_coord = base_coord;
-
+    Triangle &tri = pg.triangles[idx];
     // calculate the weights of 2*2*2 grid with guass interpolation
     float w_temp[8];
+    float w[8];
     for (int i = 0; i < 8; i++)
-        pm.weight[i] = 0;
+        w[i] = 0;
     float guass_x[TRI_GAUSS_NUM][2] = TRI_GAUSS_XS;
     float guass_w[TRI_GAUSS_NUM] = TRI_GAUSS_WS;
-    float3 dst_v[3] = {
-        {pppm.pg.vertices[p.indices.x]}, {pppm.pg.vertices[p.indices.y]}, {pppm.pg.vertices[p.indices.z]}};
+    float3 dst_v[3] = {{pg.vertices[tri.indices.x]}, {pg.vertices[tri.indices.y]}, {pg.vertices[tri.indices.z]}};
     float trg_jacobian = jacobian(dst_v);
     for (int i = 0; i < TRI_GAUSS_NUM; i++)
     {
         float3 v = local_to_global(guass_x[i][0], guass_x[i][1], dst_v);
-        float3 d = (v - pppm.pg.getCenter(base_coord)) / pppm.pg.grid_size;
+        float3 d = (v - pg.getCenter(tri.grid_base_coord)) / pg.grid_size;
         trilinear_interpolation(d, w_temp);
-        weight_add(w_temp, 0.5 * guass_w[i] * trg_jacobian, pm.weight);
-        // weight_add(w_temp, 1.0f / TRI_GAUSS_NUM, pm.weight);
+        weight_add(w_temp, 0.5 * guass_w[i] * trg_jacobian, w);
     }
-
-    pppm.cache.particle_map[particle_id] = pm;
-    // calculate the sum of neighbor particles
-    for (int dx = -1; dx <= 2; dx++)
-        for (int dy = -1; dy <= 2; dy++)
-            for (int dz = -1; dz <= 2; dz++)
-            {
-                int3 coord = base_coord + make_int3(dx, dy, dz);
-                Range r = pppm.pg.grid_hash_map(coord);
-                sum += r.length();
-            }
-    pppm.cache.particle_neighbor_num[particle_id] = sum;
+    for (int i = 0; i < 8; i++)
+        pc.interpolation_weight(idx, i) = w[i];
 }
 
-__global__ void fill_particle_info(PPPMSolver pppm)
+// angle between two vectors
+GPU_FUNC inline float angle_between(float3 normal1, float3 normal2)
 {
-    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (particle_id >= pppm.pg.particles.size())
+    float dot = normal1.x * normal2.x + normal1.y * normal2.y + normal1.z * normal2.z;
+    float det = normal1.x * normal2.y * normal2.z + normal1.y * normal2.x * normal2.z +
+                normal1.z * normal2.x * normal2.y - normal1.x * normal2.y * normal2.z -
+                normal1.y * normal2.x * normal2.z - normal1.z * normal2.x * normal2.y;
+    return atan2(det, dot);
+}
+
+__global__ void compute_face_compute_list_kernel(FaceCache pc, ParticleGrid pg)
+{
+    int base_coord_idx = blockIdx.x;
+    if (base_coord_idx >= pg.base_coord_nonempty.size())
         return;
-    int3 base_coord = pppm.cache.particle_map[particle_id].base_coord;
-    int range_end = pppm.cache.particle_neighbor_num[particle_id];
-    int range_start = range_end;
-    for (int dx = -1; dx <= 2; dx++)
-        for (int dy = -1; dy <= 2; dy++)
-            for (int dz = -1; dz <= 2; dz++)
-            {
-                int3 coord = base_coord + make_int3(dx, dy, dz);
-                Range r = pppm.pg.grid_hash_map(coord);
-                for (int i = r.start; i < r.end; i++)
-                {
-                    range_start--;
-                    pppm.cache.particle_data[range_start].particle_id = i;
-                    pppm.cache.particle_data[range_start].particle_map = &pppm.cache.particle_map[particle_id];
-                    pppm.cache.particle_data[range_start].trg_particle_id = particle_id;
-                    auto particle = pppm.pg.particles[particle_id];
-                    auto particle_neighbor = pppm.pg.particles[i];
-                    pppm.cache.common_vertex[range_start].common_vertex_num =
-                        triangle_common_vertex_num(particle.indices, particle_neighbor.indices);
-                    pppm.cache.common_vertex[range_start].particle_data_id = range_start;
-                }
-            }
-    pppm.cache.particle_map[particle_id].range = Range(range_start, range_end);
-}
-
-void set_particle_cache_size(PPPMSolver &pppm)
-{
-    int particle_num = pppm.pg.particles.size();
-    PPPMCache &cache = pppm.cache;
-    cache.particle_map.resize(pppm.pg.particles.size());
-    cache.particle_neighbor_num.resize(particle_num);
-    cuExecute(particle_num, get_particle_neighbor_sum, pppm);
-    thrust::inclusive_scan(thrust::device, cache.particle_neighbor_num.begin(), cache.particle_neighbor_num.end(),
-                           cache.particle_neighbor_num.begin(),
-                           thrust::plus<int>());  // calculate the prefix sum of neighbor_nums
-    int total_num = cache.particle_neighbor_num.last_item();
-    cache.particle_data.resize(total_num);
-    cache.common_vertex.resize(total_num);
-    cache.particle_near_field.resize(total_num);
-    cache.particle_far_field.resize(particle_num);
-    cache.particle_factor.resize(total_num);
-    cuExecute(particle_num, fill_particle_info, pppm);
+    int3 base_coord = pg.base_coord_nonempty[base_coord_idx].coord;
+    auto &neighbor_list = pg.neighbor_4_square_list(base_coord);
+    auto &center_triangle_list = pg.base_coord_face_list(base_coord);
+    int center_num = center_triangle_list.size();
+    int neighbor_num = neighbor_list.size();
+    int total_num = center_num * neighbor_num;
+    LayerWeight w;
+    for (int i = threadIdx.x; i < total_num; i += blockDim.x)
+    {
+        int neighbor_i = i / center_num;
+        int center_i = i % center_num;
+        int neighbor_face_idx = neighbor_list[neighbor_i];
+        auto &neighbor_face = pg.triangles[neighbor_face_idx];
+        int center_face_idx = center_triangle_list[center_i];
+        auto &center_face = pg.triangles[center_face_idx];
+        int normal_angle = angle_between(neighbor_face.normal, center_face.normal);
+        int distance = length(neighbor_face.center - center_face.center);
+        auto &e = pc.get_cache_element_with_check(center_face_idx, neighbor_face_idx);
+        int index = center_face_idx * PARTICLE_CACHE_SIZE + neighbor_i;
+        pc.recompute_list[index].src_idx = neighbor_face_idx;
+        pc.recompute_list[index].dst_idx = center_face_idx;
+        pc.recompute_list[index].common_vertex = triangle_common_vertex_num(neighbor_face.indices, center_face.indices);
+        if (e.empty_cache || pc.need_recompute(e, normal_angle, distance))
+        {
+            e.normal_angle = normal_angle;
+            e.distance = distance;
+            e.empty_cache = false;
+            pc.recompute_list[index].need_recompute = true;
+        }
+    }
 }
 
 template <typename T>
-GPU_FUNC inline void add_particle_near_field(PPPMSolver &pppm,
-                                             LayerWeight &layer_weight,
+GPU_FUNC inline void add_particle_near_field(ParticleGrid &pg,
+                                             TDBEM &bem,
+                                             LayerWeight<float> &layer_weight,
                                              int3 src,
                                              T dst,
                                              float scale,
                                              int offset)
 {
     LayerWeight w;
-    pppm.bem.laplace_weight(pppm.pg.vertices.data(), PairInfo(src, dst), &w);
+    bem.laplace_weight(pg.vertices.data(), PairInfo(src, dst), &w);
     layer_weight.add(w, scale, offset);
 }
 
-__global__ void precompute_cache_data(PPPMSolver pppm)
-{
-    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (particle_id >= pppm.pg.particles.size())
-        return;
-    Particle &current_particle = pppm.pg.particles[particle_id];
-    ParticleMap &pm = pppm.cache.particle_map[particle_id];
-    Range r = pm.range;
-    for (int i = r.start; i < r.end; i++)
-    {
-        LayerWeight w;
-        w.reset();
-        auto neighbor_particle_id = pppm.cache.particle_data[i].particle_id;
-        Particle &neighbor_particle = pppm.pg.particles[neighbor_particle_id];
-        add_particle_near_field(pppm, w, neighbor_particle.indices, current_particle.indices, 1, 0);
-
-        for (int dx = 0; dx < 2; dx++)
-            for (int dy = 0; dy < 2; dy++)
-                for (int dz = 0; dz < 2; dz++)
-                {
-                    int weight_idx = dx * 4 + dy * 2 + dz;
-                    int3 coord = pm.base_coord + make_int3(dx, dy, dz);
-                    auto center = pppm.pg.getCenter(coord);
-                    if (length(center - neighbor_particle.pos) > pppm.pg.grid_size * 1.5)
-                    {
-                        add_particle_near_field(pppm, w, neighbor_particle.indices, center, -pm.weight[weight_idx], 0);
-                    }
-                }
-        pppm.cache.particle_data[i].weight = w;
-    }
-}
-__global__ void precompute_cache_data_fast(PPPMSolver pppm)
+__global__ void update_particle_cache_kernel(FaceCache pc, ParticleGrid pg, TDBEM bem)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= pppm.cache.common_vertex.size())
+    if (i >= pc.recompute_list.size())
         return;
-    auto &cv = pppm.cache.common_vertex[i];
-    LayerWeight w;
-    w.reset();
-    auto bemcache = pppm.cache.particle_data[cv.particle_data_id];
-    auto pm = bemcache.particle_map;
-    auto neighbor_particle_id = bemcache.particle_id;
-    auto current_particle_id = bemcache.trg_particle_id;
-    auto &current_particle = pppm.pg.particles[current_particle_id];
-    Particle &neighbor_particle = pppm.pg.particles[neighbor_particle_id];
-    add_particle_near_field(pppm, w, neighbor_particle.indices, current_particle.indices, 1, 0);
+    int neighbor_face_idx = pc.recompute_list[i].src_idx;
+    int center_face_idx = pc.recompute_list[i].dst_idx;
+    auto &neighbor_face = pg.triangles[neighbor_face_idx];
+    auto &center_face = pg.triangles[center_face_idx];
+    int3 base_coord = center_face.grid_base_coord;
+    LayerWeight<float> w;
+    LayerWeight<cpx> w_temp1;
+    LayerWeight<cpx> w_temp2;
+    bem.laplace_weight(pg.vertices.data(), PairInfo(neighbor_face.indices, center_face.indices), &w_temp1);
+    // add_particle_near_field(pg, bem, w, neighbor_face.indices, center_face.indices, 1, 0);
+    TargetCoordArray dst;
+    dst.size = 0;
     for (int dx = 0; dx < 2; dx++)
         for (int dy = 0; dy < 2; dy++)
             for (int dz = 0; dz < 2; dz++)
             {
                 int weight_idx = dx * 4 + dy * 2 + dz;
-                int3 coord = pm->base_coord + make_int3(dx, dy, dz);
-                auto center = pppm.pg.getCenter(coord);
-                if (length(center - neighbor_particle.pos) > pppm.pg.grid_size * 1.5)
+                int3 coord = base_coord + make_int3(dx, dy, dz);
+                auto center = pg.getCenter(coord);
+                if (abs(center.x - neighbor_face.center.x) > pg.grid_size * 1.5 ||
+                    abs(center.y - neighbor_face.center.y) > pg.grid_size * 1.5 ||
+                    abs(center.z - neighbor_face.center.z) > pg.grid_size * 1.5)
                 {
-                    add_particle_near_field(pppm, w, neighbor_particle.indices, center, -pm->weight[weight_idx], 0);
+                    dst.data[dst.size] = center;
+                    dst.scale[dst.size] = -pc.interpolation_weight(center_face_idx, weight_idx);
+                    dst.size++;
                 }
             }
-    // pppm.cache.particle_data[cv.particle_data_id].weight = w;
-    LayerWeightHalf w_half;
-    w_half.reset();
-    float max_weight_single = 0;
-    float max_weight_double = 0;
-    for (int idx = 0; idx < STEP_NUM; idx++)
-    {
-        max_weight_single = max(max_weight_single, abs(w.single_layer[idx]));
-        max_weight_double = max(max_weight_double, abs(w.double_layer[idx]));
-    }
-    for (int idx = 0; idx < STEP_NUM; idx++)
-    {
-        if (max_weight_single != 0)
-            w_half.single_layer[idx] = w.single_layer[idx] / max_weight_single;
-        if (max_weight_double != 0)
-            w_half.double_layer[idx] = w.double_layer[idx] / max_weight_double;
-    }
-    pppm.cache.fast_particle_data.weight[cv.particle_data_id] = w_half;
-    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].particle_data_id = cv.particle_data_id;
-    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].neighbor_particle_id = neighbor_particle_id;
-    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].particle_id = current_particle_id;
-    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].max_weight_single = max_weight_single;
-    pppm.cache.fast_particle_data.cache_info[cv.particle_data_id].max_weight_double = max_weight_double;
+    batch_grid_near_field(pg, bem, w_temp2, neighbor_face_idx, dst);
+    w_temp1.add(w_temp2);
+    bem.scaledFFT(&w_temp1, &w);
+    pc.face2face_weight(center_face_idx, neighbor_face_idx).set(w);
 }
 
-void cache_particle_data(PPPMSolver &pppm)
+void FaceCache::update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time)
 {
-    int particle_num = pppm.pg.particles.size();
-    cuExecute(particle_num, precompute_cache_data, pppm);
+    START_TIME(log_time)
+    cuExecute(pg.triangles.size(), update_interpolation_weight_kernel, *this, pg);
+    LOG_TIME("update interpolation weight")
+    recompute_list.reset();
+    cuExecuteBlock(pg.base_coord_nonempty.size(), 64, compute_face_compute_list_kernel, *this, pg);
+    recompute_list.remove_zeros();
+    recompute_list.sort();
+    LOG_TIME("compute face compute list")
+    cuExecute(recompute_list.size(), update_particle_cache_kernel, *this, pg, bem);
+    LOG_TIME("update particle cache")
 }
-
-struct compare_common_vertex
-{
-        __host__ __device__ bool operator()(const CommonVertex &a, const CommonVertex &b)
-        {
-            return a.common_vertex_num < b.common_vertex_num;
-        }
-};
-
-struct compare_fast_cache_info
-{
-        __host__ __device__ bool operator()(const CacheInfo &a, const CacheInfo &b)
-        {
-            return a.neighbor_particle_id < b.neighbor_particle_id;
-        }
-};
-
-void cache_particle_data_fast(PPPMSolver &pppm)
-{
-    int total_num = pppm.cache.particle_data.size();
-    thrust::sort(thrust::device, pppm.cache.common_vertex.begin(), pppm.cache.common_vertex.end(),
-                 compare_common_vertex());
-    pppm.cache.fast_particle_data.resize(total_num);
-    auto &fcache = pppm.cache.fast_particle_data;
-    thrust::sort_by_key(thrust::device, fcache.cache_info.begin(), fcache.cache_info.end(), fcache.weight.begin(),
-                        compare_fast_cache_info());
-    cuExecute(total_num, precompute_cache_data_fast, pppm);
-}
-
-__global__ void solve_particle_from_cache_kernel(PPPMSolver pppm)
-{
-    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (particle_id >= pppm.pg.particles.size())
-        return;
-    ParticleMap &pm = pppm.cache.particle_map[particle_id];
-    Range r = pm.range;
-    int t = pppm.fdtd.t;
-    float far_sum = 0;
-    // caculate the far field from interpolation
-    for (int dx = 0; dx < 2; dx++)
-        for (int dy = 0; dy < 2; dy++)
-            for (int dz = 0; dz < 2; dz++)
-            {
-                int weight_idx = dx * 4 + dy * 2 + dz;
-                int3 coord = pm.base_coord + make_int3(dx, dy, dz);
-                far_sum += pm.weight[weight_idx] * pppm.far_field[t](coord);
-            }
-
-    // caculate the near field from cache
-    float near_sum = 0;
-    float factor = 0;  // the factor of G_t
-    for (int i = r.start; i < r.end; i++)
-    {
-        auto &data = pppm.cache.particle_data[i];
-        auto &neumann = pppm.neumann[data.particle_id];
-        auto &dirichlet = pppm.dirichlet[data.particle_id];
-        near_sum += data.weight.convolution<1>(neumann, dirichlet, t);
-        factor += data.weight.double_layer[0];  // "lumped mass" for G_t, the factor is small compared to 0.5
-    }
-    Particle &p = pppm.pg.particles[particle_id];
-    auto particle_area = 0.5 * jacobian(pppm.pg.vertices.data(), p.indices);
-    // Equation (2.12) in Paper:https://epubs.siam.org/doi/pdf/10.1137/090775981
-    pppm.dirichlet[particle_id][pppm.fdtd.t] = (far_sum * 0.84 + near_sum) / (0.5 * particle_area - factor);
-}
-
-void solve_particle_from_cache(PPPMSolver &pppm)
-{
-    int particle_num = pppm.pg.particles.size();
-    cuExecute(particle_num, solve_particle_from_cache_kernel, pppm);
-}
-
-__global__ void solve_particle_far_field_fast_kernel(PPPMSolver pppm)
-{
-    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (particle_id >= pppm.pg.particles.size())
-        return;
-    ParticleMap &pm = pppm.cache.particle_map[particle_id];
-    auto &far_field = pppm.cache.particle_far_field;
-    int t = pppm.fdtd.t;
-    float far_sum = 0;
-    // caculate the far field from interpolation
-#pragma unroll
-    for (int dx = 0; dx < 2; dx++)
-#pragma unroll
-        for (int dy = 0; dy < 2; dy++)
-#pragma unroll
-            for (int dz = 0; dz < 2; dz++)
-            {
-                int weight_idx = dx * 4 + dy * 2 + dz;
-                int3 coord = pm.base_coord + make_int3(dx, dy, dz);
-                far_sum += pm.weight[weight_idx] * pppm.far_field[t](coord);
-            }
-    far_field[particle_id] = far_sum;
-    pppm.dirichlet[particle_id][pppm.fdtd.t] = 0;
-}
-
-__global__ void solve_particle_near_field_fast_kernel(PPPMSolver pppm)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= pppm.cache.particle_data.size())
-        return;
-    auto &fcache = pppm.cache.fast_particle_data;
-    int particle_id = fcache.cache_info[i].particle_id;
-    int neighbor_id = fcache.cache_info[i].neighbor_particle_id;
-    int particle_data_id = fcache.cache_info[i].particle_data_id;
-    float max_weight_single_layer = fcache.cache_info[i].max_weight_single;
-    float max_weight_double_layer = fcache.cache_info[i].max_weight_double;
-    auto &weight = fcache.weight[particle_data_id];
-    auto &neumann = pppm.neumann[neighbor_id];
-    auto t = pppm.fdtd.t;
-    auto &dirichlet = pppm.dirichlet[neighbor_id];
-    float near_part_sum = 0;
-#pragma unroll
-    for (int k = 0; k < STEP_NUM; k++)
-    {
-        near_part_sum += -(float)weight.single_layer[k] * neumann[t - k] * max_weight_single_layer +
-                         (float)weight.double_layer[k] * dirichlet[t - k] * max_weight_double_layer;
-    }
-
-    pppm.cache.particle_near_field[particle_data_id] = near_part_sum;
-    pppm.cache.particle_factor[particle_data_id] = (float)weight.double_layer[0] * max_weight_double_layer;
-}
-
-__global__ void solve_dirichlet_fast_kernel(PPPMSolver pppm)
-{
-    int particle_id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (particle_id >= pppm.pg.particles.size())
-        return;
-    Particle &p = pppm.pg.particles[particle_id];
-    ParticleMap &pm = pppm.cache.particle_map[particle_id];
-    Range r = pm.range;
-    auto particle_area = 0.5 * jacobian(pppm.pg.vertices.data(), p.indices);
-    // Equation (2.12) in Paper:https://epubs.siam.org/doi/pdf/10.1137/090775981
-
-    float near_field_sum = 0, factor_sum = 0;
-    for (int i = r.start; i < r.end; i++)
-    {
-        near_field_sum += pppm.cache.particle_near_field[i];
-        factor_sum += pppm.cache.particle_factor[i];
-    }
-    pppm.dirichlet[particle_id][pppm.fdtd.t] =
-        (pppm.cache.particle_far_field[particle_id] * 0.84 + near_field_sum) / (0.5 * particle_area - factor_sum);
-}
-
-void solve_particle_from_cache_fast(PPPMSolver &pppm, bool log_time)
-{
-    int particle_num = pppm.pg.particles.size();
-    int particle_data_num = pppm.cache.particle_data.size();
-    START_TIME(log_time);
-    cuExecute(particle_num, solve_particle_far_field_fast_kernel, pppm);
-    LOG_TIME("solve_particle_far_field_fast_kernel");
-    cuExecute(particle_data_num, solve_particle_near_field_fast_kernel, pppm);
-    LOG_TIME("solve_particle_near_field_fast_kernel");
-    cuExecute(particle_num, solve_dirichlet_fast_kernel, pppm);
-    LOG_TIME("solve_dirichlet_fast_kernel");
-}
-
 }  // namespace pppm

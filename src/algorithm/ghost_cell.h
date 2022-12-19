@@ -50,8 +50,7 @@ class GhostCellSolver
     public:
         GhostCellSolver(float3 min_pos_, float grid_size_, int grid_dim_, float dt)
         {
-            fdtd.init(grid_dim_, grid_size_, dt);
-            grid.init(min_pos_, grid_size_, grid_dim_);
+            grid.init(min_pos_, grid_size_, grid_dim_, dt);
             cell_data.resize(grid_dim_, grid_dim_, grid_dim_);
             set_condition_number_threshold(25.0f);
         };
@@ -72,13 +71,13 @@ class GhostCellSolver
 
         void solve_ghost_cell(bool log_time = false);  // update right hand side of ghost cell solver and solve it
 
-        CGPU_FUNC float inline dt() { return fdtd.dt; }
+        CGPU_FUNC float inline dt() { return grid.fdtd.dt; }
 
-        CGPU_FUNC float inline dl() { return fdtd.dl; }
+        CGPU_FUNC float inline dl() { return grid.fdtd.dl; }
 
         CGPU_FUNC float inline grid_size() { return grid.grid_size; }
 
-        CGPU_FUNC int inline res() { return fdtd.res; }
+        CGPU_FUNC int inline res() { return grid.fdtd.res; }
 
         CGPU_FUNC float3 inline min_coord() { return grid.min_pos; }
 
@@ -92,9 +91,9 @@ class GhostCellSolver
         {
             cell_data.clear();
             grid.clear();
-            fdtd.clear();
             A.clear();
             b.clear();
+            x.clear();
             p_weight.clear();
             ghost_cells.clear();
             ghost_order.clear();
@@ -104,7 +103,6 @@ class GhostCellSolver
 
         GArr3D<CellInfo> cell_data;
         ParticleGrid grid;
-        FDTD fdtd;
         COOMatrix A;                      // matrix for ghost cell solver
         GArr<float> b;                    // right hand side of ghost cell solver
         GArr<float> x;                    // solution of ghost cell solver

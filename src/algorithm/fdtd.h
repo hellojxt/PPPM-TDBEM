@@ -43,7 +43,7 @@ class FDTD
             t = -1;
             dl = dl_;
             dt = dt_;
-            c = 343.2f;
+            c = AIR_WAVE_SPEED;
         }
 
         void step_inner_grid();
@@ -80,14 +80,10 @@ class FDTD
             t = -1;
         }
 
-        /**
-         * @brief get the center coordinate of the grid cell
-         */
         CGPU_FUNC inline float3 getCenter(int i, int j, int k) const
         {
             return make_float3((i + 0.5f) * dl, (j + 0.5f) * dl, (k + 0.5f) * dl);
         }
-
         CGPU_FUNC inline float3 getCenter(int3 c) const { return getCenter(c.x, c.y, c.z); }
         CGPU_FUNC inline float3 getCenter(uint3 c) const { return getCenter(c.x, c.y, c.z); }
 };

@@ -29,7 +29,7 @@ void view_cell_data(GhostCellSolver *solver)
     re.set_params(make_int3(0, 0, 32), 1, 1 / solver->grid_size());
     re.assign(0, view_data);
     re.update_mesh();
-    re.render();
+    re.write_image(0, EXP_DIR + std::string("test/cell_classification.png"));
 }
 
 int main()

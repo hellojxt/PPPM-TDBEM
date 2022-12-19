@@ -204,6 +204,21 @@ inline CGPU_FUNC cpx potential_integrand(float3 point, float3 *src_v, float src_
     return result;
 }
 
+inline CGPU_FUNC cpx
+potential_integrand(TargetCoordArray &point, float3 *src_v, float src_jacobian, cpx s, PotentialType type)
+{
+    cpx result = cpx(0, 0);
+    float guass_x[TRI_GAUSS_NUM][2] = TRI_GAUSS_XS;
+    float guass_w[TRI_GAUSS_NUM] = TRI_GAUSS_WS;
+    float3 src_norm = triangle_norm(src_v);
+    for (int i = 0; i < TRI_GAUSS_NUM; i++)
+    {
+        float3 v_in_tri = local_to_global(guass_x[i][0], guass_x[i][1], src_v);
+        result += 0.5 * guass_w[i] * src_jacobian * layer_potential(v_in_tri, point, src_norm, s, type);
+    }
+    return result;
+}
+
 enum PairType
 {
     FACE_TO_FACE,
@@ -231,4 +246,11 @@ inline CGPU_FUNC cpx face2PointIntegrand(const float3 *vertices, int3 src, float
     return potential_integrand(trg, src_v, src_jacobian, k, type);
 }
 
+inline CGPU_FUNC cpx
+face2PointIntegrand(const float3 *vertices, int3 src, TargetCoordArray &trg, cpx k, PotentialType type)
+{
+    float3 src_v[3] = {{vertices[src.x]}, {vertices[src.y]}, {vertices[src.z]}};
+    float src_jacobian = jacobian(src_v);
+    return potential_integrand(trg, src_v, src_jacobian, k, type);
+}
 }  // namespace pppm

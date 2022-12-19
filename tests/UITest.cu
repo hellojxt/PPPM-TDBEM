@@ -9,7 +9,7 @@ using namespace pppm;
 
 int main()
 {
-    auto filename = std::string(ASSET_DIR) + std::string("/sphere.obj");
+    auto filename = std::string(ASSET_DIR) + std::string("/sphere3.obj");
     auto mesh = Mesh::loadOBJ(filename);
     int res = 33;
     auto solver = empty_pppm(res);
@@ -21,16 +21,16 @@ int main()
     RenderElement re(solver->pg, "UItest");
     re.set_params(make_int3(0, 0, res / 2), step_num, 0.01f);
 
-    CArr3D<float> init_grid = solver->fdtd.grids[0].cpu();
+    CArr3D<float> init_grid = solver->pg.fdtd.grids[0].cpu();
     init_grid.reset();
     init_grid(res / 2, res / 2, res / 2) = 1;
-    solver->fdtd.grids[-1].assign(init_grid);
+    solver->pg.fdtd.grids[-1].assign(init_grid);
 
     for (int i = 0; i < step_num; i++)
     {
-        solver->fdtd.step();
-        re.assign(i, solver->fdtd.grids[i]);
+        solver->pg.fdtd.step();
+        re.assign(i, solver->pg.fdtd.grids[i]);
     }
     re.update_mesh();
-    renderArray(re);
+    re.render();
 }

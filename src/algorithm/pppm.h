@@ -1,177 +1,31 @@
 #pragma once
 #include <cstdio>
-#include "array3D.h"
-#include "bem.h"
-#include "fdtd.h"
-#include "particle_grid.h"
 #include <fstream>
+#include "array3D.h"
+#include "pppm_cache.h"
 
 namespace pppm
 {
 
-class GridMap
-{
-    public:
-        int3 coord;
-        Range range;  // index range in grid data
-        CGPU_FUNC GridMap() {}
-        CGPU_FUNC GridMap(int3 coord_, Range range_) : coord(coord_), range(range_) {}
-        friend bool operator==(const GridMap &a, const GridMap &b) { return a.coord == b.coord && a.range == b.range; }
-};
-
-class ParticleMap
-{
-    public:
-        int3 base_coord;  // lowest coordinate of the 2*2*2 grid cell
-        float weight[8];  // weight of the 8 grid cells
-        Range range;      // index range in particle data
-        CGPU_FUNC ParticleMap() {}
-        friend bool operator==(const ParticleMap &a, const ParticleMap &b)
-        {
-            for (int i = 0; i < 8; i++)
-                if (a.weight[i] != b.weight[i])
-                    return false;
-            return a.base_coord == b.base_coord && a.range == b.range;
-        }
-};
-
-class BEMCache
-{
-    public:
-        ParticleMap *particle_map;
-        int trg_particle_id;
-        int3 trg_coord;
-        int particle_id;
-        LayerWeight weight;
-        CGPU_FUNC BEMCache() {}
-        friend bool operator==(const BEMCache &a, const BEMCache &b)
-        {
-            return a.particle_id == b.particle_id && a.weight == b.weight;
-        }
-
-        friend std::ofstream &operator<<(std::ofstream &fs, const BEMCache &cache)
-        {
-            for (int i = 0; i < STEP_NUM; i++)
-            {
-                fs << cache.weight.single_layer[i] << " ";
-            }
-            fs << std::endl;
-            for (int i = 0; i < STEP_NUM; i++)
-            {
-                fs << cache.weight.double_layer[i] << " ";
-            }
-            return fs;
-        }
-};
-
-class CommonVertex
-{
-    public:
-        int common_vertex_num;
-        int particle_data_id;
-        CGPU_FUNC CommonVertex() : common_vertex_num(0), particle_data_id(-1) {}
-        CGPU_FUNC CommonVertex(int common_vertex_num_, int particle_data_id_)
-            : common_vertex_num(common_vertex_num_), particle_data_id(particle_data_id_)
-        {}
-};
-
-struct CacheInfo
-{
-        int particle_id;
-        int neighbor_particle_id;
-        int particle_data_id;
-        float max_weight_single;
-        float max_weight_double;
-};
-class FastBEMCache
-{
-    public:
-        GArr<CacheInfo> cache_info;
-        GArr<LayerWeightHalf> weight;
-
-        FastBEMCache() {}
-        void resize(int size)
-        {
-            cache_info.resize(size);
-            weight.resize(size);
-        }
-        void clear()
-        {
-            cache_info.clear();
-            weight.clear();
-        }
-};
-
-class PPPMCache
-{
-    public:
-        /* data for cache */
-        GArr<GridMap> grid_map;
-        GArr<BEMCache> grid_data;  // for solving accurate near field of BEM
-
-        GArr<BEMCache> grid_fdtd_data;   // for solving inaccurate near field of FDTD
-        GArr<ParticleMap> particle_map;  // mapping particle id to index range in particle data
-                                         // (first index is the data of particle self)
-        GArr<BEMCache> particle_data;    // for solving accurate near field of BEM
-
-        /* data for precomputation of cache size */
-        // some grid cells have no neighbors
-        GArr3D<int> grid_neighbor_nonzero;
-        GArr3D<int> grid_neighbor_num;
-        // All particles have neighbors
-        GArr<int> particle_neighbor_num;
-
-        GArr<float> particle_far_field;    // cache of particle far field
-        GArr<float> particle_near_field;   // cache of particle near field
-        GArr<float> particle_factor;       // cache of particle factor
-        GArr<CommonVertex> common_vertex;  // cache of common vertex
-        FastBEMCache fast_particle_data;   // cache of fast particle data
-
-        void clear()
-        {
-            grid_map.clear();
-            grid_data.clear();
-            grid_fdtd_data.clear();
-            particle_map.clear();
-            particle_data.clear();
-            grid_neighbor_nonzero.clear();
-            grid_neighbor_num.clear();
-            particle_neighbor_num.clear();
-            particle_far_field.clear();
-            particle_near_field.clear();
-            particle_factor.clear();
-            common_vertex.clear();
-            fast_particle_data.clear();
-        }
-
-        void reset()
-        {
-            grid_map.reset();
-            grid_data.reset();
-            grid_fdtd_data.reset();
-            particle_map.reset();
-            particle_data.reset();
-            grid_neighbor_nonzero.reset();
-            grid_neighbor_num.reset();
-            particle_neighbor_num.reset();
-            particle_far_field.reset();
-            particle_near_field.reset();
-            particle_factor.reset();
-            common_vertex.reset();
-            fast_particle_data.clear();
-        }
-};
-
 class PPPMSolver
 {
     public:
-        FDTD fdtd;  // The left corner of the fdtd grid is at (0,0,0)
-        ParticleGrid pg;
-        GArr<History> dirichlet;  // Dirichlet boundary condition
-        GArr<History> neumann;    // Neumann boundary condition
-        GridArr far_field;        // far field potential of grid cells
-        TDBEM bem;                // boundary element method solver
-        PPPMCache cache;          // cache for near field computation weights
+        TDBEM bem;        // boundary element method solver
+        ParticleGrid pg;  // The left corner of the fdtd grid is at (0,0,0)
+
+        GArr<History> dirichlet;      // Dirichlet boundary condition
+        GArr<History> neumann;        // Neumann boundary condition
+        GArr<float> current_neumann;  // Neumann boundary condition for current
+        GridArr grid_far_field;       // far field potential of grid cells
+
+        // following are used for updating the dirichlet boundary values
+        GArr<float> face_far_field;     // far field potential of faces
+        GArr2D<float> face_near_field;  // near field potential of faces
+        GArr2D<float> face_factor;      // current on faces
+
+        // following are used for accelerating the computation (cache the weights)
+        GridCache grid_cache;  // cache for near field computation weights
+        FaceCache face_cache;  // cache for near field computation weights
 
         /**
          *   Constructor of PPPMSolver
@@ -181,23 +35,22 @@ class PPPMSolver
          */
         PPPMSolver(int res_, float dl_, float dt_)
         {
-            fdtd.init(res_, dl_, dt_);
-            pg.init(make_float3(0, 0, 0), dl_, res_);
+            pg.init(make_float3(0, 0, 0), dl_, res_, dt_);
             bem.init(dt_);
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
-                far_field[i].resize(res_, res_, res_);
-                far_field[i].reset();
+                grid_far_field[i].resize(res_, res_, res_);
+                grid_far_field[i].reset();
             }
         }
 
-        CGPU_FUNC float inline dt() { return fdtd.dt; }
+        CGPU_FUNC float inline dt() { return pg.fdtd.dt; }
 
-        CGPU_FUNC float inline dl() { return fdtd.dl; }
+        CGPU_FUNC float inline dl() { return pg.fdtd.dl; }
 
         CGPU_FUNC float inline grid_size() { return pg.grid_size; }
 
-        CGPU_FUNC int inline res() { return fdtd.res; }
+        CGPU_FUNC int inline res() { return pg.fdtd.res; }
 
         CGPU_FUNC float3 inline min_coord() { return pg.min_pos; }
 
@@ -207,81 +60,77 @@ class PPPMSolver
 
         CGPU_FUNC float3 inline size() { return pg.max_pos - pg.min_pos; }
 
+        CGPU_FUNC int inline time_idx() { return pg.time_idx(); }
+
         // set mesh for the particle grid
-        void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_)
+        void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_, bool log_time = false)
         {
-            if (fdtd.t > -1)
-                remove_current_mesh();
+            START_TIME(log_time)
             pg.set_mesh(verts_, tris_);
-            pg.construct_grid();
-            dirichlet.resize(pg.particles.size());
+            LOG_TIME("particle grid: set_mesh")
+            pg.construct_neighbor_lists();
+            LOG_TIME("particle grid: construct_neighbor_lists")
+            grid_cache.init(tris_.size());
+            face_cache.init(tris_.size());
+            grid_cache.update_cache(pg, bem, log_time);
+            face_cache.update_cache(pg, bem, log_time);
+            dirichlet.resize(tris_.size());
             dirichlet.reset();
-            neumann.resize(pg.particles.size());
+            neumann.resize(tris_.size());
             neumann.reset();
+            face_far_field.resize(tris_.size());
+            face_near_field.resize(tris_.size(), BUFFER_SIZE_NEIGHBOR_NUM_4_4_4);
+            face_factor.resize(tris_.size(), BUFFER_SIZE_NEIGHBOR_NUM_4_4_4);
         }
 
-        void remove_current_mesh()
+        void update_mesh(CArr<float3> &verts_, bool log_time = false)
         {
-            pg.clear();
-            dirichlet.clear();
-            neumann.clear();
-            int t = fdtd.t;
-            for (int i = 0; i < GRID_TIME_SIZE; i++)
-                far_field[t - i].assign(fdtd.grids[t - i]);
+            START_TIME(log_time)
+            pg.update_mesh(verts_);
+            LOG_TIME("particle grid: update_mesh")
+            pg.construct_neighbor_lists();
+            LOG_TIME("particle grid: construct_neighbor_lists")
+            grid_cache.update_cache(pg, bem, log_time);
+            face_cache.update_cache(pg, bem, log_time);
         }
 
         void clear()
         {
-            fdtd.clear();
             pg.clear();
             dirichlet.clear();
             neumann.clear();
+            current_neumann.clear();
+            face_far_field.clear();
+            face_near_field.clear();
+            face_factor.clear();
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
-                far_field[i].clear();
+                grid_far_field[i].clear();
             }
-            cache.clear();
+            grid_cache.clear();
+            face_cache.clear();
         }
 
-        void reset()
+        void solve_fdtd_far(bool log_time = false);
+
+        void solve_fdtd_near(bool log_time = false);
+
+        void update_dirichlet(bool log_time = false);
+
+        void set_neumann_condition(CArr<float> neuuman_condition, bool log_time = false);
+
+        void update_grid_and_face(CArr<float> neuuman_condition, bool log_time = false)
         {
-            fdtd.reset();
-            pg.reset();
-            dirichlet.reset();
-            neumann.reset();
-            for (int i = 0; i < GRID_TIME_SIZE; i++)
-            {
-                far_field[i].reset();
-            }
-            cache.reset();
+            pg.fdtd.step(log_time);
+            set_neumann_condition(neuuman_condition, log_time);
+            solve_fdtd_far(log_time);
+            update_dirichlet(log_time);
+            solve_fdtd_near(log_time);
         }
 
-        /*
-            1. solve fdtd
-            2. update far field
-        */
         void solve_fdtd_far_simple(bool log_time = false);
 
         void solve_fdtd_near_simple(bool log_time = false);
-
-        void precompute_grid_cache_simple(bool log_time = false);
-
-        void precompute_grid_cache(bool log_time = false);
-
-        void solve_fdtd_far_with_cache(bool log_time = false);
-
-        void solve_fdtd_near_with_cache(bool log_time = false);
-
-        void precompute_particle_cache_simple(bool log_time = false);
-
-        void precompute_particle_cache(bool log_time = false);
-
-        // update particle near field (using neighbor particles) + far field (interpolation from neighbor grid cells)
-        void update_particle_dirichlet(bool log_time = false);
-
-        void update_particle_dirichlet_simple(bool log_time = false);
-
-        void set_neumann_condition(CArr<float> neuuman_condition);
 };
 
 }  // namespace pppm
