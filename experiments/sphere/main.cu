@@ -154,7 +154,7 @@ int main()
     auto mesh = Mesh::loadOBJ(filename, true);
     auto check_point = make_float3(0.25f, 0.0f, 0.0f);
 
-    float scale = 4.5;
+    float scale = 4.5f;
     for (auto grid_size : grid_size_list)
     {
         float dt = grid_size / (std::sqrt(3) * AIR_WAVE_SPEED * 1.1);

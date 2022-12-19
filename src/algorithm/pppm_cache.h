@@ -12,8 +12,8 @@ class GridCache
     public:
         struct CacheElement
         {
-                LayerWeight<float> fdtd_near_weight[GRID_CACHE_SIZE];
-                LayerWeight<float> bem_near_weight[GRID_CACHE_SIZE];
+                LayerWeightHalf fdtd_near_weight[GRID_CACHE_SIZE];
+                LayerWeightHalf bem_near_weight[GRID_CACHE_SIZE];
                 float3 center;
                 float3 normal;
                 float area;
@@ -52,12 +52,12 @@ class GridCache
             return coord - make_int3(1, 1, 1);
         }
 
-        GPU_FUNC LayerWeight<float> &fdtd_near_weight(int tri_idx, int3 tri_coord, int3 grid_coord)
+        GPU_FUNC LayerWeightHalf &fdtd_near_weight(int tri_idx, int3 tri_coord, int3 grid_coord)
         {
             return cache[tri_idx].fdtd_near_weight[weight_idx(grid_coord, tri_coord)];
         }
 
-        GPU_FUNC LayerWeight<float> &bem_near_weight(int tri_idx, int3 tri_coord, int3 grid_coord)
+        GPU_FUNC LayerWeightHalf &bem_near_weight(int tri_idx, int3 tri_coord, int3 grid_coord)
         {
             return cache[tri_idx].bem_near_weight[weight_idx(grid_coord, tri_coord)];
         }
@@ -83,7 +83,7 @@ class FaceCache
     public:
         struct CacheElement
         {
-                LayerWeight<float> weight;
+                LayerWeightHalf weight;
                 float normal_angle;
                 float distance;
                 bool empty_cache;
@@ -118,7 +118,7 @@ class FaceCache
         }
         void update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time = false);
 
-        GPU_FUNC LayerWeight<float> &face2face_weight(int i, int j) { return cache(i, cache_index(i, j)).weight; }
+        GPU_FUNC LayerWeightHalf &face2face_weight(int i, int j) { return cache(i, cache_index(i, j)).weight; }
 
         CGPU_FUNC bool need_recompute(const CacheElement &old, const float normal_angle, const float distance)
         {

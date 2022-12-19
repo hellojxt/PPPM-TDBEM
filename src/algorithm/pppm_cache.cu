@@ -99,10 +99,10 @@ __global__ void update_grid_cache_kernel(GridCache gc, ParticleGrid pg, TDBEM be
     bem.scaledFFT(&w_original, &w);
     w.move(-1);
     add_grid_near_field(pg, bem, w, face_idx, neighbor_coord, -1, -2);
-    e.fdtd_near_weight[weight_idx] = w;
+    e.fdtd_near_weight[weight_idx].set(w);
     w.reset();
     add_grid_near_field(pg, bem, w, face_idx, neighbor_coord, 1, 0);
-    e.bem_near_weight[weight_idx] = w;
+    e.bem_near_weight[weight_idx].set(w);
     if (weight_idx == 0)
     {
         e.area = tri.area;
@@ -266,7 +266,7 @@ __global__ void update_particle_cache_kernel(FaceCache pc, ParticleGrid pg, TDBE
     batch_grid_near_field(pg, bem, w_temp2, neighbor_face_idx, dst);
     w_temp1.add(w_temp2);
     bem.scaledFFT(&w_temp1, &w);
-    pc.face2face_weight(center_face_idx, neighbor_face_idx) = w;
+    pc.face2face_weight(center_face_idx, neighbor_face_idx).set(w);
 }
 
 void FaceCache::update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time)

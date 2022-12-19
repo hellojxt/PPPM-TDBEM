@@ -129,14 +129,8 @@ __global__ void solve_face_near_kernel(PPPMSolver solver)
         auto &w = solver.face_cache.face2face_weight(center_face_idx, neighbor_face_idx);
         auto &neumann = solver.neumann[neighbor_face_idx];
         auto &dirichlet = solver.dirichlet[neighbor_face_idx];
-        float near_part_sum = 0;
-#pragma unroll
-        for (int k = 0; k < STEP_NUM; k++)
-        {
-            near_part_sum += -w.single_layer[k] * neumann[t - k] + w.double_layer[k] * dirichlet[t - k];
-        }
-        solver.face_near_field(center_face_idx, neighbor_i) = near_part_sum;
-        solver.face_factor(center_face_idx, neighbor_i) = w.double_layer[0];
+        solver.face_near_field(center_face_idx, neighbor_i) = w.convolution(neumann, dirichlet, t);
+        solver.face_factor(center_face_idx, neighbor_i) = (float)w.double_layer[0] * w.max_double_layer_abs;
     }
 }
 

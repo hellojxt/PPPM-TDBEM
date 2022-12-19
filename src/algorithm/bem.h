@@ -160,6 +160,48 @@ class LayerWeight
         }
 };
 
+class LayerWeightHalf
+{
+    public:
+        half single_layer[STEP_NUM];
+        float max_single_layer_abs;
+        half double_layer[STEP_NUM];
+        float max_double_layer_abs;
+        inline CGPU_FUNC LayerWeightHalf() {}
+        inline CGPU_FUNC void set(LayerWeight<float> &other)
+        {
+            max_single_layer_abs = 0;
+            max_double_layer_abs = 0;
+#pragma unroll
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                max_single_layer_abs = max(max_single_layer_abs, abs(other.single_layer[i]));
+                max_double_layer_abs = max(max_double_layer_abs, abs(other.double_layer[i]));
+            }
+            if (max_single_layer_abs == 0)
+                max_single_layer_abs = 1;
+            if (max_double_layer_abs == 0)
+                max_double_layer_abs = 1;
+#pragma unroll
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                single_layer[i] = other.single_layer[i] / max_single_layer_abs;
+                double_layer[i] = other.double_layer[i] / max_double_layer_abs;
+            }
+        }
+        inline CGPU_FUNC float convolution(History &neumann, History &dirichlet, int t)
+        {
+            float result = 0;
+#pragma unroll
+            for (int k = 0; k < STEP_NUM; k++)
+            {
+                result += -(float)single_layer[k] * max_single_layer_abs * neumann[t - k] +
+                          (float)double_layer[k] * max_double_layer_abs * dirichlet[t - k];
+            }
+            return result;
+        }
+};
+
 CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,
                                     PairInfo pair,
                                     cpx wave_number,
