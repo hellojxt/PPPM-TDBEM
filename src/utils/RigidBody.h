@@ -59,7 +59,7 @@ namespace pppm
 
         int t;
         int impulseTimeStamp;
-        CArr<Impluse> impulses;
+        CArr<Impulse> impulses;
 
     private:
         void LoadDisplacement_(const std::string &displacementPath);
