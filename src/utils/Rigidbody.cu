@@ -142,7 +142,15 @@ namespace pppm
                 return (vec.x << 20) + (vec.y << 10) + vec.z;
             }
         };
-        std::unordered_map<int3, int, iVec3Hash> candidateTriangles;
+        struct iVec3Eq
+        {
+            bool operator()(const int3 &vec1, const int3 &vec2) const
+            {
+                return vec1.x == vec2.x && vec1.y == vec2.y && vec1.z == vec2.z;
+            }
+        };
+
+        std::unordered_map<int3, int, iVec3Hash, iVec3Eq> candidateTriangles;
         int3 currTri;
         int int3::*int3Members[] = {&int3::x, &int3::y, &int3::z};
         int int4::*int4Members[] = {&int4::x, &int4::y, &int4::z, &int4::w};
@@ -236,11 +244,11 @@ namespace pppm
         int vecDim, modalSize;
         double temp;
 
-        fin.read(reinterpret_cast<char *>(vecDim), sizeof(int));
+        fin.read(reinterpret_cast<char *>(&vecDim), sizeof(int));
         assert(fin.good());
         assert(vecDim == tetVertices.size() * 3);
 
-        fin.read(reinterpret_cast<char *>(modalSize), sizeof(int));
+        fin.read(reinterpret_cast<char *>(&modalSize), sizeof(int));
         assert(fin.good());
 
         eigenVals.resize(modalSize);
