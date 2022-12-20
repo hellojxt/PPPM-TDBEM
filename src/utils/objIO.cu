@@ -28,7 +28,24 @@ void Mesh::print()
         std::cout << "[" << f.x << "," << f.y << "," << f.z << "]\n";
 }
 
-void Mesh::writeOBJ(std::string filename) {}
+void Mesh::writeOBJ(std::string filename)
+{
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        std::cerr << "Failed to open " << filename << std::endl;
+        exit(1);
+    }
+    for (auto v : vertices.m_data)
+    {
+        file << "v " << v.x << " " << v.y << " " << v.z << std::endl;
+    }
+    for (auto f : triangles.m_data)
+    {
+        file << "f " << f.x + 1 << " " << f.y + 1 << " " << f.z + 1 << std::endl;
+    }
+    file.close();
+}
 
 void Mesh::stretch(float scale)
 {

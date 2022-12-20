@@ -8,4 +8,7 @@
     ],
     "editor.inlayHints.enabled": "off",
     "cmake.configureOnOpen": false,
+    "python.analysis.extraPaths": [
+        "/home/jxt/PPPM-TDBEM/python_scripts",
+    ]
 }
