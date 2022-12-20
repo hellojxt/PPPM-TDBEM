@@ -230,11 +230,6 @@ static std::ostream &operator<<(std::ostream &o, int4 const &a)
     return o << "(" << a.x << ", " << a.y << ", " << a.z << ", " << a.w << ")";
 }
 
-static bool operator==(int3 const &a, int3 const &b)
-{
-    return a.x == b.x && a.y == b.y && a.z == b.z;
-}
-
 class Range
 {
     public:

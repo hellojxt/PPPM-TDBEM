@@ -151,6 +151,8 @@ class CArr
 
         inline void pushBack(T ele) { m_data.push_back(ele); }
 
+        inline T &last() { return m_data.back(); }
+
         void assign(const T &val);
         void assign(uint num, const T &val);
         void assign(const GArr<T> &src);

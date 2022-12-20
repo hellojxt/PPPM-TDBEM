@@ -28,9 +28,6 @@ target_link_libraries(FFTTest PRIVATE Catch2::Catch2WithMain alglib utillib)
 add_executable(PPPMTest PPPMTest.cu)
 target_link_libraries(PPPMTest PRIVATE uilib alglib utillib)
 
-add_executable(FastCacheTest FastCacheTest.cu)
-target_link_libraries(FastCacheTest PRIVATE uilib alglib utillib)
-
 add_executable(CellClassificationTest CellClassificationTest.cu)
 target_link_libraries(CellClassificationTest PRIVATE uilib alglib utillib)
 

@@ -11,6 +11,7 @@ class Mesh
         CArr<float3> vertices;
         CArr<int3> triangles;
         CArr<float3> normal;
+        Mesh(){};
         Mesh(CArr<float3> vertices_, CArr<int3> triangles_);
         Mesh(CArr<float3> vertices_, CArr<int3> triangles_, CArr<float3> normal_);
         void print();
