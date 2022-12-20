@@ -16,6 +16,8 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal)
 
     float omega = std::sqrt(lambda);
     float ksi = (alpha + beta * lambda) / (2 * omega);
+    if(ksi > 1)
+        ksi = 1;
     float omega_prime = omega * std::sqrt(1 - ksi * ksi);
     float epsilon = std::exp(-ksi * omega * timestep);
     float sqrEpsilon = epsilon * epsilon;
@@ -229,6 +231,7 @@ void RigidBody::LoadTetMesh_(const std::string &tetPath)
         fin.read(reinterpret_cast<char *>(&tetrahedrons[i]), sizeof(int4));
         assert(fin.good() && tetrahedrons[i].x < tetVertAmount && tetrahedrons[i].y < tetVertAmount &&
                tetrahedrons[i].z < tetVertAmount && tetrahedrons[i].w < tetVertAmount);
+        std::sort(reinterpret_cast<int *>(tetrahedrons.data() + i), reinterpret_cast<int *>(tetrahedrons.data() + i + 1));
     }
 
     tetVertices.assign(cpuTetVertices);
