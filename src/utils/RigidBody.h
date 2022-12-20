@@ -1,12 +1,11 @@
 #pragma once
-#ifndef RIGID_BODY_H
-#    define RIGID_BODY_H
 
-#    include <string>
-#    include "objIO.h"
-#    include "array2D.h"
-#    include "macro.h"
-#    include <filesystem>
+#include <string>
+#include "objIO.h"
+#include "array2D.h"
+#include "macro.h"
+#include <filesystem>
+#include "material.h"
 
 namespace pppm
 {
@@ -27,15 +26,16 @@ struct ModalInfo
         float q1 = 0;
         float q2 = 0;
 
-        void SetCoeffs(float timestep, float eigenVal);
+        void SetCoeffs(float timestep, float eigenVal, MaterialParameters &material);
 };
 
 class RigidBody
 {
     public:
-        RigidBody(const std::string &data_dir, float sample_rate_)
+        RigidBody(const std::string &data_dir, float sample_rate_, std::string material_name)
         {
             sample_rate = sample_rate_;
+            material.set_parameters(material_name);
             std::string base_name = data_dir.substr(data_dir.find_last_of('/') + 1);
             std::string model_dir = data_dir + "/model/" + base_name;
             std::string objPath;
@@ -93,6 +93,7 @@ class RigidBody
         float current_time;
         float timestep;
         CArr<Impulse> impulses;
+        MaterialParameters material;
 
     private:
         void LoadDisplacement_(const std::string &displacementPath);
@@ -105,5 +106,3 @@ class RigidBody
 };
 
 }  // namespace pppm
-
-#endif  // RIGID_BODY_H

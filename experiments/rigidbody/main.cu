@@ -18,8 +18,8 @@ using namespace pppm;
 
 int main()
 {
-    RigidBody rigidbody("/home/jxt/PPPM-TDBEM/dataset/lego", 44100);
-    rigidbody.export_mesh_with_modes("/home/jxt/PPPM-TDBEM/experiments/rigidbody/output");
+    RigidBody rigidbody("/home/jxt/PPPM-TDBEM/dataset/lego", 44100, "polystyrene");
+    // rigidbody.export_mesh_with_modes("/home/jxt/PPPM-TDBEM/experiments/rigidbody/output");
     rigidbody.export_signal("/home/jxt/PPPM-TDBEM/experiments/rigidbody/output");
     return 0;
 }

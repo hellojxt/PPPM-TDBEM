@@ -7,17 +7,11 @@
 
 namespace pppm
 {
-void ModalInfo::SetCoeffs(float timestep, float eigenVal)
+void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &material)
 {
-    const float alpha = 30, beta = 1e-6f;
-    const float rho = 1.29f;
-
-    float lambda = eigenVal;
-
+    float lambda = eigenVal / material.density;
     float omega = std::sqrt(lambda);
-    float ksi = (alpha + beta * lambda) / (2 * omega);
-    if(ksi > 1)
-        ksi = 1;
+    float ksi = (material.alpha + material.beta * lambda) / (2 * omega);
     float omega_prime = omega * std::sqrt(1 - ksi * ksi);
     float epsilon = std::exp(-ksi * omega * timestep);
     float sqrEpsilon = epsilon * epsilon;
@@ -29,7 +23,7 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal)
 
     float coeff3_item1 = epsilon * std::cos(theta + gamma);
     float coeff3_item2 = sqrEpsilon * std::cos(2 * theta + gamma);
-    coeff3 = 2 * (coeff3_item1 - coeff3_item2) * omega_prime * rho / (3 * omega);
+    coeff3 = 2 * (coeff3_item1 - coeff3_item2) * omega_prime / (3 * omega);
     return;
 }
 
@@ -231,7 +225,8 @@ void RigidBody::LoadTetMesh_(const std::string &tetPath)
         fin.read(reinterpret_cast<char *>(&tetrahedrons[i]), sizeof(int4));
         assert(fin.good() && tetrahedrons[i].x < tetVertAmount && tetrahedrons[i].y < tetVertAmount &&
                tetrahedrons[i].z < tetVertAmount && tetrahedrons[i].w < tetVertAmount);
-        std::sort(reinterpret_cast<int *>(tetrahedrons.data() + i), reinterpret_cast<int *>(tetrahedrons.data() + i + 1));
+        std::sort(reinterpret_cast<int *>(tetrahedrons.data() + i),
+                  reinterpret_cast<int *>(tetrahedrons.data() + i + 1));
     }
 
     tetVertices.assign(cpuTetVertices);
@@ -251,26 +246,32 @@ void RigidBody::LoadEigen_(const std::string &eigenPath)
     fin.read(reinterpret_cast<char *>(&modalSize), sizeof(int));
     assert(fin.good());
 
-    eigenVals.resize(modalSize);
-    eigenVecs.resize(vecDim, modalSize);
-
+    CArr<float> eigenVals_;
+    eigenVals_.resize(modalSize);
+    int modalSize_ = modalSize;
     for (int i = 0; i < modalSize; i++)
     {
         fin.read(reinterpret_cast<char *>(&temp), sizeof(double));
         assert(fin.good());
-        eigenVals[i] = static_cast<float>(temp);
+        eigenVals_[i] = static_cast<float>(temp);
+        if (std::sqrt(eigenVals_[i] / material.density) / (2 * M_PI) < 20000.0f)
+            modalSize_ = i + 1;
     }
 
+    eigenVals.resize(modalSize_);
+    for (int i = 0; i < modalSize_; i++)
+        eigenVals[i] = eigenVals_[i];
+    eigenVecs.resize(vecDim, modalSize_);
+
     // store transpose of U
-    for (int i = 0; i < vecDim; i++)
-    {
-        for (int j = 0; j < modalSize; j++)
+    for (int j = 0; j < modalSize; j++)
+        for (int i = 0; i < vecDim; i++)
         {
             fin.read((char *)&temp, sizeof(double));
             assert(fin.good());
-            eigenVecs(i, j) = static_cast<float>(temp);
+            if (j < modalSize_)
+                eigenVecs(i, j) = static_cast<float>(temp);
         }
-    }
     return;
 };
 
@@ -283,7 +284,7 @@ void RigidBody::InitIIR_()
     modalInfos.resize(eigenNum);
     for (int i = 0; i < eigenNum; i++)
     {
-        modalInfos[i].SetCoeffs(timestep, eigenVals[i]);
+        modalInfos[i].SetCoeffs(timestep, eigenVals[i], material);
     }
     cpuQ.resize(eigenNum);
     gpuQ.resize(eigenNum);
@@ -310,7 +311,10 @@ __global__ void GetVertAccs(GArr2D<float> gpuModalMatrix, GArr<float> gpuQ, GArr
     return;
 }
 
-__global__ void CollectAccToTri(GArr<float3> gpuVertAccArr, GArr<float> gpuTriAccArr, GArr<int3> gpuTriangleArr)
+__global__ void CollectAccToTri(GArr<float3> gpuVertAccArr,
+                                GArr<float> gpuTriAccArr,
+                                GArr<int3> gpuTriangleArr,
+                                GArr<float3> vertices)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if (id >= gpuTriAccArr.size())
@@ -324,7 +328,7 @@ __global__ void CollectAccToTri(GArr<float3> gpuVertAccArr, GArr<float> gpuTriAc
 void RigidBody::Q_to_Accs_()
 {
     cuExecute(vertAccs.size(), GetVertAccs, modalMatrix, gpuQ, vertAccs);
-    cuExecute(surfaceAccs.size(), CollectAccToTri, vertAccs, surfaceAccs, tetSurfaces);
+    cuExecute(surfaceAccs.size(), CollectAccToTri, vertAccs, surfaceAccs, tetSurfaces, tetVertices);
 }
 
 void RigidBody::CalculateIIR_()
@@ -411,7 +415,15 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
     surfaceMesh.writeOBJ(output_path + "/surface.obj");
     std::ofstream fout(output_path + "/modes.txt");
     int modalAmount = modalMatrix.cols;
+    printf("surface triangle amount: %d\n", tetSurfaces.size());
+    printf("modalAmount: %d\n", modalAmount);
     progressbar bar(modalAmount);
+    for (int i = 0; i < modalAmount; i++)
+    {
+        // print frequency
+        std::cout << "frequency of mode " << i << ": " << sqrt(eigenVals[i] / material.density) / (2 * M_PI)
+                  << std::endl;
+    }
     for (int i = 0; i < modalAmount; i++)
     {
         bar.update();
@@ -430,6 +442,7 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
         fout << std::endl;
     }
     fout.close();
+    std::cout << std::endl;
     return;
 }
 
@@ -450,6 +463,7 @@ void RigidBody::export_signal(const std::string &output_path)
         fout << s << std::endl;
     }
     fout.close();
+    std::cout << std::endl;
     return;
 }
 
