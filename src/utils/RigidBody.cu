@@ -17,7 +17,6 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &ma
     float sqrEpsilon = epsilon * epsilon;
     float theta = omega_prime * timestep;
     float gamma = std::asin(ksi);
-
     coeff1 = 2 * epsilon * std::cos(theta);
     coeff2 = -sqrEpsilon;
 
@@ -353,7 +352,7 @@ void RigidBody::CalculateIIR_()
     {
         auto &modalInfo = modalInfos[i];
         cpuQ[i] = modalInfo.coeff1 * modalInfo.q1 + modalInfo.coeff2 * modalInfo.q2 + modalInfo.coeff3 * modalInfo.f;
-        modalInfo.q1 = modalInfo.q2, modalInfo.q2 = cpuQ[i];
+        modalInfo.q2 = modalInfo.q1, modalInfo.q1 = cpuQ[i];
         modalInfo.f = 0;
     }
 
@@ -424,6 +423,7 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
         std::cout << "frequency of mode " << i << ": " << sqrt(eigenVals[i] / material.density) / (2 * M_PI)
                   << std::endl;
     }
+    std::cout << std::endl;
     for (int i = 0; i < modalAmount; i++)
     {
         bar.update();
