@@ -3,7 +3,7 @@
 #include <cmath>
 #include <unordered_map>
 #include "helper_math.h"
-#include "progressbar.hpp"
+#include "progressbar.h"
 
 namespace pppm
 {
@@ -416,7 +416,7 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
     int modalAmount = modalMatrix.cols;
     printf("surface triangle amount: %d\n", tetSurfaces.size());
     printf("modalAmount: %d\n", modalAmount);
-    progressbar bar(modalAmount);
+
     for (int i = 0; i < modalAmount; i++)
     {
         // print frequency
@@ -424,6 +424,7 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
                   << std::endl;
     }
     std::cout << std::endl;
+    progressbar bar(modalAmount, "exporting modes");
     for (int i = 0; i < modalAmount; i++)
     {
         bar.update();
@@ -450,7 +451,7 @@ void RigidBody::export_signal(const std::string &output_path)
 {
     std::ofstream fout(output_path + "/signal.txt");
     int frame_num = frameTime.last() / timestep;
-    progressbar bar(frame_num);
+    progressbar bar(frame_num, "exporting signal");
     for (int i = 0; i < frame_num; i++)
     {
         bar.update();

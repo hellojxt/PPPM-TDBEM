@@ -122,8 +122,8 @@ class PPPMSolver
         void update_grid_and_face(CArr<float> neuuman_condition, bool log_time = false)
         {
             pg.fdtd.step(log_time);
-            set_neumann_condition(neuuman_condition, log_time);
             solve_fdtd_far(log_time);
+            set_neumann_condition(neuuman_condition, log_time);
             update_dirichlet(log_time);
             solve_fdtd_near(log_time);
         }

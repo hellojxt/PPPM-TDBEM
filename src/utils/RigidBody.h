@@ -36,21 +36,26 @@ class RigidBody
         {
             sample_rate = sample_rate_;
             material.set_parameters(material_name);
-            std::string base_name = data_dir.substr(data_dir.find_last_of('/') + 1);
-            std::string model_dir = data_dir + "/model/" + base_name;
-            std::string objPath;
-            for (const auto &entry : std::filesystem::directory_iterator(model_dir))
+            std::string model_dir = data_dir + "/model/";
+            std::string model_subdir = std::filesystem::directory_iterator(model_dir)->path();
+            std::string objPath, eigenPath, tetPath;
+            for (const auto &entry : std::filesystem::directory_iterator(model_subdir))
             {
                 if (entry.path().extension() == ".obj")
                 {
                     objPath = entry.path();
-                    break;
+                }
+                if (entry.path().extension() == ".modes")
+                {
+                    eigenPath = entry.path();
+                }
+                if (entry.path().extension() == ".tet")
+                {
+                    tetPath = entry.path();
                 }
             }
             std::string displacementPath = data_dir + "/animation/displace.bin";
             std::string implusePath = data_dir + "/shader/modalImpulses.txt";
-            std::string eigenPath = objPath.substr(0, objPath.find_last_of('.')) + ".modes";
-            std::string tetPath = objPath.substr(0, objPath.find_last_of('.')) + ".tet";
             load_data(objPath, displacementPath, implusePath, eigenPath, tetPath);
         }
 
