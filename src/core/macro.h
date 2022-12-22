@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <vector>
+#include <filesystem>
 
 namespace pppm
 {
@@ -80,6 +81,11 @@ namespace pppm
 #define RAND_SIGN (rand() % 2 == 0 ? 1 : -1)
 #define BDF2(x) 0.5 * ((x) * (x)-4 * (x) + 3)
 #define MAX_FLOAT 3.402823466e+38F
+#define CHECK_DIR(dir)                          \
+    if (!std::filesystem::exists(dir))          \
+    {                                           \
+        std::filesystem::create_directory(dir); \
+    }
 
 typedef float real_t;
 const real_t EPS = 1e-8f;
@@ -273,6 +279,7 @@ class BBox
         {
             min = _min;
             max = _max;
+            width = std::max(std::max(max.x - min.x, max.y - min.y), max.z - min.z);
         }
         friend std::ostream &operator<<(std::ostream &os, const BBox &b)
         {

@@ -15,6 +15,8 @@ add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 add_definitions(-DASSET_DIR="${CMAKE_SOURCE_DIR}/assets/")
 add_definitions(-DEXP_DIR="${CMAKE_SOURCE_DIR}/experiments/")
+add_definitions(-DDATASET_DIR="${CMAKE_SOURCE_DIR}/dataset/")
+add_definitions(-DROOT_DIR="${CMAKE_SOURCE_DIR}/")
 
 ################################
 # For Config

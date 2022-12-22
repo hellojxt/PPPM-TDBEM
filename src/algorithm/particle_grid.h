@@ -103,6 +103,14 @@ class ParticleGrid
             neighbor_3_square_nonempty.reserve(grid_dim * grid_dim * grid_dim);
         }
 
+        void set_only_vertices(CArr<float3> vertices_)
+        {
+            vertices.assign(vertices_);
+            grid_face_list.reset();
+            empty_grid = true;
+            construct_vertices_grid();
+        }
+
         void set_mesh(CArr<float3> vertices_, CArr<int3> faces_)
         {
             vertices.assign(vertices_);
@@ -135,6 +143,8 @@ class ParticleGrid
         }
 
         void construct_grid();
+
+        void construct_vertices_grid();
 
         void construct_neighbor_lists();
 

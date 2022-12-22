@@ -12,6 +12,7 @@ class Mesh
         CArr<int3> triangles;
         CArr<float3> normal;
         Mesh(){};
+        Mesh(std::string file_name, bool log = false) { *this = loadOBJ(file_name, log); }
         Mesh(CArr<float3> vertices_, CArr<int3> triangles_);
         Mesh(CArr<float3> vertices_, CArr<int3> triangles_, CArr<float3> normal_);
         void print();

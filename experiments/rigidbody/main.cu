@@ -18,8 +18,11 @@ using namespace pppm;
 
 int main()
 {
-    RigidBody rigidbody("/home/jxt/PPPM-TDBEM/dataset/lego", 44100, "polystyrene");
-    rigidbody.export_mesh_with_modes("/home/jxt/PPPM-TDBEM/experiments/rigidbody/output");
-    rigidbody.export_signal("/home/jxt/PPPM-TDBEM/experiments/rigidbody/output");
+    std::string obj_name = "lego";
+    std::string OUT_DIR = EXP_DIR + std::string("rigidbody/output/") + obj_name;
+    RigidBody rigidbody(DATASET_DIR + obj_name, 44100, "polystyrene");
+    rigidbody.fix_mesh(3e-2, OUT_DIR);
+    rigidbody.export_mesh_with_modes(OUT_DIR);
+    rigidbody.export_signal(OUT_DIR);
     return 0;
 }

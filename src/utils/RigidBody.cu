@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include "helper_math.h"
 #include "progressbar.h"
+#include "particle_grid.h"
 
 namespace pppm
 {
@@ -129,9 +130,10 @@ void RigidBody::LoadImpulses_(const std::string &impulsePath)
     return;
 }
 
-CArr<int3> FindAllSurfaces(CArr<int4> &tetrahedrons)
+std::pair<CArr<int3>, CArr<float3>> FindAllSurfaces(CArr<int4> &tetrahedrons, CArr<float3> &tetraVerts)
 {
     CArr<int3> surfaceTriangles;
+    CArr<float3> surfaceNorms;
 
     struct iVec3Hash
     {
@@ -144,8 +146,14 @@ CArr<int3> FindAllSurfaces(CArr<int4> &tetrahedrons)
                 return vec1.x == vec2.x && vec1.y == vec2.y && vec1.z == vec2.z;
             }
     };
+    struct TriInfo
+    {
+            int cnt = 0;
+            int tetID = 0;
+            int exceptVertID = 0;
+    };
 
-    std::unordered_map<int3, int, iVec3Hash, iVec3Eq> candidateTriangles;
+    std::unordered_map<int3, TriInfo, iVec3Hash, iVec3Eq> candidateTriangles;
     int3 currTri;
     int int3::*int3Members[] = {&int3::x, &int3::y, &int3::z};
     int int4::*int4Members[] = {&int4::x, &int4::y, &int4::z, &int4::w};
@@ -161,19 +169,37 @@ CArr<int3> FindAllSurfaces(CArr<int4> &tetrahedrons)
                     continue;
                 currTri.*(int3Members[k++]) = currVertIDs.*(int4Members[j]);
             }
-            candidateTriangles[currTri]++;
+            auto &currInfo = candidateTriangles[currTri];
+            currInfo.cnt++;
+            currInfo.tetID = i;
+            currInfo.exceptVertID = i0;
         }
     }
 
     for (auto &candidateTriangle : candidateTriangles)
     {
-        if (candidateTriangle.second != 1)
+        if (candidateTriangle.second.cnt != 1)
             continue;
 
-        surfaceTriangles.pushBack(candidateTriangle.first);
+        int3 currTri = candidateTriangle.first;
+
+        int4 &currTet = tetrahedrons[candidateTriangle.second.tetID];
+        int exceptVertID = candidateTriangle.second.exceptVertID;
+
+        float3 center = (tetraVerts[currTri.x] + tetraVerts[currTri.y] + tetraVerts[currTri.z]) / 3;
+        float3 exceptVec = tetraVerts[currTet.*(int4Members[exceptVertID])] - center;
+        float3 e1 = tetraVerts[currTri.y] - tetraVerts[currTri.x], e2 = tetraVerts[currTri.z] - tetraVerts[currTri.x];
+        float3 normVec = normalize(cross(e1, e2));
+        if (dot(normVec, exceptVec) > 0)
+        {
+            std::swap(currTri.y, currTri.z);
+            normVec = -normVec;
+        }
+        surfaceTriangles.pushBack(currTri);
+        surfaceNorms.pushBack(normVec);
     }
 
-    return surfaceTriangles;
+    return {surfaceTriangles, surfaceNorms};
 }
 
 void RigidBody::LoadTetMesh_(const std::string &tetPath)
@@ -200,17 +226,6 @@ void RigidBody::LoadTetMesh_(const std::string &tetPath)
         FillFloat3Member(cpuTetVertices[i], &float3::x);
         FillFloat3Member(cpuTetVertices[i], &float3::y);
         FillFloat3Member(cpuTetVertices[i], &float3::z);
-        // fin.read(reinterpret_cast<char *>(&tempD), sizeof(double));
-        // assert(fin.good());
-        // cpuTetVertices[i].x = static_cast<float>(tempD);
-
-        // fin.read(reinterpret_cast<char *>(&tempD), sizeof(double));
-        // assert(fin.good());
-        // cpuTetVertices[i].y = static_cast<float>(tempD);
-
-        // fin.read(reinterpret_cast<char *>(&tempD), sizeof(double));
-        // assert(fin.good());
-        // cpuTetVertices[i].z = static_cast<float>(tempD);
     }
 
     CArr<int4> tetrahedrons;
@@ -229,7 +244,9 @@ void RigidBody::LoadTetMesh_(const std::string &tetPath)
     }
 
     tetVertices.assign(cpuTetVertices);
-    tetSurfaces.assign(FindAllSurfaces(tetrahedrons));
+    auto [surfaceTris, surfaceNorms] = FindAllSurfaces(tetrahedrons, cpuTetVertices);
+    tetSurfaces.assign(surfaceTris);
+    tetSurfaceNorms.assign(surfaceNorms);
 }
 
 void RigidBody::LoadEigen_(const std::string &eigenPath)
@@ -276,7 +293,6 @@ void RigidBody::LoadEigen_(const std::string &eigenPath)
 
 void RigidBody::InitIIR_()
 {
-    surfaceAccs.resize(tetSurfaces.size());
     timestep = 1.0f / sample_rate;
     int eigenNum = eigenVals.size();
 
@@ -289,45 +305,56 @@ void RigidBody::InitIIR_()
     gpuQ.resize(eigenNum);
     vertAccs.resize(tetVertices.size());
     modalMatrix.assign(eigenVecs);
+    update_surf_matrix();
     return;
 }
 
-__global__ void GetVertAccs(GArr2D<float> gpuModalMatrix, GArr<float> gpuQ, GArr<float3> gpuVertAccArr)
+__global__ void MatrixVertToTri(GArr2D<float> modalMatrix,
+                                GArr2D<float> modelMatrixSurf,
+                                GArr<int3> surfaces,
+                                GArr<float3> surfaceNorms)
 {
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-    if (id >= gpuVertAccArr.size())
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= surfaces.size())
         return;
-    int modalAmount = gpuModalMatrix.cols;
-    gpuVertAccArr[id].x = 0;
-    gpuVertAccArr[id].y = 0;
-    gpuVertAccArr[id].z = 0;
-    for (int i = 0; i < modalAmount; i++)
+    int3 verts = surfaces[id];
+    for (int i = 0; i < modelMatrixSurf.size.y; i++)
     {
-        gpuVertAccArr[id].x += gpuModalMatrix(id * 3, i) * gpuQ[i];
-        gpuVertAccArr[id].y += gpuModalMatrix(id * 3 + 1, i) * gpuQ[i];
-        gpuVertAccArr[id].z += gpuModalMatrix(id * 3 + 2, i) * gpuQ[i];
+        float3 surf_vec = (make_float3(modalMatrix(verts.x * 3, i), modalMatrix(verts.x * 3 + 1, i),
+                                       modalMatrix(verts.x * 3 + 2, i)) +
+                           make_float3(modalMatrix(verts.y * 3, i), modalMatrix(verts.y * 3 + 1, i),
+                                       modalMatrix(verts.y * 3 + 2, i)) +
+                           make_float3(modalMatrix(verts.z * 3, i), modalMatrix(verts.z * 3 + 1, i),
+                                       modalMatrix(verts.z * 3 + 2, i))) /
+                          3;
+        modelMatrixSurf(id, i) = dot(surf_vec, surfaceNorms[id]);
     }
     return;
 }
 
-__global__ void CollectAccToTri(GArr<float3> gpuVertAccArr,
-                                GArr<float> gpuTriAccArr,
-                                GArr<int3> gpuTriangleArr,
-                                GArr<float3> vertices)
+void RigidBody::update_surf_matrix()
+{
+    surfaceAccs.resize(tetSurfaces.size());
+    modelMatrixSurf.resize(tetSurfaces.size(), eigenVals.size());
+    cuExecute(tetSurfaces.size(), MatrixVertToTri, modalMatrix, modelMatrixSurf, tetSurfaces, tetSurfaceNorms);
+}
+
+__global__ void update_surf_acc_kernel(GArr<float> gpuQ, GArr2D<float> modelMatrixSurf, GArr<float> surfaceAccs)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (id >= gpuTriAccArr.size())
+    if (id >= surfaceAccs.size())
         return;
-    int3 verts = gpuTriangleArr[id];
-    float3 vertAccs = (gpuVertAccArr[verts.x] + gpuVertAccArr[verts.y] + gpuVertAccArr[verts.z]) / 3;
-    gpuTriAccArr[id] = length(vertAccs);
-    return;
+    float acc = 0;
+    for (int i = 0; i < gpuQ.size(); i++)
+    {
+        acc += modelMatrixSurf(id, i) * gpuQ[i];
+    }
+    surfaceAccs[id] = acc;
 }
 
 void RigidBody::Q_to_Accs_()
 {
-    cuExecute(vertAccs.size(), GetVertAccs, modalMatrix, gpuQ, vertAccs);
-    cuExecute(surfaceAccs.size(), CollectAccToTri, vertAccs, surfaceAccs, tetSurfaces, tetVertices);
+    cuExecute(surfaceAccs.size(), update_surf_acc_kernel, gpuQ, modelMatrixSurf, surfaceAccs);
 }
 
 void RigidBody::CalculateIIR_()
@@ -407,21 +434,100 @@ void RigidBody::audio_step()
     CalculateIIR_();
 }
 
+__global__ void update_fixed_surface_kernel(ParticleGrid pg,
+                                            GArr<float3> vertices,
+                                            GArr<float3> vertices_fixed,
+                                            GArr<int3> surfaces,
+                                            GArr<float3> surfaceNorms)
+{
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= surfaces.size())
+        return;
+
+    int3 surface = surfaces[id];
+    float3 vs[3] = {vertices_fixed[surface.x], vertices_fixed[surface.y], vertices_fixed[surface.z]};
+    int indices[3] = {0, 0, 0};
+#pragma unroll
+    for (int i = 0; i < 3; i++)
+    {
+        float3 v = vs[i];
+        int3 coord = pg.getGridCoord(v);
+        auto &v_neighbors = pg.neighbor_3_square_list(coord);
+        float min_distance = MAXFLOAT;
+        int min_v_id = -1;
+        for (int j = 0; j < v_neighbors.size(); j++)
+        {
+            int v_id = v_neighbors[j];
+            float3 v_neighbor = vertices[v_id];
+            float distance = length(v - v_neighbor);
+            if (distance < min_distance)
+            {
+                min_distance = distance;
+                min_v_id = v_id;
+            }
+        }
+        indices[i] = min_v_id;
+    }
+    surfaces[id] = make_int3(indices[0], indices[1], indices[2]);
+    surfaceNorms[id] = normalize(cross(vs[1] - vs[0], vs[2] - vs[0]));
+}
+
+void RigidBody::fix_mesh(float precision, std::string tmp_dir)
+{
+    CHECK_DIR(tmp_dir);
+    std::string python_src_dir = ROOT_DIR + std::string("python_scripts/");
+    std::string python_src_name = "fix_mesh.py";
+    export_surface_mesh(tmp_dir);
+    std::string in_mesh_name = "surface.obj";
+    std::string out_mesh_name = "surface_fixed.obj";
+    std::string cmd = "docker run -it --rm -v " + tmp_dir + ":/models " + "-v " + python_src_dir + ":/scripts " +
+                      "pymesh/pymesh /scripts/" + python_src_name + " --detail " + std::to_string(precision) +
+                      " /models/" + in_mesh_name + " /models/" + out_mesh_name;
+    // std::cout << cmd << std::endl;
+    system(cmd.c_str());
+    Mesh fixedMesh(tmp_dir + "/" + out_mesh_name);
+    Mesh originMesh(tetVertices.cpu(), tetSurfaces.cpu());
+    float3 min_pos = originMesh.bbox().min;
+    float length = originMesh.bbox().width;
+    int res = 64;
+    float grid_size = length / res;
+    ParticleGrid pg;
+    pg.init(min_pos - grid_size * 2, length / res, res + 4, 0.1f);
+    pg.set_only_vertices(originMesh.vertices);
+    pg.construct_neighbor_lists();
+    GArr<float3> gpuVerticesFixed(fixedMesh.vertices);
+    tetSurfaces.assign(fixedMesh.triangles);
+    tetSurfaceNorms.resize(fixedMesh.triangles.size());
+    std::cout << "update fixed surface...";
+    cuExecute(fixedMesh.triangles.size(), update_fixed_surface_kernel, pg, tetVertices, gpuVerticesFixed, tetSurfaces,
+              tetSurfaceNorms);
+    std::cout << "done" << std::endl;
+    gpuVerticesFixed.clear();
+    pg.clear();
+    update_surf_matrix();
+}
+
+void RigidBody::export_surface_mesh(const std::string &output_path)
+{
+    CHECK_DIR(output_path);
+    Mesh surfaceMesh(tetVertices, tetSurfaces);
+    surfaceMesh.writeOBJ(output_path + "/surface.obj");
+}
+
 // export the surface mesh with all the modes.
 void RigidBody::export_mesh_with_modes(const std::string &output_path)
 {
-    Mesh surfaceMesh(tetVertices, tetSurfaces);
-    surfaceMesh.writeOBJ(output_path + "/surface.obj");
+    CHECK_DIR(output_path);
+    export_surface_mesh(output_path);
     std::ofstream fout(output_path + "/modes.txt");
     int modalAmount = modalMatrix.cols;
     printf("surface triangle amount: %d\n", tetSurfaces.size());
     printf("modalAmount: %d\n", modalAmount);
-
+    std::cout << "frequency of modes: " << std::endl;
     for (int i = 0; i < modalAmount; i++)
     {
         // print frequency
-        std::cout << "frequency of mode " << i << ": " << sqrt(eigenVals[i] / material.density) / (2 * M_PI)
-                  << std::endl;
+        std::cout << int(sqrt(eigenVals[i] / material.density) / (2 * M_PI)) << ", ";
     }
     std::cout << std::endl;
     progressbar bar(modalAmount, "exporting modes");
@@ -449,6 +555,7 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
 
 void RigidBody::export_signal(const std::string &output_path)
 {
+    CHECK_DIR(output_path);
     std::ofstream fout(output_path + "/signal.txt");
     int frame_num = frameTime.last() / timestep;
     progressbar bar(frame_num, "exporting signal");

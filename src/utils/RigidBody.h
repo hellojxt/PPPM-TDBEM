@@ -65,7 +65,10 @@ class RigidBody
                        const std::string &eigenPath,
                        const std::string &tetPath);
 
+        void fix_mesh(float precision, std::string tmp_dir);
+        void update_surf_matrix();
         void export_mesh_with_modes(const std::string &output_path);
+        void export_surface_mesh(const std::string &output_path);
         void export_signal(const std::string &output_path);  // export the signal without considering the acoustics
 
         void animation_step();
@@ -78,12 +81,14 @@ class RigidBody
         CArr<float> frameTime;
         GArr<float3> tetVertices;
         GArr<int3> tetSurfaces;
+        GArr<float3> tetSurfaceNorms;
 
         CArr<float3> translations;
         CArr<float4> rotations;
 
         CArr2D<float> eigenVecs;
         GArr2D<float> modalMatrix;
+        GArr2D<float> modelMatrixSurf;
         CArr<float> eigenVals;
         CArr<float> cpuQ;
         GArr<float> gpuQ;

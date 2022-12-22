@@ -2,7 +2,22 @@
 
 namespace pppm
 {
+__global__ void update_vertices_grid_kernel(ParticleGrid pg)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= pg.vertices.size())
+        return;
+    float3 &v = pg.vertices[i];
+    int3 coord = pg.getGridCoord(v);
+    int3 base_coord = pg.getGridBaseCoord(v);
+    pg.grid_face_list(coord).atomic_append(i);
+    pg.base_coord_face_list(base_coord).atomic_append(i);
+}
 
+void ParticleGrid::construct_vertices_grid()
+{
+    cuExecute(vertices.size(), update_vertices_grid_kernel, *this);
+}
 // update the grid and the grid face list
 __global__ void update_triangles_kernel(ParticleGrid pg)
 {
@@ -195,6 +210,8 @@ void ParticleGrid::construct_neighbor_lists()
     cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), init_neigbor_list_size_kernel, *this);
     neighbor_3_square_nonempty.remove_zeros();
     base_coord_nonempty.remove_zeros();
+    neighbor_3_square_list.reset();
+    neighbor_4_square_list.reset();
     cuExecuteBlock(neighbor_3_square_nonempty.size(), 32, fill_neighbor_list_3_kernel, *this);
     cuExecuteBlock(base_coord_nonempty.size(), 64, fill_neighbor_list_4_kernel, *this);
 }
