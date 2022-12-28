@@ -1,5 +1,7 @@
 #include "pppm.h"
 #include "pppm_direct.h"
+#include "array_writer.h"
+
 namespace pppm
 {
 __global__ void solve_fdtd_far_kernel(PPPMSolver solver)
@@ -68,11 +70,35 @@ __global__ void solve_fdtd_near_kernel(PPPMSolver solver)
         auto &neumann = solver.neumann[tri_idx];
         auto &dirichlet = solver.dirichlet[tri_idx];
         atomicAdd_block(&accurate_near_field, w.convolution(neumann, dirichlet, t));
+        // if (grid_coord.x == 13 && grid_coord.y == 22 && grid_coord.z == 18 && solver.pg.fdtd.t == 24)
+        // if (abs(w.convolution(neumann, dirichlet, t)) > 10 && solver.pg.fdtd.t == 24)
+        // {
+        //     printf("error\n");
+        //     printf("tri_idx = %d, tri_coord = %d %d %d, grid_coord = %d %d %d\n", tri_idx, tri_coord.x, tri_coord.y,
+        //            tri_coord.z, grid_coord.x, grid_coord.y, grid_coord.z);
+        //     auto &vertices = solver.pg.vertices;
+        //     auto indices = tri.indices;
+        //     float3 v0 = vertices[indices.x];
+        //     float3 v1 = vertices[indices.y];
+        //     float3 v2 = vertices[indices.z];
+        //     float3 grid_center = solver.pg.getCenter(grid_coord);
+        //     printf("tri(%d, %d, %d)\n", indices.x, indices.y, indices.z);
+        //     printf("v0 = %f %f %f, v1 = %f %f %f, v2 = %f %f %f, grid_center = %f %f %f\n", v0.x, v0.y, v0.z, v1.x,
+        //            v1.y, v1.z, v2.x, v2.y, v2.z, grid_center.x, grid_center.y, grid_center.z);
+        //     printf("grid_size = %e\n", solver.pg.grid_size);
+        //     w.convolution_with_print(neumann, dirichlet, t);
+        // }
     }
     __syncthreads();
     if (threadIdx.x == 0)
     {
         solver.pg.fdtd.grids[t](grid_coord) = solver.grid_far_field[t](grid_coord) + accurate_near_field;
+        // if (abs(solver.pg.fdtd.grids[t](grid_coord)) > 5)
+        // {
+        //     printf("t = %d, grid %d %d %d: grid_far_field = %e, accurate_near_field = %e, fdtd = %e\n",
+        //            solver.pg.fdtd.t, grid_coord.x, grid_coord.y, grid_coord.z, solver.grid_far_field[t](grid_coord),
+        //            accurate_near_field, solver.pg.fdtd.grids[t](grid_coord));
+        // }
     }
 }
 
@@ -172,13 +198,17 @@ __global__ void set_neumann_condition_kernel(GArr<History> neumann, GArr<float> 
     }
 }
 
-void PPPMSolver::set_neumann_condition(CArr<float> neuuman_condition, bool log_time)
+template <typename T>
+void PPPMSolver::set_neumann_condition(T neuuman_condition, bool log_time)
 {
     START_TIME(log_time)
     current_neumann.assign(neuuman_condition);
     cuExecute(neumann.size(), set_neumann_condition_kernel, neumann, current_neumann, time_idx());
     LOG_TIME("set_neumann_condition")
 }
+
+template void PPPMSolver::set_neumann_condition(GArr<float> neuuman_condition, bool log_time);
+template void PPPMSolver::set_neumann_condition(CArr<float> neuuman_condition, bool log_time);
 
 void PPPMSolver::solve_fdtd_far_simple(bool log_time)
 {
@@ -193,6 +223,22 @@ void PPPMSolver::solve_fdtd_near_simple(bool log_time)
     START_TIME(log_time)
     direct_correction_fdtd_near(*this);
     LOG_TIME("Direct Near Solve")
+}
+
+__global__ void get_current_dirichlet_kernel(PPPMSolver solver, GArr<float> current_dirichlet)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i < solver.dirichlet.size())
+    {
+        current_dirichlet[i] = solver.dirichlet[i][solver.time_idx()];
+    }
+}
+
+void PPPMSolver::export_dirichlet(std::string file_name)
+{
+    GArr<float> current_dirichlet(dirichlet.size());
+    cuExecute(dirichlet.size(), get_current_dirichlet_kernel, *this, current_dirichlet);
+    write_to_txt(file_name, current_dirichlet.cpu());
 }
 
 }  // namespace pppm

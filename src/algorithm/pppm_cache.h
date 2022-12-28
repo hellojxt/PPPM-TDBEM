@@ -76,7 +76,7 @@ class GridCache
         }
 };
 
-#define PARTICLE_CACHE_SIZE 512
+#define PARTICLE_CACHE_SIZE 1024
 #define INTERPOLATION_WEIGHT_SIZE 8
 class FaceCache
 {

@@ -200,6 +200,31 @@ class LayerWeightHalf
             }
             return result;
         }
+
+        inline CGPU_FUNC float convolution_with_print(History &neumann, History &dirichlet, int t)
+        {
+            float result = 0;
+#pragma unroll
+            for (int k = 0; k < STEP_NUM; k++)
+            {
+                float delta = -(float)single_layer[k] * max_single_layer_abs * neumann[t - k] +
+                              (float)double_layer[k] * max_double_layer_abs * dirichlet[t - k];
+                result += delta;
+                printf("result(%e) = -single(%e) * neumann(%e) + double(%e) * dirichlet(%e) + old_result(%e)\n", result,
+                       (float)single_layer[k] * max_single_layer_abs, neumann[t - k],
+                       (float)double_layer[k] * max_double_layer_abs, dirichlet[t - k], result - delta);
+            }
+            return result;
+        }
+
+        inline CGPU_FUNC void print()
+        {
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                printf("weight.single[%d]:%e, .double[%d]:%e\n", i, (float)single_layer[i] * max_single_layer_abs, i,
+                       (float)double_layer[i] * max_double_layer_abs);
+            }
+        }
 };
 
 CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,

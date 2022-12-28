@@ -72,7 +72,30 @@ void static inline write_to_png(std::string filename, uchar4 *data, int width, i
 
 void static inline write_to_png(std::string filename, CArr2D<uchar4> data)
 {
-    write_to_png(filename, data.begin(), data.rows, data.cols);
+    CArr2D<uchar4> img(data.cols, data.rows);
+    for (int i = 0; i < data.rows; i++)
+    {
+        for (int j = 0; j < data.cols; j++)
+        {
+            img(data.cols - j - 1, i) = data(i, j);
+        }
+    }
+    write_to_png(filename, img.begin(), img.rows, img.cols);
+}
+
+CArr<float> static inline read_from_txt(std::string filename)
+{
+    FILE *fp = fopen(filename.c_str(), "r");
+    fseek(fp, 0, SEEK_END);
+    int num = ftell(fp) / sizeof(float);
+    fseek(fp, 0, SEEK_SET);
+    CArr<float> data(num);
+    for (int i = 0; i < num; i++)
+    {
+        fscanf(fp, "%e", &data[i]);
+    }
+    fclose(fp);
+    return data;
 }
 
 }  // namespace pppm

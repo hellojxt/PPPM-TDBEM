@@ -156,4 +156,29 @@ void FDTD::step_boundary_grid()
     cuExecute2D(dim2(6 * res, res), fdtd_boundary_kernel, *this);
 }
 
+__global__ void fdtd_reflect_kernel(FDTD fdtd, int3 center_coord, int3 normal, bool has_grooves)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= fdtd.res - 1 || x == 0 || y >= fdtd.res - 1 || y == 0)
+        return;
+    int3 direction[3] = {make_int3(1, 0, 0), make_int3(0, 1, 0), make_int3(0, 0, 1)};
+    int direct_index;
+#pragma unroll
+    for (int i = 0; i < 3; i++)
+        if (dot(normal, direction[i]) != 0)
+            direct_index = i;
+    int3 coord = dot(center_coord, normal) * normal + x * direction[(direct_index + 1) % 3] +
+                 y * direction[(direct_index + 2) % 3];
+    // add groove with stride 4
+    if (has_grooves && (x % 4 == 0 || y % 4 == 0))
+        coord -= normal;
+    fdtd.grids[fdtd.t + 1](coord) = fdtd.grids[fdtd.t + 1](coord + normal);
+}
+
+void FDTD::step_reflect_boundary(int3 center_coord, int3 normal, bool has_grooves)
+{
+    cuExecute2D(dim2(res, res), fdtd_reflect_kernel, *this, center_coord, normal, has_grooves);
+}
+
 }  // namespace pppm

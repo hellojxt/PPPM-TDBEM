@@ -111,7 +111,8 @@ class ParticleGrid
             construct_vertices_grid();
         }
 
-        void set_mesh(CArr<float3> vertices_, CArr<int3> faces_)
+        template <typename T1, typename T2>
+        void set_mesh(T1 vertices_, T2 faces_)
         {
             vertices.assign(vertices_);
             faces.assign(faces_);
@@ -121,7 +122,8 @@ class ParticleGrid
             empty_grid = false;
         }
 
-        void update_mesh(CArr<float3> vertices_)
+        template <typename T>
+        void update_mesh(T vertices_)
         {
             vertices.assign(vertices_);
             construct_grid();

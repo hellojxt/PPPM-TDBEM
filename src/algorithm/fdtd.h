@@ -23,6 +23,10 @@ class FDTD
         int res_bound;  // resolution of the boundary
         float dl;       // grid spacing
         float dt;       // time step
+        int3 reflect_center_coord;
+        int3 reflect_normal;
+        bool reflect_grooves;
+        bool use_reflect_boundary;
 
         /**
          *  This function is used to initialize the FDTD grid.
@@ -44,12 +48,22 @@ class FDTD
             dl = dl_;
             dt = dt_;
             c = AIR_WAVE_SPEED;
+            use_reflect_boundary = false;
         }
 
         void step_inner_grid();
 
         void step_boundary_grid();
 
+        void step_reflect_boundary(int3 center_coord, int3 normal, bool has_grooves = false);
+
+        void set_reflect_boundary(int3 center_coord, int3 normal, bool has_grooves = false)
+        {
+            reflect_center_coord = center_coord;
+            reflect_normal = normal;
+            reflect_grooves = has_grooves;
+            use_reflect_boundary = true;
+        }
         /**
          * @brief step forward in time,
          * t++ first, then compute the FDTD kernel
@@ -59,6 +73,8 @@ class FDTD
             START_TIME(log_time)
             step_inner_grid();
             step_boundary_grid();
+            if (use_reflect_boundary)
+                step_reflect_boundary(reflect_center_coord, reflect_normal);
             t++;
             LOG_TIME("FDTD")
         }

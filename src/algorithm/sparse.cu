@@ -458,8 +458,7 @@ void BiCGSTAB_Solver::set_coo_matrix(GArr<int> &A_rows,
 
 void BiCGSTAB_Solver::clear_cache()
 {
-    CHECK_CUSPARSE(cusparseDestroyDnVec(d_B.vec))
-    CHECK_CUSPARSE(cusparseDestroyDnVec(d_X.vec))
+
     CHECK_CUSPARSE(cusparseDestroyDnVec(d_R.vec))
     CHECK_CUSPARSE(cusparseDestroyDnVec(d_R0.vec))
     CHECK_CUSPARSE(cusparseDestroyDnVec(d_P.vec))
@@ -534,6 +533,8 @@ void BiCGSTAB_Solver::solve(GArr<float> &b, GArr<float> &x, int maxIterations, f
     thrust::transform(thrust::device, x.begin(), x.end(), x.begin(), multiply(b_norm));
     // b = b * b_norm
     thrust::transform(thrust::device, b.begin(), b.end(), b.begin(), multiply(b_norm));
+    CHECK_CUSPARSE(cusparseDestroyDnVec(d_B.vec))
+    CHECK_CUSPARSE(cusparseDestroyDnVec(d_X.vec))
 }
 
 __global__ void eliminate_zeros_kernel(GArr<int> index,

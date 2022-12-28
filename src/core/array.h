@@ -61,6 +61,12 @@ class CircularArray
             }
             return true;
         }
+        CGPU_FUNC void print()
+        {
+            for (int i = 0; i < N; i++)
+                printf("%f ", m_data[i]);
+            printf("\n");
+        }
 };
 
 template <typename T>

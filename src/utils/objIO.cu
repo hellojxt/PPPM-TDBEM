@@ -102,6 +102,42 @@ BBox Mesh::bbox()
     return BBox(min_p, max_p);
 }
 
+void Mesh::remove_isolated_vertices()
+{
+    std::vector<bool> is_isolated(vertices.size(), true);
+    for (auto f : triangles.m_data)
+    {
+        is_isolated[f.x] = false;
+        is_isolated[f.y] = false;
+        is_isolated[f.z] = false;
+    }
+    std::vector<int> new_indices(vertices.size());
+    int new_index = 0;
+    for (int i = 0; i < vertices.size(); i++)
+    {
+        if (!is_isolated[i])
+        {
+            new_indices[i] = new_index;
+            new_index++;
+        }
+    }
+    CArr<float3> new_vertices(new_index);
+    for (int i = 0; i < vertices.size(); i++)
+    {
+        if (!is_isolated[i])
+        {
+            new_vertices[new_indices[i]] = vertices[i];
+        }
+    }
+    for (auto &f : triangles.m_data)
+    {
+        f.x = new_indices[f.x];
+        f.y = new_indices[f.y];
+        f.z = new_indices[f.z];
+    }
+    vertices = new_vertices;
+}
+
 float3 Mesh::get_center()
 {
     float3 min_pos = vertices[0];

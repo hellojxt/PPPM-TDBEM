@@ -9,8 +9,8 @@ using namespace pppm;
 static PPPMSolver *empty_pppm(int res)
 {
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    float grid_size = 0.005;
-    float dt = 8e-6f;
+    float grid_size = 0.001875f;
+    float dt = 2e-6f;
     PPPMSolver *pppm = new PPPMSolver(res, grid_size, dt);
     return pppm;
 }
@@ -87,7 +87,7 @@ static PPPMSolver *point_pppm(int res = 64)
 
 static GhostCellSolver *empty_ghost_cell_solver(int res)
 {
-    float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
+    float3 min_pos = make_float3(2.0f, 2.0f, 2.0f);
     float grid_size = 0.005;
     float dt = 8e-6f;
     GhostCellSolver *solver = new GhostCellSolver(min_pos, grid_size, res, dt);

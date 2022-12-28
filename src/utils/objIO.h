@@ -24,6 +24,7 @@ class Mesh
         void stretch(float scale);
         void stretch_to(float scale);
         void normalize();
+        void remove_isolated_vertices();
         BBox bbox();
         static Mesh loadOBJ(std::string file_name, bool log = false);
 };

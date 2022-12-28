@@ -15,6 +15,7 @@ class MaterialParameters
         float gamma;
         float restitution_coeff;
         float friction_coeff;
+        float one_minus_nu2_over_E;
 
         MaterialParameters()
         {
@@ -47,7 +48,7 @@ class MaterialParameters
                 poissonRatio = 0.34;
                 density = 1050.0;
                 alpha = 30.0;
-                beta = 8e-7;
+                beta = 1e-6;
                 gamma = 4e-4;
                 restitution_coeff = 0.4;
                 friction_coeff = 0.2;
@@ -96,6 +97,7 @@ class MaterialParameters
                 restitution_coeff = 0.0f;
                 friction_coeff = 0.0f;
             }
+            one_minus_nu2_over_E = (1.0 - pow(poissonRatio, 2)) / youngModulus;
         };
 };
 

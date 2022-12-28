@@ -41,7 +41,7 @@ TEST_CASE("GridCache", "[gc]")
     CArr3D<float> far_field = solver->grid_far_field[0].cpu();
     CArr3D<float> fdtd_grid = solver->pg.fdtd.grids[0].cpu();
     auto grid_list = solver->pg.grid_face_list.cpu();
-
+    int assert_num = 0;
     for (int x = 1; x < solver->res() - 1; x++)
     {
         for (int y = 1; y < solver->res() - 1; y++)
@@ -51,10 +51,12 @@ TEST_CASE("GridCache", "[gc]")
                 if (far_field_simple(x, y, z) != 0)
                 {
                     REQUIRE(far_field_simple(x, y, z) == Approx(far_field(x, y, z)).margin(1e-3));
+                    assert_num++;
                 }
                 if (fdtd_grid_simple(x, y, z) != 0)
                 {
                     REQUIRE(fdtd_grid_simple(x, y, z) == Approx(fdtd_grid(x, y, z)).margin(1e-3));
+                    assert_num++;
                 }
             }
         }

@@ -90,6 +90,31 @@ __global__ void cell_classfication_kernel(GArr3D<CellInfo> cell_data,
     ghost_idx_arr(x, y, z) = (type == GHOST);
 }
 
+__global__ void post_cell_classification_kernel(ParticleGrid grid, GArr3D<CellType> type_arr)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x < 0 || x >= grid.grid_dim || y < 0 || y >= grid.grid_dim)
+        return;
+    auto current_type = AIR;
+    for (int z = 0; z < grid.grid_dim; z++)
+    {
+        auto &t = type_arr(x, y, z);
+        if (t == SOLID || t == GHOST)
+        {
+            current_type = SOLID;
+        }
+        else if (t == AIR)
+        {
+            current_type = AIR;
+        }
+        else
+        {
+            type_arr(x, y, z) = current_type;
+        }
+    }
+}
+
 __global__ void apply_cell_type_kernel(GArr3D<CellInfo> cell_data,
                                        ParticleGrid grid,
                                        GArr3D<CellType> type_arr,
@@ -122,6 +147,7 @@ int fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data, bool thin_shel
     type_arr.resize(grid_dim_3D);
     ghost_idx_arr.resize(grid_dim_3D);
     cuExecute3D(grid_dim_3D, cell_classfication_kernel, cell_data, grid, type_arr, ghost_idx_arr);
+    cuExecute2D(dim2(grid.grid_dim, grid.grid_dim), post_cell_classification_kernel, grid, type_arr);
     thrust::inclusive_scan(thrust::device, ghost_idx_arr.begin(), ghost_idx_arr.end(), ghost_idx_arr.begin());
     cuExecute3D(grid_dim_3D, apply_cell_type_kernel, cell_data, grid, type_arr, ghost_idx_arr);
     int ghost_cell_num = ghost_idx_arr.data.last_item();

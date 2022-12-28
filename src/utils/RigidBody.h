@@ -14,6 +14,10 @@ struct Impulse
         float currTime;
         int vertexID;
         float3 impulseVec;
+        float3 impactPosition;      // in object space
+        float supportLength = 0.0;  // tau
+        float gamma;                // gamma = pi * norm(J) / (2 tau)
+        float contactSpeed = 0.0;
 };
 
 struct ModalInfo
@@ -25,6 +29,7 @@ struct ModalInfo
         float f = 0.0f;
         float q1 = 0;
         float q2 = 0;
+        float q3 = 0;
 
         void SetCoeffs(float timestep, float eigenVal, MaterialParameters &material);
 };
@@ -32,13 +37,17 @@ struct ModalInfo
 class RigidBody
 {
     public:
-        RigidBody(const std::string &data_dir, float sample_rate_, std::string material_name)
+        RigidBody(const std::string &data_dir,
+                  float sample_rate_,
+                  std::string material_name,
+                  float max_frequncy_ = 20000.0f)
         {
             sample_rate = sample_rate_;
+            max_frequncy = max_frequncy_;
             material.set_parameters(material_name);
             std::string model_dir = data_dir + "/model/";
             std::string model_subdir = std::filesystem::directory_iterator(model_dir)->path();
-            std::string objPath, eigenPath, tetPath;
+            std::string objPath, eigenPath, tetPath, mapPath;
             for (const auto &entry : std::filesystem::directory_iterator(model_subdir))
             {
                 if (entry.path().extension() == ".obj")
@@ -54,6 +63,7 @@ class RigidBody
                     tetPath = entry.path();
                 }
             }
+            obj_filename = objPath;
             std::string displacementPath = data_dir + "/animation/displace.bin";
             std::string implusePath = data_dir + "/shader/modalImpulses.txt";
             load_data(objPath, displacementPath, implusePath, eigenPath, tetPath);
@@ -64,22 +74,46 @@ class RigidBody
                        const std::string &implusePath,
                        const std::string &eigenPath,
                        const std::string &tetPath);
-
         void fix_mesh(float precision, std::string tmp_dir);
         void update_surf_matrix();
         void export_mesh_with_modes(const std::string &output_path);
         void export_surface_mesh(const std::string &output_path);
-        void export_signal(const std::string &output_path);  // export the signal without considering the acoustics
-
+        void export_signal(const std::string &output_path,
+                           float max_time);  // export the signal without considering the acoustics
+        void export_mesh_sequence(const std::string &output_path);
+        void export_surface_accs(const std::string &filename);
+        void move_to_first_impulse();
         void animation_step();
         void audio_step();
         bool end() { return current_time <= frameTime.last(); }
+        void clear()
+        {
+            gpuVertices.clear();
+            frameTime.clear();
+            tetVertices.clear();
+            standardTetVertices.clear();
+            tetSurfaces.clear();
+            tetSurfaceNorms.clear();
+            translations.clear();
+            rotations.clear();
+            eigenVecs.clear();
+            modalMatrix.clear();
+            modelMatrixSurf.clear();
+            eigenVals.clear();
+            cpuQ.clear();
+            gpuQ.clear();
+            modalInfos.clear();
+            vertAccs.clear();
+            surfaceAccs.clear();
+            impulses.clear();
+        }
 
         Mesh mesh;
         GArr<float3> gpuVertices;
 
         CArr<float> frameTime;
         GArr<float3> tetVertices;
+        GArr<float3> standardTetVertices;
         GArr<int3> tetSurfaces;
         GArr<float3> tetSurfaceNorms;
 
@@ -96,12 +130,15 @@ class RigidBody
 
         GArr<float3> vertAccs;
         GArr<float> surfaceAccs;
+        bool mesh_is_updated;  // used after audio_step is called
 
         int animationTimeStamp;
         int impulseTimeStamp;
         float sample_rate;
         float current_time;
         float timestep;
+        float max_frequncy;
+        std::string obj_filename;
         CArr<Impulse> impulses;
         MaterialParameters material;
 

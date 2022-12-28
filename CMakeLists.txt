@@ -20,7 +20,7 @@ add_definitions(-DROOT_DIR="${CMAKE_SOURCE_DIR}/")
 
 ################################
 # For Config
-add_compile_definitions(LINE_GAUSS_NUM=2)
+add_compile_definitions(LINE_GAUSS_NUM=3)
 add_compile_definitions(TRI_GAUSS_NUM=3)
 add_compile_definitions(STEP_NUM=16) # number of time steps for history of each particle
 

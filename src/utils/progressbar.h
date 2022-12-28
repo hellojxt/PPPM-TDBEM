@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "macro.h"
 
 class progressbar
 {
@@ -26,6 +27,7 @@ class progressbar
             terminal_width = w.ws_col;
             bar_width = terminal_width / 2;
             message = message_;
+            start_time = CURRENT_TIME;
         }
 
         // main function
@@ -48,14 +50,27 @@ class progressbar
             for (int i = 0; i < n_todo; ++i)
                 output << todo_char;
             // readd trailing percentage characters
-            std::string perc_str = std::to_string(perc);
-            output << closing_bracket_char << ' ' << perc << '%' << std::string(3 - perc_str.size(), ' ');
+            std::string perc_str = std::to_string(std::min(progress * 100 / n_cycles, 100));
+            output << closing_bracket_char << ' ' << perc_str << '%' << std::string(3 - perc_str.size(), ' ');
+            int seconds =
+                std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_time)
+                    .count();
+            // format time using hh:mm:ss
+            int hours = seconds / 3600;
+            seconds -= hours * 3600;
+            int minutes = seconds / 60;
+            seconds -= minutes * 60;
+            output << ' ' << std::string(2 - std::to_string(hours).size(), '0') << hours << ':'
+                   << std::string(2 - std::to_string(minutes).size(), '0') << minutes << ':'
+                   << std::string(2 - std::to_string(seconds).size(), '0') << seconds;
             // write message
             output << ' ' << message;
             last_perc = perc;
             output << std::flush;
             return;
         }
+
+        inline int get_progress() { return progress; }
 
     private:
         int progress;
@@ -68,6 +83,7 @@ class progressbar
         std::string opening_bracket_char;
         std::string closing_bracket_char;
         std::string message;
+        std::chrono::steady_clock::time_point start_time;
 
         std::ostream &output;
 };

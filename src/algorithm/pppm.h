@@ -33,9 +33,9 @@ class PPPMSolver
          *   @param dl_: grid cell size
          *   @param dt_: time step for the FDTD solver
          */
-        PPPMSolver(int res_, float dl_, float dt_)
+        PPPMSolver(int res_, float dl_, float dt_, float3 min_pos = make_float3(0, 0, 0))
         {
-            pg.init(make_float3(0, 0, 0), dl_, res_, dt_);
+            pg.init(min_pos, dl_, res_, dt_);
             bem.init(dt_);
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
@@ -63,7 +63,8 @@ class PPPMSolver
         CGPU_FUNC int inline time_idx() { return pg.time_idx(); }
 
         // set mesh for the particle grid
-        void set_mesh(CArr<float3> &verts_, CArr<int3> &tris_, bool log_time = false)
+        template <typename T1, typename T2>
+        void set_mesh(T1 &verts_, T2 &tris_, bool log_time = false)
         {
             START_TIME(log_time)
             pg.set_mesh(verts_, tris_);
@@ -83,7 +84,8 @@ class PPPMSolver
             face_factor.resize(tris_.size(), BUFFER_SIZE_NEIGHBOR_NUM_4_4_4);
         }
 
-        void update_mesh(CArr<float3> &verts_, bool log_time = false)
+        template <typename T>
+        void update_mesh(T &verts_, bool log_time = false)
         {
             START_TIME(log_time)
             pg.update_mesh(verts_);
@@ -92,6 +94,8 @@ class PPPMSolver
             LOG_TIME("particle grid: construct_neighbor_lists")
             grid_cache.update_cache(pg, bem, log_time);
             face_cache.update_cache(pg, bem, log_time);
+            // neumann.reset();
+            // dirichlet.reset();
         }
 
         void clear()
@@ -117,9 +121,11 @@ class PPPMSolver
 
         void update_dirichlet(bool log_time = false);
 
-        void set_neumann_condition(CArr<float> neuuman_condition, bool log_time = false);
+        template <typename T>
+        void set_neumann_condition(T neuuman_condition, bool log_time = false);
 
-        void update_grid_and_face(CArr<float> neuuman_condition, bool log_time = false)
+        template <typename T>
+        void update_grid_and_face(T neuuman_condition, bool log_time = false)
         {
             pg.fdtd.step(log_time);
             solve_fdtd_far(log_time);
@@ -131,6 +137,8 @@ class PPPMSolver
         void solve_fdtd_far_simple(bool log_time = false);
 
         void solve_fdtd_near_simple(bool log_time = false);
+
+        void export_dirichlet(std::string file_name);
 };
 
 }  // namespace pppm

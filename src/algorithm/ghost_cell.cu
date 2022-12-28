@@ -21,12 +21,24 @@ GPU_FUNC inline int3 get_base_coord_for_reflect(CellInfo ghost_cell, GhostCellSo
 {
     float grid_size = solver.grid_size();
     float3 reflect_point = ghost_cell.reflect_point;
-    int3 base_coord = make_int3(reflect_point / grid_size - 0.5f);
+    int3 base_coord = make_int3((reflect_point - solver.grid.min_pos) / grid_size - 0.5f);
 #ifdef MEMORY_CHECK
     float3 base_point = solver.grid.getCenter(base_coord);
     float3 offset = reflect_point - base_point;
-    assert(offset.x >= 0 && offset.y >= 0 && offset.z >= 0 && offset.x <= grid_size && offset.y <= grid_size &&
-           offset.z <= grid_size);
+    // if (offset.x < -EPS || offset.y < -EPS || offset.z < -EPS || offset.x > grid_size + EPS ||
+    //     offset.y > grid_size + EPS || offset.z > grid_size + EPS)
+    // {
+    //     printf("offset: %f %f %f\n", offset.x, offset.y, offset.z);
+    //     printf("base_point: %f %f %f\n", base_point.x, base_point.y, base_point.z);
+    //     printf("reflect_point: %f %f %f\n", reflect_point.x, reflect_point.y, reflect_point.z);
+    //     printf("grid_size: %f\n", grid_size);
+    //     printf("base_coord: %d %d %d\n", base_coord.x, base_coord.y, base_coord.z);
+    //     printf("grid_dim: %d\n", solver.grid.grid_dim);
+    //     printf("min_pos: %f %f %f\n", solver.grid.min_pos.x, solver.grid.min_pos.y, solver.grid.min_pos.z);
+    // }
+    assert(offset.x >= -EPS && offset.y >= -EPS && offset.z >= -EPS && offset.x <= grid_size + EPS &&
+           offset.y <= grid_size + EPS && offset.z <= grid_size + EPS);
+
 #endif
     return base_coord;
 }
@@ -162,17 +174,20 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
             int3 dcoord[6] = {make_int3(1, 0, 0),  make_int3(-1, 0, 0), make_int3(0, 1, 0),
                               make_int3(0, -1, 0), make_int3(0, 0, 1),  make_int3(0, 0, -1)};
             auto cell = solver.cell_data(ghost_cell_coord);
+            int neighbor_num = 0;
+            solver.b[ghost_idx] = 0;
             for (int i = 0; i < 6; i++)
             {
                 int3 coord = ghost_cell_coord + dcoord[i];
                 if (solver.cell_data(coord).type == AIR)
                 {
-                    solver.b[ghost_idx] =
+                    solver.b[ghost_idx] +=
                         -solver.neuuman_data[cell.nearest_particle_idx] * solver.grid_size() +
                         solver.grid.fdtd.grids[solver.grid.fdtd.t](coord);  // p_g - p_n = l * rho * a_n
-                    break;
+                    neighbor_num++;
                 }
             }
+            solver.b[ghost_idx] /= neighbor_num;
         }
     }
     else if (acc_order == AccuracyOrder::SECOND_ORDER)
@@ -235,32 +250,37 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
 void GhostCellSolver::precompute_ghost_matrix(bool log_time)
 {
     START_TIME(log_time)
-    A.resize(ghost_cell_num, ghost_cell_num, ghost_cell_num * (GHOST_CELL_NEIGHBOR_NUM + 1));
-    A.reset();  // set A to zero matrix
-    p_weight.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM);
     b.resize(ghost_cell_num);
-    x.resize(ghost_cell_num);
-    GArr3D<float> phi;
-    phi.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM, GHOST_CELL_NEIGHBOR_NUM);
-    cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this);
-    LOG_TIME("Construct phi matrix")
-    auto svd_result = cusolver_svd(phi);
-    svd_result.solve_inverse();
-    LOG_TIME("SVD")
-    ghost_order.resize(ghost_cell_num);
-    cuExecute(ghost_cell_num, precompute_p_weight_kernel, svd_result, *this);
-    LOG_TIME("Precompute p weight")
     if (condition_number_threshold > 0.0f)
     {
+        A.resize(ghost_cell_num, ghost_cell_num, ghost_cell_num * (GHOST_CELL_NEIGHBOR_NUM + 1));
+        A.reset();  // set A to zero matrix
+        x.resize(ghost_cell_num);
+        p_weight.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM);
+        GArr3D<float> phi;
+        phi.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM, GHOST_CELL_NEIGHBOR_NUM);
+        cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this);
+        LOG_TIME("Construct phi matrix")
+        auto svd_result = cusolver_svd(phi);
+        svd_result.solve_inverse();
+        LOG_TIME("SVD")
+        ghost_order.resize(ghost_cell_num);
+        cuExecute(ghost_cell_num, precompute_p_weight_kernel, svd_result, *this);
+        LOG_TIME("Precompute p weight")
         auto construct_matrix_kernel = construct_equation_kernel<true, false>;
         cuExecute(ghost_cell_num, construct_matrix_kernel, *this);
         A.eliminate_zeros();
         A.sort_by_row();
         linear_solver.set_coo_matrix(A);
         LOG_TIME("Construct matrix A")
+        phi.clear();
+        svd_result.clear();
     }
-    phi.clear();
-    svd_result.clear();
+    else
+    {
+        ghost_order.resize(ghost_cell_num);
+        ghost_order.reset();
+    }
 }
 
 __global__ void update_ghost_cell_kernel(GArr<float> x, GhostCellSolver solver)
@@ -289,6 +309,21 @@ void GhostCellSolver::solve_ghost_cell(bool log_time)
         cuExecute(ghost_cell_num, update_ghost_cell_kernel, x, *this);
         LOG_TIME("Solve equation for ghost cell")
     }
+}
+
+__global__ void set_solid_cell_zero_kernel(FDTD fdtd, GArr3D<CellInfo> cell_data)
+{
+    int3 coord = make_int3(blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y,
+                           blockIdx.z * blockDim.z + threadIdx.z);
+    if (coord.x >= fdtd.res || coord.y >= fdtd.res || coord.z >= fdtd.res)
+        return;
+    if (cell_data(coord).type == SOLID)
+        fdtd.grids[fdtd.t](coord) = 0;
+}
+
+void GhostCellSolver::set_solid_cell_zero()
+{
+    cuExecute3D(dim3(grid.grid_dim, grid.grid_dim, grid.grid_dim), set_solid_cell_zero_kernel, grid.fdtd, cell_data);
 }
 
 }  // namespace pppm

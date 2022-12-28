@@ -10,9 +10,9 @@ namespace pppm
 {
 void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &material)
 {
-    float lambda = eigenVal / material.density;
-    float omega = std::sqrt(lambda);
-    float ksi = (material.alpha + material.beta * lambda) / (2 * omega);
+    float lambda = eigenVal;
+    float omega = std::sqrt(lambda / material.density);
+    float ksi = (material.alpha + material.beta * lambda / material.density) / (2 * omega);
     float omega_prime = omega * std::sqrt(1 - ksi * ksi);
     float epsilon = std::exp(-ksi * omega * timestep);
     float sqrEpsilon = epsilon * epsilon;
@@ -23,7 +23,7 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &ma
 
     float coeff3_item1 = epsilon * std::cos(theta + gamma);
     float coeff3_item2 = sqrEpsilon * std::cos(2 * theta + gamma);
-    coeff3 = 2 * (coeff3_item1 - coeff3_item2) * omega_prime / (3 * omega);
+    coeff3 = 2 * (coeff3_item1 - coeff3_item2) / (3 * omega * material.density * omega_prime);
     return;
 }
 
@@ -35,7 +35,6 @@ void RigidBody::load_data(const std::string &objPath,
 {
     mesh = Mesh::loadOBJ(objPath);
     impulseTimeStamp = 0;
-    gpuVertices.assign(mesh.vertices);
     LoadDisplacement_(displacementPath);
     LoadImpulses_(implusePath);
     LoadTetMesh_(tetPath);
@@ -94,6 +93,33 @@ void RigidBody::LoadDisplacement_(const std::string &displacementPath)
 
 void RigidBody::LoadImpulses_(const std::string &impulsePath)
 {
+    // load *.geo.txt (for *.obj)
+    // The format of the file is:
+    // map_size
+    // vertexID1 vertexID2 ...
+    // vertexID1 vertexID2 ...
+
+    std::ifstream fin_map(obj_filename.replace(obj_filename.end() - 4, obj_filename.end(), ".geo.txt"));
+    int map_size;
+    fin_map >> map_size;
+    CArr<int2> map_data;
+    int max_vertex_id = 0;
+    for (int i = 0; i < map_size; i++)
+    {
+        int2 tmp;
+        fin_map >> tmp.x >> tmp.y;
+        if (tmp.y > max_vertex_id)
+            max_vertex_id = tmp.y;
+        float4 tmp4;
+        fin_map >> tmp4.x >> tmp4.y >> tmp4.z >> tmp4.w;
+        map_data.pushBack(tmp);
+    }
+    CArr<int> vertex_map(max_vertex_id + 1);
+    vertex_map.reset();
+    for (int i = 0; i < map_size; i++)
+    {
+        vertex_map[map_data[i].y] = map_data[i].x;
+    }
     std::ifstream fin(impulsePath);
     double currTime, lastTime = 0.0;
     int vertexID, objID;
@@ -120,9 +146,12 @@ void RigidBody::LoadImpulses_(const std::string &impulsePath)
             std::cout << cnt << " " << lastTime << " " << currTime << "\n";
             assert(false);
         };
-        impulses.pushBack(Impulse{.currTime = static_cast<float>(currTime),
-                                  .vertexID = vertexID,
-                                  .impulseVec = make_float3(impulse.x, impulse.y, impulse.z)});
+        Impulse imp;
+        imp.currTime = static_cast<float>(currTime);
+        imp.vertexID = vertex_map[vertexID];
+        imp.impulseVec = make_float3(impulse.x, impulse.y, impulse.z);
+        imp.contactSpeed = static_cast<float>(relativeSpeed);
+        impulses.pushBack(imp);
         lastTime = currTime;
         cnt++;
     }
@@ -244,6 +273,7 @@ void RigidBody::LoadTetMesh_(const std::string &tetPath)
     }
 
     tetVertices.assign(cpuTetVertices);
+    standardTetVertices.assign(cpuTetVertices);
     auto [surfaceTris, surfaceNorms] = FindAllSurfaces(tetrahedrons, cpuTetVertices);
     tetSurfaces.assign(surfaceTris);
     tetSurfaceNorms.assign(surfaceNorms);
@@ -270,7 +300,7 @@ void RigidBody::LoadEigen_(const std::string &eigenPath)
         fin.read(reinterpret_cast<char *>(&temp), sizeof(double));
         assert(fin.good());
         eigenVals_[i] = static_cast<float>(temp);
-        if (std::sqrt(eigenVals_[i] / material.density) / (2 * M_PI) < 20000.0f)
+        if (std::sqrt(eigenVals_[i] / material.density) / (2 * M_PI) < max_frequncy)
             modalSize_ = i + 1;
     }
 
@@ -362,7 +392,10 @@ void RigidBody::CalculateIIR_()
 
     float currTime = current_time;
     int size = modalInfos.size();
-
+    for (int i = 0; i < size; i++)
+    {
+        modalInfos[i].f = 0;
+    }
     while (impulseTimeStamp < impulses.size() && currTime >= impulses[impulseTimeStamp].currTime)
     {
         int id = impulses[impulseTimeStamp].vertexID;
@@ -379,8 +412,10 @@ void RigidBody::CalculateIIR_()
     {
         auto &modalInfo = modalInfos[i];
         cpuQ[i] = modalInfo.coeff1 * modalInfo.q1 + modalInfo.coeff2 * modalInfo.q2 + modalInfo.coeff3 * modalInfo.f;
-        modalInfo.q2 = modalInfo.q1, modalInfo.q1 = cpuQ[i];
-        modalInfo.f = 0;
+        modalInfo.q3 = modalInfo.q2;
+        modalInfo.q2 = modalInfo.q1;
+        modalInfo.q1 = cpuQ[i];
+        cpuQ[i] = (modalInfo.q1 + modalInfo.q3 - 2 * modalInfo.q2) / (timestep * timestep);
     }
 
     gpuQ.assign(cpuQ);
@@ -404,34 +439,44 @@ __device__ __forceinline__ float3 rotate(const float4 q, const float3 v)
                        2.0f * ((t7 - t3) * v.x + (t2 + t9) * v.y + (t5 + t8) * v.z) + v.z);
 }
 
-__global__ void Transform(GArr<float3> vertices, float3 translation, float4 rotation)
+__global__ void Transform(GArr<float3> vertices, GArr<float3> standard_vertices, float3 translation, float4 rotation)
 {
-    int id = threadIdx.y * blockIdx.x + threadIdx.x;
-    if (id > vertices.size())
-    {
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= vertices.size())
         return;
-    }
-    vertices[id].x += translation.x, vertices[id].y += translation.y, vertices[id].z += translation.z;
-    vertices[id] = rotate(rotation, vertices[id]);
+    vertices[id] = rotate(rotation, standard_vertices[id]) + translation;
     return;
 }
 
 void RigidBody::animation_step()
 {
-    cuExecute(gpuVertices.size(), Transform, gpuVertices, translations[animationTimeStamp],
+    cuExecute(tetVertices.size(), Transform, tetVertices, standardTetVertices, translations[animationTimeStamp],
               rotations[animationTimeStamp]);
-
     animationTimeStamp++;
 }
 
 void RigidBody::audio_step()
 {
-    if (frameTime[animationTimeStamp] < current_time)
+    if (frameTime[animationTimeStamp] <= current_time)
     {
         animation_step();
+        mesh_is_updated = true;
+    }
+    else
+    {
+        mesh_is_updated = false;
     }
     current_time += timestep;
     CalculateIIR_();
+}
+
+void RigidBody::move_to_first_impulse()
+{
+    while (current_time + timestep < impulses[0].currTime)
+    {
+        audio_step();
+    };
+    printf("Move to first impulse at time %f\n", current_time);
 }
 
 __global__ void update_fixed_surface_kernel(ParticleGrid pg,
@@ -511,6 +556,7 @@ void RigidBody::export_surface_mesh(const std::string &output_path)
 {
     CHECK_DIR(output_path);
     Mesh surfaceMesh(tetVertices, tetSurfaces);
+    printf("export surface mesh to %s\n", output_path.c_str());
     surfaceMesh.writeOBJ(output_path + "/surface.obj");
 }
 
@@ -553,12 +599,19 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
     return;
 }
 
-void RigidBody::export_signal(const std::string &output_path)
+void RigidBody::export_signal(const std::string &output_path, float max_time)
 {
     CHECK_DIR(output_path);
     std::ofstream fout(output_path + "/signal.txt");
-    int frame_num = frameTime.last() / timestep;
+    std::ofstream force_out(output_path + "/force.txt");
+    int frame_num = max_time / timestep;
+    printf("frame_num: %d\n", frame_num);
     progressbar bar(frame_num, "exporting signal");
+    for (int i = 0; i < eigenVals.size(); i++)
+    {
+        force_out << eigenVals[i] / material.density << " ";
+    }
+    force_out << std::endl;
     for (int i = 0; i < frame_num; i++)
     {
         bar.update();
@@ -568,10 +621,50 @@ void RigidBody::export_signal(const std::string &output_path)
         {
             s += cpuQ[j];
         }
+        for (int j = 0; j < modalInfos.size(); j++)
+        {
+            force_out << modalInfos[j].f << " ";
+        }
+        force_out << std::endl;
         fout << s << std::endl;
     }
     fout.close();
+    force_out.close();
     std::cout << std::endl;
+    return;
+}
+
+void RigidBody::export_mesh_sequence(const std::string &output_path)
+{
+    current_time = 0;
+    CHECK_DIR(output_path);
+    float animation_export_timestep = 1.0f / 60.0f;
+    int frame_num = frameTime.last() / animation_export_timestep;
+    progressbar bar(frame_num - 1, "exporting mesh sequence");
+    for (int i = 1; i < frame_num; i++)
+    {
+        while (current_time < i * animation_export_timestep)
+        {
+            audio_step();
+        }
+        bar.update();
+        Mesh surfaceMesh(tetVertices, tetSurfaces);
+        surfaceMesh.remove_isolated_vertices();
+        surfaceMesh.writeOBJ(output_path + "/surface_" + std::to_string(i) + ".obj");
+    }
+    std::cout << std::endl;
+    return;
+}
+
+void RigidBody::export_surface_accs(const std::string &filename)
+{
+    std::ofstream fout(filename);
+    auto surf_accs = surfaceAccs.cpu();
+    for (int j = 0; j < surf_accs.size(); j++)
+    {
+        fout << surf_accs[j] << std::endl;
+    }
+    fout.close();
     return;
 }
 

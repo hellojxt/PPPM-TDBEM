@@ -22,13 +22,17 @@ int main()
     auto solver = empty_pppm(65);
 
     RenderElement re(solver->pg, "FDTD Test");
-    re.set_params({res / 2, 0, 0}, step_num, 0.02);
+    re.set_params({res / 2, 0, 0}, step_num, 0.005);
     SineSource s(5000 * 2 * M_PI);
 
+    int3 center_coord = make_int3(0, 5, 0);
+    int3 normal = make_int3(0, 1, 0);
+    solver->pg.fdtd.set_reflect_boundary(center_coord, normal, true);
     for (int i = 0; i < step_num; i++)
     {
         solver->pg.fdtd.step();
-        cuExecuteBlock(1, 1, set_center_signal, solver->pg.fdtd, s);
+        if (i < 20)
+            cuExecuteBlock(1, 1, set_center_signal, solver->pg.fdtd, s);
         re.assign(i, solver->pg.fdtd.grids[i]);
     }
     renderArray(re);

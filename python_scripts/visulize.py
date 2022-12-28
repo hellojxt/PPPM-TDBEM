@@ -16,7 +16,7 @@ col_layout = Layout(
 
 
 class viewer():
-    def __init__(self, vertices, elements, data, show_axis=False, title=''):
+    def __init__(self, vertices, elements, data=None, show_axis=False, title=''):
         '''
         Shape of parameters:
         vertices    [node_num, 3]
@@ -27,10 +27,13 @@ class viewer():
         self.show_axis = show_axis
         self.vertices, self.elements, self.data = vertices.T, elements.T, data
         self._in_batch_mode = False
-        self.items = [
-            self.init_data_selector(),
-            self.init_3D()
-        ]
+        if self.data is None:
+            self.items = [self.init_3D()]
+        else:
+            self.items = [
+                self.init_data_selector(),
+                self.init_3D()
+            ]
 
     @property
     def box(self):
@@ -54,22 +57,40 @@ class viewer():
     def init_3D(self):
         bound_max = self.vertices.max()
         bound_min = self.vertices.min()
-        self.fig = go.FigureWidget(data=[
-            go.Mesh3d(
-                x=self.vertices[0],
-                y=self.vertices[1],
-                z=self.vertices[2],
-                intensity=self.data[0],
-                intensitymode='cell',
-                colorscale='Jet',
-                i=self.elements[0],
-                j=self.elements[1],
-                k=self.elements[2],
-                showlegend=self.show_axis,
-                showscale=True,
+        if self.data is None:
+            self.fig = go.FigureWidget(data=[
+                go.Mesh3d(
+                    x=self.vertices[0],
+                    y=self.vertices[1],
+                    z=self.vertices[2],
+                    # intensity=self.data[0],
+                    # intensitymode='cell',
+                    # colorscale='Jet',
+                    i=self.elements[0],
+                    j=self.elements[1],
+                    k=self.elements[2],
+                    showlegend=self.show_axis,
+                    showscale=True,
+                )
+            ]
             )
-        ]
-        )
+        else:
+            self.fig = go.FigureWidget(data=[
+                go.Mesh3d(
+                    x=self.vertices[0],
+                    y=self.vertices[1],
+                    z=self.vertices[2],
+                    intensity=self.data[0],
+                    intensitymode='cell',
+                    colorscale='Jet',
+                    i=self.elements[0],
+                    j=self.elements[1],
+                    k=self.elements[2],
+                    showlegend=self.show_axis,
+                    showscale=True,
+                )
+            ]
+            )
         self.fig.layout.height = 500
         self.fig.layout.width = 1000
         self.fig.layout.autosize = False

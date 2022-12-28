@@ -19,6 +19,7 @@ namespace pppm
 #define LOG_DEBUG_COLOR "\033[1;34m"
 #define LOG_RESET_COLOR "\033[0m"
 #define LOG_BOLD_COLOR "\033[1m"
+#define CURRENT_TIME std::chrono::steady_clock::now()
 
 #define LOG_FILE std::cout
 #define LOG(x) LOG_FILE << x << std::endl;

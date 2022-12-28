@@ -15,7 +15,7 @@
 
 using namespace pppm;
 
-__global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp)
+__global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp, GArr<float> surface_accs)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= pppm.pg.triangles.size())
@@ -25,16 +25,23 @@ __global__ void set_boundary_value(PPPMSolver pppm, SineSource sine, MonoPole mp
     float dt = pppm.dt();
     if (SET_DIRICHLET)
         pppm.dirichlet[i][t] = (mp.dirichlet(p.center) * sine(dt * t)).real();
-    pppm.neumann[i][t] = (mp.neumann(p.center, p.normal) * sine(dt * t)).real();
+    if (t == 0)
+        pppm.neumann[i][t] = surface_accs[i];
+    else
+        pppm.neumann[i][t] = 0;
 }
 
 int main()
 {
     int res = 32;
     PPPMSolver *solver = empty_pppm(res);
-    auto filename = ASSET_DIR + std::string("sphere3.obj");
+    auto filename =
+        "/home/jxt/PPPM-TDBEM/experiments/rigidbody/output/lego/surface.obj";  // ASSET_DIR +
+                                                                               // std::string("sphere3.obj");
+    auto surface_accs_cpu = read_from_txt("/home/jxt/PPPM-TDBEM/experiments/rigidbody/output/lego/surface_accs.txt");
+    GArr<float> surface_accs(surface_accs_cpu);
     auto mesh = Mesh::loadOBJ(filename, true);
-    mesh.stretch_to(solver->size().x / 4.0f);
+    mesh.stretch_to(solver->size().x / 2.0f);
     LOG("stretch to " << mesh.get_scale())
     mesh.move_to(solver->center());
 
@@ -44,7 +51,7 @@ int main()
     int y_idx = res / 2;
     int z_idx = res / 2;
 
-    re.set_params(make_int3(0, 0, z_idx), ALL_STEP, 1.0f);
+    re.set_params(make_int3(0, 0, z_idx), ALL_STEP, 0.01f);
 
     auto sine = SineSource(2 * PI * 3000);
     float wave_number = sine.omega / AIR_WAVE_SPEED;
@@ -56,7 +63,7 @@ int main()
     {
         solver->pg.fdtd.step();
         solver->solve_fdtd_far();
-        cuExecute(solver->pg.triangles.size(), set_boundary_value, *solver, sine, mp);
+        cuExecute(solver->pg.triangles.size(), set_boundary_value, *solver, sine, mp, surface_accs);
         if (!SET_DIRICHLET)
             solver->update_dirichlet();
         solver->solve_fdtd_near();
@@ -92,5 +99,5 @@ int main()
     write_to_txt("analytic_signal.txt", analytic_result);
     re.update_mesh();
     // re.write_image(ALL_STEP / 2, "pppm.png");
-    // renderArray(re);
+    renderArray(re);
 }

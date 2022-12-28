@@ -53,12 +53,30 @@ class GhostCellSolver
             grid.init(min_pos_, grid_size_, grid_dim_, dt);
             cell_data.resize(grid_dim_, grid_dim_, grid_dim_);
             set_condition_number_threshold(25.0f);
+            linear_solver.cache_stored = false;
         };
 
-        void set_mesh(CArr<float3> &vertices_, CArr<int3> &triangles_)
+        template <typename T1, typename T2>
+        void set_mesh(T1 &vertices_, T2 &triangles_, bool log_time = false)
         {
+            START_TIME(log_time)
             grid.set_mesh(vertices_, triangles_);
-            grid.construct_grid();
+            LOG_TIME("set mesh")
+            precompute_cell_data(log_time);
+            LOG_TIME("precompute cell data")
+            precompute_ghost_matrix(log_time);
+            LOG_TIME("precompute ghost matrix")
+        }
+        template <typename T>
+        void update_mesh(T &verts_, bool log_time = false)
+        {
+            START_TIME(log_time)
+            grid.update_mesh(verts_);
+            LOG_TIME("update mesh")
+            precompute_cell_data(log_time);
+            LOG_TIME("precompute cell data")
+            precompute_ghost_matrix(log_time);
+            LOG_TIME("precompute ghost matrix")
         }
 
         void set_boundary_condition(CArr<float> neuuman_condition) { neuuman_data.assign(neuuman_condition); }
@@ -70,6 +88,19 @@ class GhostCellSolver
         void precompute_ghost_matrix(bool log_time = false);  // caclulate ghost matrix and p_weight matrix
 
         void solve_ghost_cell(bool log_time = false);  // update right hand side of ghost cell solver and solve it
+
+        void update(CArr<float> neuuman_condition, bool log = false)
+        {
+            START_TIME(log)
+            set_boundary_condition(neuuman_condition);
+            solve_ghost_cell();
+            LOG_TIME("solve ghost cell")
+            grid.fdtd.step();
+            set_solid_cell_zero();
+            LOG_TIME("fdtd step")
+        }
+
+        void set_solid_cell_zero();
 
         CGPU_FUNC float inline dt() { return grid.fdtd.dt; }
 
@@ -98,7 +129,8 @@ class GhostCellSolver
             ghost_cells.clear();
             ghost_order.clear();
             neuuman_data.clear();
-            linear_solver.clear();
+            if (condition_number_threshold > 0)
+                linear_solver.clear();
         }
 
         GArr3D<CellInfo> cell_data;

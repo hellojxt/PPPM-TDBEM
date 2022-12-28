@@ -14,7 +14,7 @@
 #include "ghost_cell.h"
 
 #define ALL_TIME 0.02f
-#define OUTPUT_DIR (EXP_DIR + std::string("sphere/output/"))
+#define OUTPUT_DIR (EXP_DIR + std::string("static/output/"))
 #define USE_UI
 #define UI_FRAME_NUM 256
 using namespace pppm;

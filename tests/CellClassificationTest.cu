@@ -11,10 +11,10 @@ struct view_transformer
             if (x.type == SOLID)
                 return 0.0f;  // green for solid
             if (x.type == GHOST)
-                return 1.0f / (x.nearst_distance + 0.005);  // light red for ghost
+                return 1.0f;  // red for ghost
             if (x.type == AIR)
-                return -1.0f / (x.nearst_distance + 0.005);  // light blue for air
-            return -MAX_FLOAT;                               // blue for UNKNOWN
+                return -1.0f;  // blue for air
+            return 0.5f;       // yellow unknown
         }
 };
 
@@ -26,7 +26,7 @@ void view_cell_data(GhostCellSolver *solver)
                       view_transformer());
 
     RenderElement re(solver->grid, "distance");
-    re.set_params(make_int3(0, 0, 32), 1, 1 / solver->grid_size());
+    re.set_params(make_int3(0, 0, 32), 1, 1.0f);
     re.assign(0, view_data);
     re.update_mesh();
     re.write_image(0, EXP_DIR + std::string("test/cell_classification.png"));
