@@ -6,18 +6,39 @@
 #include "macro.h"
 #include <filesystem>
 #include "material.h"
+#include <deque>
 
 namespace pppm
 {
+
+#define CONTACT_TIME_SCALE 0.00005f
+
 struct Impulse
 {
         float currTime;
         int vertexID;
         float3 impulseVec;
-        float3 impactPosition;      // in object space
-        float supportLength = 0.0;  // tau
-        float gamma;                // gamma = pi * norm(J) / (2 tau)
-        float contactSpeed = 0.0;
+        float impulseRelativeSpeed;
+};
+
+class ImpulseSine
+{
+    public:
+        Impulse imp;
+        ImpulseSine(Impulse imp_) : imp(imp_) {}
+        inline float amp(float time)
+        {
+            float tau = (CONTACT_TIME_SCALE / pow(abs(imp.impulseRelativeSpeed), 0.2));
+            float signal = sin(M_PI * (time - imp.currTime) / tau) / tau;
+            if (isnan(signal))
+            {
+                printf("tau: %f, time: %f, currTime: %f, sin: %f, amp: %f\n", tau, time, imp.currTime,
+                       sin(M_PI * (time - imp.currTime) / tau), signal);
+                printf("pow(imp.impulseRelativeSpeed, 0.2): %f\n", pow(imp.impulseRelativeSpeed, 0.2));
+            }
+            return signal;
+        }
+        inline bool dead(float time) { return time - imp.currTime > CONTACT_TIME_SCALE; }
 };
 
 struct ModalInfo
@@ -127,7 +148,7 @@ class RigidBody
         CArr<float> cpuQ;
         GArr<float> gpuQ;
         CArr<ModalInfo> modalInfos;
-
+        std::deque<ImpulseSine> currentImpulseSines;
         GArr<float3> vertAccs;
         GArr<float> surfaceAccs;
         bool mesh_is_updated;  // used after audio_step is called

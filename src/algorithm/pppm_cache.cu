@@ -4,13 +4,24 @@
 
 namespace pppm
 {
+GPU_FUNC bool triangle_in_grid_cell(ParticleGrid &pg, Triangle &tri, int3 grid_coord)
+{
+    // float3 nearst_point = get_nearest_triangle_point(pg.getCenter(grid_coord), pg.vertices[tri.indices.x],
+    //                                                  pg.vertices[tri.indices.y], pg.vertices[tri.indices.z]);
+    // float3 grid_center = pg.getCenter(grid_coord);
+    // return abs(nearst_point.x - grid_center.x) < pg.grid_size / 2 &&
+    //        abs(nearst_point.y - grid_center.y) < pg.grid_size / 2 &&
+    //        abs(nearst_point.z - grid_center.z) < pg.grid_size / 2;
+    return (tri.grid_coord.x == grid_coord.x) && (tri.grid_coord.y == grid_coord.y) &&
+           (tri.grid_coord.z == grid_coord.z);
+}
 
 template <typename T>
 GPU_FUNC inline void
 add_grid_near_field(ParticleGrid &pg, TDBEM &bem, LayerWeight<T> &w, int src_face_id, int3 dst, float scale, int offset)
 {
     Triangle &tri = pg.triangles[src_face_id];
-    if (tri.grid_coord.x == dst.x && tri.grid_coord.y == dst.y && tri.grid_coord.z == dst.z)
+    if (triangle_in_grid_cell(pg, tri, dst))
         return;
     float3 dst_point = pg.getCenter(dst);  // use the center of the grid cell as destination point
     LayerWeight<T> w_current;
@@ -80,7 +91,7 @@ __global__ void update_grid_cache_kernel(GridCache gc, ParticleGrid pg, TDBEM be
     float dst_scale[8] = {2, scale, scale, scale, scale, scale, scale, -6 * scale};
     for (int i = 0; i < 8; i++)
     {
-        if (dst_coord[i].x != tri_coord.x || dst_coord[i].y != tri_coord.y || dst_coord[i].z != tri_coord.z)
+        if (!triangle_in_grid_cell(pg, tri, dst_coord[i]))
         {
             dst.data[dst.size] = pg.getCenter(dst_coord[i]);
             dst.scale[dst.size] = dst_scale[i];

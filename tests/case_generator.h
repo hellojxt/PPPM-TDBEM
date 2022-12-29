@@ -9,8 +9,8 @@ using namespace pppm;
 static PPPMSolver *empty_pppm(int res)
 {
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    float grid_size = 0.001875f;
-    float dt = 2e-6f;
+    float grid_size = 0.005;
+    float dt = 8e-6f;
     PPPMSolver *pppm = new PPPMSolver(res, grid_size, dt);
     return pppm;
 }
@@ -40,6 +40,31 @@ static PPPMSolver *random_pppm(int triangle_count, int res = 64)
         float3 v2 = make_float3(0.0f, 1.0f, 0.0f) * RAND_F * RAND_SIGN;
         float3 offset = make_float3(RAND_F, RAND_F, RAND_F) * make_float3(pppm->res() - 8) * pppm->pg.grid_size +
                         make_float3(4.0f, 4.0f, 4.0f) * pppm->pg.grid_size;
+        vertices[i * 3 + 0] = v0 * pppm->pg.grid_size + offset;
+        vertices[i * 3 + 1] = v1 * pppm->pg.grid_size + offset;
+        vertices[i * 3 + 2] = v2 * pppm->pg.grid_size + offset;
+        triangles[i] = make_int3(i * 3 + 0, i * 3 + 1, i * 3 + 2);
+    }
+    pppm->set_mesh(vertices, triangles);
+    return pppm;
+}
+
+static PPPMSolver *regular_random_pppm(int triangle_count, int res = 64)
+{
+    PPPMSolver *pppm = empty_pppm(res);
+    CArr<float3> vertices;
+    CArr<int3> triangles;
+    vertices.resize(triangle_count * 3);
+    triangles.resize(triangle_count);
+    for (int i = 0; i < triangle_count; i++)
+    {
+        float3 v0 = make_float3(0.0f, 0.0f, 0.1f) * RAND_F * RAND_SIGN;
+        float3 v1 = make_float3(0.1f, 0.0f, 0.0f) * RAND_F * RAND_SIGN;
+        float3 v2 = make_float3(0.0f, 0.1f, 0.0f) * RAND_F * RAND_SIGN;
+        float3 offset =
+            make_float3(RAND_I(0, pppm->res() - 9), RAND_I(0, pppm->res() - 9), RAND_I(0, pppm->res() - 9)) *
+                pppm->pg.grid_size +
+            make_float3(4.5f, 4.5f, 4.5f) * pppm->pg.grid_size;
         vertices[i * 3 + 0] = v0 * pppm->pg.grid_size + offset;
         vertices[i * 3 + 1] = v1 * pppm->pg.grid_size + offset;
         vertices[i * 3 + 2] = v2 * pppm->pg.grid_size + offset;
@@ -87,7 +112,7 @@ static PPPMSolver *point_pppm(int res = 64)
 
 static GhostCellSolver *empty_ghost_cell_solver(int res)
 {
-    float3 min_pos = make_float3(2.0f, 2.0f, 2.0f);
+    float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
     float grid_size = 0.005;
     float dt = 8e-6f;
     GhostCellSolver *solver = new GhostCellSolver(min_pos, grid_size, res, dt);

@@ -10,9 +10,9 @@ namespace pppm
 {
 void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &material)
 {
-    float lambda = eigenVal;
-    float omega = std::sqrt(lambda / material.density);
-    float ksi = (material.alpha + material.beta * lambda / material.density) / (2 * omega);
+    float lambda = eigenVal / material.density;
+    float omega = std::sqrt(lambda);
+    float ksi = (material.alpha + material.beta * lambda) / (2 * omega);
     float omega_prime = omega * std::sqrt(1 - ksi * ksi);
     float epsilon = std::exp(-ksi * omega * timestep);
     float sqrEpsilon = epsilon * epsilon;
@@ -150,7 +150,7 @@ void RigidBody::LoadImpulses_(const std::string &impulsePath)
         imp.currTime = static_cast<float>(currTime);
         imp.vertexID = vertex_map[vertexID];
         imp.impulseVec = make_float3(impulse.x, impulse.y, impulse.z);
-        imp.contactSpeed = static_cast<float>(relativeSpeed);
+        imp.impulseRelativeSpeed = static_cast<float>(relativeSpeed);
         impulses.pushBack(imp);
         lastTime = currTime;
         cnt++;
@@ -336,6 +336,7 @@ void RigidBody::InitIIR_()
     vertAccs.resize(tetVertices.size());
     modalMatrix.assign(eigenVecs);
     update_surf_matrix();
+    currentImpulseSines.clear();
     return;
 }
 
@@ -392,21 +393,34 @@ void RigidBody::CalculateIIR_()
 
     float currTime = current_time;
     int size = modalInfos.size();
-    for (int i = 0; i < size; i++)
-    {
-        modalInfos[i].f = 0;
-    }
     while (impulseTimeStamp < impulses.size() && currTime >= impulses[impulseTimeStamp].currTime)
     {
         int id = impulses[impulseTimeStamp].vertexID;
         float3 currImpluse = impulses[impulseTimeStamp].impulseVec;
-        for (int i = 0; i < size; i++)
+        currentImpulseSines.push_back(ImpulseSine(impulses[impulseTimeStamp]));
+        // for (int i = 0; i < size; i++)
+        // {
+        //     modalInfos[i].f += eigenVecs(id * 3, i) * currImpluse.x + eigenVecs(id * 3 + 1, i) * currImpluse.y +
+        //                        eigenVecs(id * 3 + 2, i) * currImpluse.z;
+        // }
+        impulseTimeStamp++;
+    };
+    while (currentImpulseSines.size() > 0 && currentImpulseSines[0].dead(currTime))
+    {
+        currentImpulseSines.erase(currentImpulseSines.begin());
+    }
+
+    for (int i = 0; i < size; i++)
+    {
+        modalInfos[i].f = 0;
+        for (int j = 0; j < currentImpulseSines.size(); j++)
         {
+            int id = currentImpulseSines[j].imp.vertexID;
+            float3 currImpluse = currentImpulseSines[j].imp.impulseVec * currentImpulseSines[j].amp(currTime);
             modalInfos[i].f += eigenVecs(id * 3, i) * currImpluse.x + eigenVecs(id * 3 + 1, i) * currImpluse.y +
                                eigenVecs(id * 3 + 2, i) * currImpluse.z;
         }
-        impulseTimeStamp++;
-    };
+    }
 
     for (int i = 0; i < size; i++)
     {
@@ -611,6 +625,7 @@ void RigidBody::export_signal(const std::string &output_path, float max_time)
     {
         force_out << eigenVals[i] / material.density << " ";
     }
+    fout << sample_rate << std::endl;
     force_out << std::endl;
     for (int i = 0; i < frame_num; i++)
     {

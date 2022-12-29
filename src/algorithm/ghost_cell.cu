@@ -36,8 +36,9 @@ GPU_FUNC inline int3 get_base_coord_for_reflect(CellInfo ghost_cell, GhostCellSo
     //     printf("grid_dim: %d\n", solver.grid.grid_dim);
     //     printf("min_pos: %f %f %f\n", solver.grid.min_pos.x, solver.grid.min_pos.y, solver.grid.min_pos.z);
     // }
-    assert(offset.x >= -EPS && offset.y >= -EPS && offset.z >= -EPS && offset.x <= grid_size + EPS &&
-           offset.y <= grid_size + EPS && offset.z <= grid_size + EPS);
+    float eps = grid_size * 1e-3;
+    assert(offset.x >= -eps && offset.y >= -eps && offset.z >= -eps && offset.x <= grid_size + eps &&
+           offset.y <= grid_size + eps && offset.z <= grid_size + eps);
 
 #endif
     return base_coord;

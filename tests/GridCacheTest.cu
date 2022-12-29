@@ -16,7 +16,7 @@ using Catch::Approx;
 TEST_CASE("GridCache", "[gc]")
 {
     using namespace pppm;
-    PPPMSolver *solver = random_pppm(256);
+    PPPMSolver *solver = regular_random_pppm(256);
 
     auto dirichlet = solver->dirichlet.cpu();
     for (int t_idx = 0; t_idx < STEP_NUM; t_idx++)
