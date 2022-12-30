@@ -189,6 +189,17 @@ class LayerWeightHalf
                 double_layer[i] = other.double_layer[i] / max_double_layer_abs;
             }
         }
+
+        inline CGPU_FUNC void to_float(LayerWeight<float> &other)
+        {
+#pragma unroll
+            for (int i = 0; i < STEP_NUM; i++)
+            {
+                other.single_layer[i] = (float)single_layer[i] * max_single_layer_abs;
+                other.double_layer[i] = (float)double_layer[i] * max_double_layer_abs;
+            }
+        }
+
         inline CGPU_FUNC float convolution(History &neumann, History &dirichlet, int t)
         {
             float result = 0;

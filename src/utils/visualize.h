@@ -126,6 +126,7 @@ static inline void save_grid(ParticleGrid &grid, std::string filename, float max
 
 static inline void save_all_grid(ParticleGrid &grid, std::string filename, float max_value = 1.0f)
 {
+    CHECK_DIR(filename)
     for (int i = 1; i < grid.grid_dim; i++)
     {
         RenderElement e(grid, "save");

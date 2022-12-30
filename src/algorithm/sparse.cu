@@ -519,13 +519,24 @@ void BiCGSTAB_Solver::solve(GArr<float> &b, GArr<float> &x, int maxIterations, f
         thrust::transform_reduce(thrust::device, b.begin(), b.end(), square(), 0.0f, thrust::plus<float>()) / b.size());
     if (b_norm == 0.0f)
         return;
+    // printf("b_norm = %f\n", b_norm);
     // b = b / b_norm
     thrust::transform(thrust::device, b.begin(), b.end(), b.begin(), multiply(1.0f / b_norm));
     CHECK_CUSPARSE(cusparseCreateDnVec(&d_B.vec, b.size(), d_B.ptr, CUDA_R_32F))
     CHECK_CUSPARSE(cusparseCreateDnVec(&d_X.vec, b.size(), d_X.ptr, CUDA_R_32F))
+    // auto b_cpu = b.cpu();
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     printf("b[%d] = %f\n", i, b_cpu[i]);
+    // }
     int converge_iter_num =
         solve_BiCGStab_cusparse(cublasHandle, cusparseHandle, b.size(), matA, matM_lower, matM_upper, d_B, d_X, d_R0,
                                 d_R, d_P, d_P_aux, d_S, d_S_aux, d_V, d_T, d_tmp, d_bufferMV, maxIterations, tolerance);
+    // auto x_cpu = x.cpu();
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     printf("x[%d] = %f\n", i, x_cpu[i]);
+    // }
     // #ifndef NDEBUG
     //     std::cout << "BiCGStab converged in " << converge_iter_num << " iterations" << std::endl;
     // #endif

@@ -12,26 +12,23 @@ import pymesh
 
 def fix_mesh(mesh, detail):
     print("Fixing mesh...")
-    bbox_min, bbox_max = mesh.bbox
-    diag_len = norm(bbox_max - bbox_min)
-    target_len = diag_len * float(detail)
+    target_len = float(detail)
     count = 0
     old_vertices_num = mesh.num_vertices
     old_faces_num = mesh.num_faces
     mesh, __ = pymesh.remove_degenerated_triangles(mesh, 100)
-    mesh, __ = pymesh.split_long_edges(mesh, target_len)
     num_vertices = mesh.num_vertices
     while True:
-        mesh, __ = pymesh.collapse_short_edges(mesh, 1e-6)
-        mesh, __ = pymesh.collapse_short_edges(mesh, target_len,
+        mesh, __ = pymesh.collapse_short_edges(mesh, target_len / 2,
                                                preserve_feature=True)
+        mesh, __ = pymesh.split_long_edges(mesh, target_len)
         mesh, __ = pymesh.remove_obtuse_triangles(mesh, 150.0, 100)
         if mesh.num_vertices == num_vertices:
             break
 
         num_vertices = mesh.num_vertices
         count += 1
-        if count > 10:
+        if count > 20:
             break
     mesh = pymesh.resolve_self_intersection(mesh)
     mesh, __ = pymesh.remove_duplicated_faces(mesh)

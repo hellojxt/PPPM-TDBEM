@@ -145,7 +145,7 @@ void Analytical_test(SineSource &sine, MonoPole &mp, float3 check_point, int all
     write_to_txt(dirname + "analytical_solution.txt", analytical_solution);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035};
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
@@ -153,8 +153,12 @@ int main()
     auto filename = ASSET_DIR + obj_name;
     auto mesh = Mesh::loadOBJ(filename, true);
     auto check_point = make_float3(0.25f, 0.0f, 0.0f);
-
-    float scale = 4.5f;
+    // get scale from argv[0]
+    float scale;
+    if (argc > 1)
+        scale = std::stof(argv[1]);
+    else
+        scale = 4.0f;
     for (auto grid_size : grid_size_list)
     {
         float dt = grid_size / (std::sqrt(3) * AIR_WAVE_SPEED * 1.1);

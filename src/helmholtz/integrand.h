@@ -252,5 +252,15 @@ face2PointIntegrand(const float3 *vertices, int3 src, TargetCoordArray &trg, cpx
     float3 src_v[3] = {{vertices[src.x]}, {vertices[src.y]}, {vertices[src.z]}};
     float src_jacobian = jacobian(src_v);
     return potential_integrand(trg, src_v, src_jacobian, k, type);
+    // float3 src_v[3] = {{vertices[src.x]}, {vertices[src.y]}, {vertices[src.z]}};
+    // float src_jacobian = jacobian(src_v);
+    // cpx result = cpx(0, 0);
+    // float guass_x[2] = {0.3333333333333330, 0.3333333333333330};
+    // float guass_w[1] = {1.0f};
+    // float3 src_norm = triangle_norm(src_v);
+    // float3 v_in_tri = local_to_global(guass_x[0], guass_x[1], src_v);
+    // result += 0.5 * guass_w[0] * src_jacobian * layer_potential(v_in_tri, trg, src_norm, k, type);
+    // return result;
 }
+
 }  // namespace pppm

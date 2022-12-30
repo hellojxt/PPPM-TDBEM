@@ -92,12 +92,12 @@ class GhostCellSolver
         void update(CArr<float> neuuman_condition, bool log = false)
         {
             START_TIME(log)
-            set_boundary_condition(neuuman_condition);
-            solve_ghost_cell();
-            LOG_TIME("solve ghost cell")
             grid.fdtd.step();
             set_solid_cell_zero();
             LOG_TIME("fdtd step")
+            set_boundary_condition(neuuman_condition);
+            solve_ghost_cell();
+            LOG_TIME("solve ghost cell")
         }
 
         void set_solid_cell_zero();

@@ -180,16 +180,6 @@ __global__ void update_interpolation_weight_kernel(FaceCache pc, ParticleGrid pg
         pc.interpolation_weight(idx, i) = w[i];
 }
 
-// angle between two vectors
-GPU_FUNC inline float angle_between(float3 normal1, float3 normal2)
-{
-    float dot = normal1.x * normal2.x + normal1.y * normal2.y + normal1.z * normal2.z;
-    float det = normal1.x * normal2.y * normal2.z + normal1.y * normal2.x * normal2.z +
-                normal1.z * normal2.x * normal2.y - normal1.x * normal2.y * normal2.z -
-                normal1.y * normal2.x * normal2.z - normal1.z * normal2.x * normal2.y;
-    return atan2(det, dot);
-}
-
 __global__ void compute_face_compute_list_kernel(FaceCache pc, ParticleGrid pg)
 {
     int base_coord_idx = blockIdx.x;
@@ -210,8 +200,8 @@ __global__ void compute_face_compute_list_kernel(FaceCache pc, ParticleGrid pg)
         auto &neighbor_face = pg.triangles[neighbor_face_idx];
         int center_face_idx = center_triangle_list[center_i];
         auto &center_face = pg.triangles[center_face_idx];
-        int normal_angle = angle_between(neighbor_face.normal, center_face.normal);
-        int distance = length(neighbor_face.center - center_face.center);
+        float normal_angle = dot(neighbor_face.normal, center_face.normal);
+        float distance = length(neighbor_face.center - center_face.center);
         auto &e = pc.get_cache_element_with_check(center_face_idx, neighbor_face_idx);
         int index = center_face_idx * PARTICLE_CACHE_SIZE + neighbor_i;
         pc.recompute_list[index].src_idx = neighbor_face_idx;
@@ -290,6 +280,10 @@ void FaceCache::update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_
     recompute_list.remove_zeros();
     recompute_list.sort();
     LOG_TIME("compute face compute list")
+    if (log_time)
+    {
+        LOG("recompute list size: " << recompute_list.size());
+    }
     cuExecute(recompute_list.size(), update_particle_cache_kernel, *this, pg, bem);
     LOG_TIME("update particle cache")
 }

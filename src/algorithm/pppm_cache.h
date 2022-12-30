@@ -122,8 +122,9 @@ class FaceCache
 
         CGPU_FUNC bool need_recompute(const CacheElement &old, const float normal_angle, const float distance)
         {
-            return (abs(old.normal_angle - normal_angle) > RECOMPUTE_THRESHOLD * 2 * M_PI ||
-                    abs(old.distance - distance) > RECOMPUTE_THRESHOLD * distance);
+            bool ret = (abs(old.normal_angle - normal_angle) > RECOMPUTE_THRESHOLD ||
+                        abs(old.distance - distance) > RECOMPUTE_THRESHOLD * distance);
+            return ret;
         }
 
         GPU_FUNC CacheElement &get_cache_element_with_check(int i, int j)

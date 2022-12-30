@@ -23,7 +23,7 @@ void test_PPPM()
     std::string OUT_DIR = EXP_DIR + std::string("rigidbody/output/") + obj_name + "/pppm";
     float3 grid_center = make_float3(0.0, 0.08, 0.015);
     float grid_length = 0.005 * 50;
-    int res = 40;
+    int res = 20;
     float grid_size = grid_length / res;
     int boundary_size = 5;
     float3 min_pos = grid_center - grid_length / 2 - grid_size * boundary_size;
@@ -42,14 +42,14 @@ void test_PPPM()
     float3 reflect_center = make_float3(0, -grid_size, 0);
     int3 reflect_coord = solver.pg.getGridCoord(reflect_center);
     int3 reflect_normal = make_int3(0, 1, 0);
-    solver.pg.fdtd.set_reflect_boundary(reflect_coord, reflect_normal);
+    // solver.pg.fdtd.set_reflect_boundary(reflect_coord, reflect_normal);
 
     RigidBody rigidbody(DATASET_DIR + obj_name, frame_rate, "polystyrene");
-    rigidbody.fix_mesh(2e-2, OUT_DIR);
+    rigidbody.fix_mesh(grid_size, OUT_DIR);
     // rigidbody.export_surface_mesh(OUT_DIR);
     rigidbody.move_to_first_impulse();
     int frame_num = (max_time - rigidbody.current_time) / dt;
-    auto IMG_DIR = OUT_DIR + "/img_pppm/";
+    auto IMG_DIR = OUT_DIR + "/img/";
     CHECK_DIR(IMG_DIR)
     int3 check_coord = make_int3(res - boundary_size);
     CArr<float> resultPPPM(frame_num + 2);
@@ -67,7 +67,7 @@ void test_PPPM()
             solver.set_mesh(rigidbody.tetVertices, rigidbody.tetSurfaces);
         }
         rigidbody.audio_step();
-        // if (bar.get_progress() < 50800)
+        // if (bar.get_progress() < 20000)
         // {
         //     bar.update();
         //     continue;
@@ -83,13 +83,13 @@ void test_PPPM()
         solver.update_grid_and_face(rigidbody.surfaceAccs);
         resultPPPM[bar.get_progress() + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         bar.update();
-        // if (bar.get_progress() <= 50826 && bar.get_progress() >= 50820)
-        // {
-        //     auto sub_img_dir = IMG_DIR + "grid" + std::to_string(bar.get_progress()) + "/";
-        //     CHECK_DIR(sub_img_dir)
-        //     save_all_grid(solver.pg, sub_img_dir, 100);
-        // }
-        // if (bar.get_progress() == 50826)
+        if (bar.get_progress() <= 31005 && bar.get_progress() >= 31000)
+        {
+            auto sub_img_dir = IMG_DIR + "grid" + std::to_string(bar.get_progress()) + ".png";
+            // CHECK_DIR(sub_img_dir)
+            save_grid(solver.pg, sub_img_dir, 100);
+        }
+        // if (bar.get_progress() == 33000)
         //     break;
     }
     std::cout << "Done" << std::endl;
@@ -119,11 +119,11 @@ void test_Ghost()
     printf("frame rate: %d\n", frame_rate);
 
     GhostCellSolver ghost_cell_solver(min_pos, grid_size, res, dt);
-    ghost_cell_solver.set_condition_number_threshold(10);
+    ghost_cell_solver.set_condition_number_threshold(15);
     float3 reflect_center = make_float3(0, -grid_size / 2, 0);
     int3 reflect_coord = ghost_cell_solver.grid.getGridCoord(reflect_center);
     int3 reflect_normal = make_int3(0, 1, 0);
-    ghost_cell_solver.grid.fdtd.set_reflect_boundary(reflect_coord, reflect_normal);
+    // ghost_cell_solver.grid.fdtd.set_reflect_boundary(reflect_coord, reflect_normal);
 
     RigidBody rigidbody(DATASET_DIR + obj_name, frame_rate, "polystyrene");
     rigidbody.fix_mesh(2e-2, OUT_DIR);
@@ -180,8 +180,8 @@ void test_Ghost()
 int main()
 {
     CHECK_DIR(EXP_DIR + std::string("rigidbody/output/") + obj_name);
-    // test_PPPM();
-    test_Ghost();
+    test_PPPM();
+    // test_Ghost();
     // RigidBody rigidbody(DATASET_DIR + obj_name, 44100, "polystyrene");
     // rigidbody.export_signal(EXP_DIR + std::string("rigidbody/output/") + obj_name + "/ghost", 2.5);
     // rigidbody.export_mesh_with_modes(EXP_DIR + std::string("rigidbody/output/") + obj_name + "/ghost");

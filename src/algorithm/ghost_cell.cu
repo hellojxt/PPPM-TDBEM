@@ -121,7 +121,18 @@ __global__ void precompute_p_weight_kernel(SVDResult svd_result, GhostCellSolver
     int ghost_idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (ghost_idx >= solver.ghost_cell_num)
         return;
-    float condition_num = svd_result.S(ghost_idx, 0) / svd_result.S(ghost_idx, GHOST_CELL_NEIGHBOR_NUM - 1);
+    float max_singular_value = 0;
+    float min_singular_value = MAX_FLOAT;
+    for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
+    {
+        float singular_value = svd_result.S(ghost_idx, i);
+        if (singular_value > max_singular_value)
+            max_singular_value = singular_value;
+        if (singular_value < min_singular_value)
+            min_singular_value = singular_value;
+    }
+    float condition_num = max_singular_value / min_singular_value;
+
     // printf("condition_num: %f , threshold: %f\n", condition_num, solver.condition_number_threshold);
     if (condition_num > solver.condition_number_threshold)
     {
@@ -147,6 +158,15 @@ __global__ void precompute_p_weight_kernel(SVDResult svd_result, GhostCellSolver
             for (int j = 0; j < GHOST_CELL_NEIGHBOR_NUM; j++)
             {
                 sum += svd_result.inv_A(ghost_idx, j, i) * phi_r[j];
+            }
+            if (isnan(sum))
+            {
+                solver.ghost_order[ghost_idx] = AccuracyOrder::FIRST_ORDER;
+                for (int k = 0; k < GHOST_CELL_NEIGHBOR_NUM; k++)
+                {
+                    solver.p_weight(ghost_idx, i) = 0;
+                }
+                return;
             }
             solver.p_weight(ghost_idx, i) = sum;
         }
@@ -290,6 +310,12 @@ __global__ void update_ghost_cell_kernel(GArr<float> x, GhostCellSolver solver)
     if (ghost_idx >= solver.ghost_cell_num)
         return;
     int3 ghost_cell_coord = solver.ghost_cells[ghost_idx];
+    if (abs(x[ghost_idx]) > 1e3)
+    {
+        printf("t = %d\n", solver.grid.fdtd.t);
+        printf("x[%d] = %f at (%d, %d, %d)\n", ghost_idx, x[ghost_idx], ghost_cell_coord.x, ghost_cell_coord.y,
+               ghost_cell_coord.z);
+    }
     solver.grid.fdtd.grids[solver.grid.fdtd.t](ghost_cell_coord) = x[ghost_idx];
 }
 
@@ -306,7 +332,7 @@ void GhostCellSolver::solve_ghost_cell(bool log_time)
     }
     else
     {
-        linear_solver.solve(b, x, 100);
+        linear_solver.solve(b, x);
         cuExecute(ghost_cell_num, update_ghost_cell_kernel, x, *this);
         LOG_TIME("Solve equation for ghost cell")
     }
