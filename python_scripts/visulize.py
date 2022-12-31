@@ -16,16 +16,17 @@ col_layout = Layout(
 
 
 class viewer():
-    def __init__(self, vertices, elements, data=None, show_axis=False, title=''):
+    def __init__(self, vertices, elements, data=None, show_axis=False, title='', intensitymode='cell'):
         '''
         Shape of parameters:
         vertices    [node_num, 3]
         elements    [triangle_num, 3]
-        data        [feature_num, triangle_num]
+        data        [feature_num, triangle_num] or [feature_num, node_num]
         '''
         self.title = title
         self.show_axis = show_axis
         self.vertices, self.elements, self.data = vertices.T, elements.T, data
+        self.intensitymode = intensitymode
         self._in_batch_mode = False
         if self.data is None:
             self.items = [self.init_3D()]
@@ -81,7 +82,7 @@ class viewer():
                     y=self.vertices[1],
                     z=self.vertices[2],
                     intensity=self.data[0],
-                    intensitymode='cell',
+                    intensitymode=self.intensitymode,
                     colorscale='Jet',
                     i=self.elements[0],
                     j=self.elements[1],
@@ -127,7 +128,7 @@ class viewer():
 
     def init_data_selector(self):
         self.int_range = IntSlider(min=0, max=len(
-            self.data)-1, step=1, value=0, layout=Layout(flex='3 1 auto'), description="Mode Index")
+            self.data) - 1, step=1, value=0, layout=Layout(flex='3 1 auto'), description="Mode Index")
 
         def select(change):
             self.fig.data[0].intensity = self.data[self.int_range.value]
