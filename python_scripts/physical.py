@@ -61,8 +61,6 @@ class PhysicalAnimation():
         self.animation_rate = 1.0 / fps
         camTargetPos = np.array(
             np.matrix(render_config['camtargetpos'])).ravel()
-        self.cameraPos = np.array(
-            np.matrix(render_config['camerapos'])).ravel()
         yaw = float(render_config['yaw'])
         pitch = float(render_config['pitch'])
         roll = float(render_config['roll'])
