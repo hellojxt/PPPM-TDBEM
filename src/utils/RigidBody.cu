@@ -10,7 +10,7 @@ namespace pppm
 {
 void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &material)
 {
-    float lambda = eigenVal / material.density;
+    float lambda = eigenVal;
     float omega = std::sqrt(lambda);
     float ksi = (material.alpha + material.beta * lambda) / (2 * omega);
     float omega_prime = omega * std::sqrt(1 - ksi * ksi);
@@ -23,68 +23,49 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &ma
 
     float coeff3_item1 = epsilon * std::cos(theta + gamma);
     float coeff3_item2 = sqrEpsilon * std::cos(2 * theta + gamma);
-    coeff3 = 2 * (coeff3_item1 - coeff3_item2) / (3 * omega * material.density * omega_prime);
+    coeff3 = 2 * (coeff3_item1 - coeff3_item2) / (3 * omega * omega_prime);
     return;
 }
 
-void RigidBody::load_data(const std::string &objPath,
-                          const std::string &displacementPath,
-                          const std::string &implusePath,
-                          const std::string &eigenPath,
-                          const std::string &tetPath)
+void RigidBody::load_data(const std::string &data_dir)
 {
-    mesh = Mesh::loadOBJ(objPath);
     impulseTimeStamp = 0;
-    LoadDisplacement_(displacementPath);
-    LoadImpulses_(implusePath);
-    LoadTetMesh_(tetPath);
-    LoadEigen_(eigenPath);
+    LoadMotion_(std::filesystem::path(data_dir) / "motion.txt");
+    LoadImpulses_(std::filesystem::path(data_dir) / "contact.txt");
+    LoadTetMesh_(std::filesystem::path(data_dir) / "vertices.txt", std::filesystem::path(data_dir) / "tets.txt");
+    LoadEigen_(std::filesystem::path(data_dir) / "eigenvalues.txt",
+               std::filesystem::path(data_dir) / "eigenvectors.txt");
     InitIIR_();
     current_time = 0;
     animationTimeStamp = 0;
 }
 
-void RigidBody::LoadDisplacement_(const std::string &displacementPath)
+void RigidBody::LoadMotion_(const std::string &displacementPath)
 {
-    std::ifstream fin(displacementPath, std::ios::binary);
+    std::ifstream fin(displacementPath);
 
-    double currTime = 0;
-    double3 currTranslation;
-    double4 currRotation;
-    int termination = 0;
-    int cnt = 0;
-    int omit = 0;
+    float currTime = 0;
+    float3 currTranslation;
+    float4 currRotation;
     CArr<float3> cpuTranslations;
     CArr<float4> cpuRotations;
 
-    while (true)
+    if (!fin.good())
     {
-        fin.read(reinterpret_cast<char *>(&currTime), sizeof(double));
-
-        if (fin.eof())
-            break;
-        else if (!fin.good())
-        {
-            LOG_ERROR("Fail to load displacement file.\n");
-            std::exit(EXIT_FAILURE);
-        }
-
-        frameTime.pushBack(static_cast<float>(currTime));
-
-        fin.read(reinterpret_cast<char *>(&omit), sizeof(int));
-        assert(fin.good());
-
-        fin.read(reinterpret_cast<char *>(&currTranslation), sizeof(double) * 3);
-        assert(fin.good());
-        cpuTranslations.pushBack(make_float3(currTranslation.x, currTranslation.y, currTranslation.z));
-
-        fin.read(reinterpret_cast<char *>(&currRotation), sizeof(double) * 4);
-        assert(fin.good());
-        cpuRotations.pushBack(make_float4(currRotation.x, currRotation.y, currRotation.z, currRotation.w));
-        fin.read(reinterpret_cast<char *>(&termination), sizeof(int));
-        assert(termination == -1);
-
-        cnt++;
+        LOG_ERROR("Fail to load displacement file.\n");
+        std::exit(EXIT_FAILURE);
+    }
+    std::string line;
+    while (getline(fin, line))
+    {
+        if (line.empty())
+            continue;
+        std::istringstream iss(line);
+        iss >> currTime >> currTranslation.x >> currTranslation.y >> currTranslation.z >> currRotation.x >>
+            currRotation.y >> currRotation.z >> currRotation.w;
+        cpuTranslations.pushBack(currTranslation);
+        cpuRotations.pushBack(currRotation);
+        frameTime.pushBack(currTime);
     }
     translations.assign(cpuTranslations);
     rotations.assign(cpuRotations);
@@ -93,69 +74,31 @@ void RigidBody::LoadDisplacement_(const std::string &displacementPath)
 
 void RigidBody::LoadImpulses_(const std::string &impulsePath)
 {
-    // load *.geo.txt (for *.obj)
-    // The format of the file is:
-    // map_size
-    // vertexID1 vertexID2 ...
-    // vertexID1 vertexID2 ...
-
-    std::ifstream fin_map(obj_filename.replace(obj_filename.end() - 4, obj_filename.end(), ".geo.txt"));
-    int map_size;
-    fin_map >> map_size;
-    CArr<int2> map_data;
-    int max_vertex_id = 0;
-    for (int i = 0; i < map_size; i++)
-    {
-        int2 tmp;
-        fin_map >> tmp.x >> tmp.y;
-        if (tmp.y > max_vertex_id)
-            max_vertex_id = tmp.y;
-        float4 tmp4;
-        fin_map >> tmp4.x >> tmp4.y >> tmp4.z >> tmp4.w;
-        map_data.pushBack(tmp);
-    }
-    CArr<int> vertex_map(max_vertex_id + 1);
-    vertex_map.reset();
-    for (int i = 0; i < map_size; i++)
-    {
-        vertex_map[map_data[i].y] = map_data[i].x;
-    }
     std::ifstream fin(impulsePath);
-    double currTime, lastTime = 0.0;
-    int vertexID, objID;
-    double relativeSpeed;
-    double3 impulse;
-    char TorS, CorP;
+    float currTime;
+    float vertexID;
+    float3 impulseNormal;
+    float impulseMagnitude;
 
-    int cnt = 0;
-    while (true)
+    if (!fin.good())
     {
-        fin >> currTime;
-        if (fin.eof())
-            break;
-        else if (!fin.good())
-        {
-            LOG_ERROR("Fail to load impulse file.");
-            std::exit(EXIT_FAILURE);
-        }
-        fin >> objID >> vertexID >> relativeSpeed >> impulse.x >> impulse.y >> impulse.z >> TorS >> CorP;
-
-        // Here we assume the timestamp is monocratic.
-        if (lastTime > currTime)
-        {
-            std::cout << cnt << " " << lastTime << " " << currTime << "\n";
-            assert(false);
-        };
-        Impulse imp;
-        imp.currTime = static_cast<float>(currTime);
-        imp.vertexID = vertex_map[vertexID];
-        imp.impulseVec = make_float3(impulse.x, impulse.y, impulse.z);
-        imp.impulseRelativeSpeed = static_cast<float>(relativeSpeed);
-        impulses.pushBack(imp);
-        lastTime = currTime;
-        cnt++;
+        LOG_ERROR("Fail to load impulse file.");
+        std::exit(EXIT_FAILURE);
     }
+    std::string line;
+    while (getline(fin, line))
+    {
+        if (line.empty())
+            continue;
+        std::istringstream iss(line);
+        iss >> currTime >> vertexID >> impulseNormal.x >> impulseNormal.y >> impulseNormal.z >> impulseMagnitude;
 
+        Impulse imp;
+        imp.currTime = currTime;
+        imp.vertexID = F2I(vertexID);
+        imp.impulseVec = impulseNormal * impulseMagnitude;
+        impulses.pushBack(imp);
+    }
     return;
 }
 
@@ -231,45 +174,44 @@ std::pair<CArr<int3>, CArr<float3>> FindAllSurfaces(CArr<int4> &tetrahedrons, CA
     return {surfaceTriangles, surfaceNorms};
 }
 
-void RigidBody::LoadTetMesh_(const std::string &tetPath)
+void RigidBody::LoadTetMesh_(const std::string &vertsPath, const std::string &tetPath)
 {
-    std::ifstream fin(tetPath, std::ios::binary);
-
-    int tetVertAmount = 0;
-    // skip alignment.
-    fin.seekg(4);
-    fin.read(reinterpret_cast<char *>(&tetVertAmount), sizeof(int));
+    std::ifstream f_verts(vertsPath);
     CArr<float3> cpuTetVertices;
-    cpuTetVertices.resize(tetVertAmount);
-
-    auto FillFloat3Member = [&fin](float3 & num, float float3::*member) __attribute__((always_inline))
+    float3 vert;
+    if (!f_verts.good())
     {
-        double tempD = 0;
-        fin.read(reinterpret_cast<char *>(&tempD), sizeof(double));
-        assert(fin.good());
-        num.*member = static_cast<float>(tempD);
-    };
-
-    for (int i = 0; i < tetVertAmount; i++)
-    {
-        FillFloat3Member(cpuTetVertices[i], &float3::x);
-        FillFloat3Member(cpuTetVertices[i], &float3::y);
-        FillFloat3Member(cpuTetVertices[i], &float3::z);
+        LOG_ERROR("Fail to load tet mesh file.");
+        std::exit(EXIT_FAILURE);
     }
-
-    CArr<int4> tetrahedrons;
-    int tetAmount = 0;
-    fin.read(reinterpret_cast<char *>(&tetAmount), sizeof(int));
-    tetrahedrons.resize(tetAmount);
-    assert(tetAmount != 0);
-
-    for (int i = 0; i < tetAmount; i++)
+    std::string line;
+    while (getline(f_verts, line))
     {
-        fin.read(reinterpret_cast<char *>(&tetrahedrons[i]), sizeof(int4));
-        assert(fin.good() && tetrahedrons[i].x < tetVertAmount && tetrahedrons[i].y < tetVertAmount &&
-               tetrahedrons[i].z < tetVertAmount && tetrahedrons[i].w < tetVertAmount);
-        std::sort(reinterpret_cast<int *>(tetrahedrons.data() + i),
-                  reinterpret_cast<int *>(tetrahedrons.data() + i + 1));
+        if (line.empty())
+            continue;
+        std::istringstream iss(line);
+        iss >> vert.x >> vert.y >> vert.z;
+        cpuTetVertices.pushBack(vert);
+    }
+    f_verts.close();
+
+    std::ifstream f_tet(tetPath);
+    CArr<int4> tetrahedrons;
+    float4 tet;
+    if (!f_tet.good())
+    {
+        LOG_ERROR("Fail to load tet mesh file.");
+        std::exit(EXIT_FAILURE);
+    }
+    while (getline(f_tet, line))
+    {
+        if (line.empty())
+            continue;
+        std::istringstream iss(line);
+        iss >> tet.x >> tet.y >> tet.z >> tet.w;
+        int idxs[4] = {F2I(tet.x), F2I(tet.y), F2I(tet.z), F2I(tet.w)};
+        std::sort(idxs, idxs + 4);
+        tetrahedrons.pushBack(make_int4(idxs[0], idxs[1], idxs[2], idxs[3]));
     }
 
     tetVertices.assign(cpuTetVertices);
@@ -279,45 +221,51 @@ void RigidBody::LoadTetMesh_(const std::string &tetPath)
     tetSurfaceNorms.assign(surfaceNorms);
 }
 
-void RigidBody::LoadEigen_(const std::string &eigenPath)
+void RigidBody::LoadEigen_(const std::string &eigenvalPath, const std::string &eigenvecPath)
 {
-    std::ifstream fin(eigenPath, std::ios::binary);
-    int vecDim, modalSize;
-    double temp;
-
-    fin.read(reinterpret_cast<char *>(&vecDim), sizeof(int));
-    assert(fin.good());
-    assert(vecDim == tetVertices.size() * 3);
-
-    fin.read(reinterpret_cast<char *>(&modalSize), sizeof(int));
-    assert(fin.good());
-
+    std::ifstream f_val(eigenvalPath);
     CArr<float> eigenVals_;
-    eigenVals_.resize(modalSize);
-    int modalSize_ = modalSize;
-    for (int i = 0; i < modalSize; i++)
+    int modalSize;
+
+    if (!f_val.good())
     {
-        fin.read(reinterpret_cast<char *>(&temp), sizeof(double));
-        assert(fin.good());
-        eigenVals_[i] = static_cast<float>(temp);
-        if (std::sqrt(eigenVals_[i] / material.density) / (2 * M_PI) < max_frequncy)
-            modalSize_ = i + 1;
+        LOG_ERROR("Fail to load eigenval file.");
+        std::exit(EXIT_FAILURE);
     }
-
-    eigenVals.resize(modalSize_);
-    for (int i = 0; i < modalSize_; i++)
+    std::string line;
+    while (getline(f_val, line))
+    {
+        if (line.empty())
+            continue;
+        std::istringstream iss(line);
+        float val;
+        iss >> val;
+        eigenVals_.pushBack(val);
+        if (std::sqrt(val) / (2 * M_PI) < max_frequncy)
+            modalSize = eigenVals_.size();
+    }
+    int vecDim = tetVertices.size() * 3;
+    eigenVals.resize(modalSize);
+    for (int i = 0; i < modalSize; i++)
         eigenVals[i] = eigenVals_[i];
-    eigenVecs.resize(vecDim, modalSize_);
+    eigenVecs.resize(vecDim, modalSize);
 
-    // store transpose of U
-    for (int j = 0; j < modalSize; j++)
-        for (int i = 0; i < vecDim; i++)
+    std::ifstream f_vec(eigenvecPath);
+    if (!f_vec.good())
+    {
+        LOG_ERROR("Fail to load eigenvec file.");
+        std::exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < vecDim; i++)
+    {
+        for (int j = 0; j < eigenVals_.size(); j++)
         {
-            fin.read((char *)&temp, sizeof(double));
-            assert(fin.good());
-            if (j < modalSize_)
-                eigenVecs(i, j) = static_cast<float>(temp);
+            float val;
+            f_vec >> val;
+            if (j < modalSize)
+                eigenVecs(i, j) = val;
         }
+    }
     return;
 };
 
@@ -336,7 +284,7 @@ void RigidBody::InitIIR_()
     vertAccs.resize(tetVertices.size());
     modalMatrix.assign(eigenVecs);
     update_surf_matrix();
-    currentImpulseSines.clear();
+    currentImpulse.clear();
     return;
 }
 
@@ -358,6 +306,7 @@ __global__ void MatrixVertToTri(GArr2D<float> modalMatrix,
                            make_float3(modalMatrix(verts.z * 3, i), modalMatrix(verts.z * 3 + 1, i),
                                        modalMatrix(verts.z * 3 + 2, i))) /
                           3;
+
         modelMatrixSurf(id, i) = dot(surf_vec, surfaceNorms[id]);
     }
     return;
@@ -395,28 +344,20 @@ void RigidBody::CalculateIIR_()
     int size = modalInfos.size();
     while (impulseTimeStamp < impulses.size() && currTime >= impulses[impulseTimeStamp].currTime)
     {
-        int id = impulses[impulseTimeStamp].vertexID;
-        float3 currImpluse = impulses[impulseTimeStamp].impulseVec;
-        currentImpulseSines.push_back(ImpulseSine(impulses[impulseTimeStamp]));
-        // for (int i = 0; i < size; i++)
-        // {
-        //     modalInfos[i].f += eigenVecs(id * 3, i) * currImpluse.x + eigenVecs(id * 3 + 1, i) * currImpluse.y +
-        //                        eigenVecs(id * 3 + 2, i) * currImpluse.z;
-        // }
+        currentImpulse.push_back(impulses[impulseTimeStamp]);
         impulseTimeStamp++;
     };
-    while (currentImpulseSines.size() > 0 && currentImpulseSines[0].dead(currTime))
+    while (currentImpulse.size() > 0 && currentImpulse[0].dead(currTime))
     {
-        currentImpulseSines.erase(currentImpulseSines.begin());
+        currentImpulse.erase(currentImpulse.begin());
     }
-
     for (int i = 0; i < size; i++)
     {
         modalInfos[i].f = 0;
-        for (int j = 0; j < currentImpulseSines.size(); j++)
+        for (int j = 0; j < currentImpulse.size(); j++)
         {
-            int id = currentImpulseSines[j].imp.vertexID;
-            float3 currImpluse = currentImpulseSines[j].imp.impulseVec * currentImpulseSines[j].amp(currTime);
+            int id = currentImpulse[j].vertexID;
+            float3 currImpluse = currentImpulse[j].impulseVec * currentImpulse[j].amp(currTime);
             modalInfos[i].f += eigenVecs(id * 3, i) * currImpluse.x + eigenVecs(id * 3 + 1, i) * currImpluse.y +
                                eigenVecs(id * 3 + 2, i) * currImpluse.z;
         }
@@ -425,10 +366,10 @@ void RigidBody::CalculateIIR_()
     for (int i = 0; i < size; i++)
     {
         auto &modalInfo = modalInfos[i];
-        cpuQ[i] = modalInfo.coeff1 * modalInfo.q1 + modalInfo.coeff2 * modalInfo.q2 + modalInfo.coeff3 * modalInfo.f;
+        float q0 = modalInfo.coeff1 * modalInfo.q1 + modalInfo.coeff2 * modalInfo.q2 + modalInfo.coeff3 * modalInfo.f;
         modalInfo.q3 = modalInfo.q2;
         modalInfo.q2 = modalInfo.q1;
-        modalInfo.q1 = cpuQ[i];
+        modalInfo.q1 = q0;
         cpuQ[i] = (modalInfo.q1 + modalInfo.q3 - 2 * modalInfo.q2) / (timestep * timestep);
     }
 
@@ -437,20 +378,11 @@ void RigidBody::CalculateIIR_()
     return;
 }
 
-__device__ __forceinline__ float3 rotate(const float4 q, const float3 v)
+__device__ inline float3 rotate(const float4 q, const float3 v)
 {
-    float t2 = q.x * q.y;
-    float t3 = q.x * q.z;
-    float t4 = q.x * q.w;
-    float t5 = -q.y * q.y;
-    float t6 = q.y * q.z;
-    float t7 = q.y * q.w;
-    float t8 = -q.z * q.z;
-    float t9 = q.z * q.w;
-    float t10 = -q.w * q.w;
-    return make_float3(2.0f * ((t8 + t10) * v.x + (t6 - t4) * v.y + (t3 + t7) * v.z) + v.x,
-                       2.0f * ((t4 + t6) * v.x + (t5 + t10) * v.y + (t9 - t2) * v.z) + v.y,
-                       2.0f * ((t7 - t3) * v.x + (t2 + t9) * v.y + (t5 + t8) * v.z) + v.z);
+    float3 u = make_float3(q.x, q.y, q.z);
+    float s = q.w;
+    return 2.0f * dot(u, v) * u + (s * s - dot(u, u)) * v + 2.0f * s * cross(u, v);
 }
 
 __global__ void Transform(GArr<float3> vertices, GArr<float3> standard_vertices, float3 translation, float4 rotation)
@@ -548,7 +480,7 @@ void RigidBody::fix_mesh(float precision, std::string tmp_dir)
     Mesh originMesh(tetVertices.cpu(), tetSurfaces.cpu());
     float3 min_pos = originMesh.bbox().min;
     float length = originMesh.bbox().width;
-    int res = 64;
+    int res = 32;
     float grid_size = length / res;
     ParticleGrid pg;
     pg.init(min_pos - grid_size * 2, length / res, res + 4, 0.1f);
@@ -587,7 +519,7 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
     for (int i = 0; i < modalAmount; i++)
     {
         // print frequency
-        std::cout << int(sqrt(eigenVals[i] / material.density) / (2 * M_PI)) << ", ";
+        std::cout << int(sqrt(eigenVals[i]) / (2 * M_PI)) << ", ";
     }
     std::cout << std::endl;
     progressbar bar(modalAmount, "exporting modes");

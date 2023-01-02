@@ -11,34 +11,20 @@
 namespace pppm
 {
 
-#define CONTACT_TIME_SCALE 0.00005f
+#define CONTACT_TIME_SCALE 0.0005f
 
 struct Impulse
 {
         float currTime;
         int vertexID;
         float3 impulseVec;
-        float impulseRelativeSpeed;
-};
-
-class ImpulseSine
-{
-    public:
-        Impulse imp;
-        ImpulseSine(Impulse imp_) : imp(imp_) {}
         inline float amp(float time)
         {
-            float tau = (CONTACT_TIME_SCALE / pow(abs(imp.impulseRelativeSpeed), 0.2));
-            float signal = sin(M_PI * (time - imp.currTime) / tau) / tau;
-            if (isnan(signal))
-            {
-                printf("tau: %f, time: %f, currTime: %f, sin: %f, amp: %f\n", tau, time, imp.currTime,
-                       sin(M_PI * (time - imp.currTime) / tau), signal);
-                printf("pow(imp.impulseRelativeSpeed, 0.2): %f\n", pow(imp.impulseRelativeSpeed, 0.2));
-            }
+            float tau = CONTACT_TIME_SCALE;
+            float signal = sin(M_PI * (time - currTime) / tau);
             return signal;
         }
-        inline bool dead(float time) { return time - imp.currTime > CONTACT_TIME_SCALE; }
+        inline bool dead(float time) { return time - currTime > CONTACT_TIME_SCALE; }
 };
 
 struct ModalInfo
@@ -66,35 +52,10 @@ class RigidBody
             sample_rate = sample_rate_;
             max_frequncy = max_frequncy_;
             material.set_parameters(material_name);
-            std::string model_dir = data_dir + "/model/";
-            std::string model_subdir = std::filesystem::directory_iterator(model_dir)->path();
-            std::string objPath, eigenPath, tetPath, mapPath;
-            for (const auto &entry : std::filesystem::directory_iterator(model_subdir))
-            {
-                if (entry.path().extension() == ".obj")
-                {
-                    objPath = entry.path();
-                }
-                if (entry.path().extension() == ".modes")
-                {
-                    eigenPath = entry.path();
-                }
-                if (entry.path().extension() == ".tet")
-                {
-                    tetPath = entry.path();
-                }
-            }
-            obj_filename = objPath;
-            std::string displacementPath = data_dir + "/animation/displace.bin";
-            std::string implusePath = data_dir + "/shader/modalImpulses.txt";
-            load_data(objPath, displacementPath, implusePath, eigenPath, tetPath);
+            load_data(data_dir);
         }
 
-        void load_data(const std::string &objPath,
-                       const std::string &displacementPath,
-                       const std::string &implusePath,
-                       const std::string &eigenPath,
-                       const std::string &tetPath);
+        void load_data(const std::string &data_dir);
         void fix_mesh(float precision, std::string tmp_dir);
         void update_surf_matrix();
         void export_mesh_with_modes(const std::string &output_path);
@@ -129,7 +90,6 @@ class RigidBody
             impulses.clear();
         }
 
-        Mesh mesh;
         GArr<float3> gpuVertices;
 
         CArr<float> frameTime;
@@ -148,7 +108,7 @@ class RigidBody
         CArr<float> cpuQ;
         GArr<float> gpuQ;
         CArr<ModalInfo> modalInfos;
-        std::deque<ImpulseSine> currentImpulseSines;
+        std::deque<Impulse> currentImpulse;
         GArr<float3> vertAccs;
         GArr<float> surfaceAccs;
         bool mesh_is_updated;  // used after audio_step is called
@@ -164,10 +124,10 @@ class RigidBody
         MaterialParameters material;
 
     private:
-        void LoadDisplacement_(const std::string &displacementPath);
+        void LoadMotion_(const std::string &);
         void LoadImpulses_(const std::string &);
-        void LoadTetMesh_(const std::string &);
-        void LoadEigen_(const std::string &);
+        void LoadTetMesh_(const std::string &, const std::string &);
+        void LoadEigen_(const std::string &, const std::string &);
         void InitIIR_();
         void CalculateIIR_();
         void Q_to_Accs_();

@@ -10,6 +10,7 @@
 #include <iostream>
 #include <vector>
 #include <filesystem>
+#include <fstream>
 
 namespace pppm
 {
@@ -72,6 +73,7 @@ namespace pppm
 #define TOCK_VALUE(x) std::chrono::duration<float>(std::chrono::steady_clock::now() - bench_##x).count()
 
 #define PI 3.14159265359
+#define F2I(x) (int)(x + 0.5f)
 #define AIR_WAVE_SPEED 340.29f
 #define AIR_DENSITY 1.225f
 #define CGPU_FUNC __host__ __device__
@@ -282,6 +284,22 @@ class BBox
             max = _max;
             width = std::max(std::max(max.x - min.x, max.y - min.y), max.z - min.z);
         }
+        void load_from_txt(std::string filename)
+        {
+            std::ifstream file(filename);
+            file >> min.x >> min.y >> min.z >> max.x >> max.y >> max.z;
+            file.close();
+            width = std::max(std::max(max.x - min.x, max.y - min.y), max.z - min.z);
+        }
+        float3 center()
+        {
+            float3 c;
+            c.x = (min.x + max.x) / 2;
+            c.y = (min.y + max.y) / 2;
+            c.z = (min.z + max.z) / 2;
+            return c;
+        }
+        float length() { return std::max(std::max(max.x - min.x, max.y - min.y), max.z - min.z); }
         friend std::ostream &operator<<(std::ostream &os, const BBox &b)
         {
             os << "[" << b.min << "," << b.max << "]";

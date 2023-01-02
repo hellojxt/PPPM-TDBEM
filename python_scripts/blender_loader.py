@@ -21,7 +21,7 @@ class ObjLoader(object):
                     for item in line:
                         if item.find('/') > 0:
                             item = item[:item.find('/')]
-                        face.append(int(item)-1)
+                        face.append(int(item) - 1)
                     self.faces.append(face)
             f.close()
         except IOError:
@@ -34,7 +34,8 @@ class ObjLoader(object):
 def load_base_mesh(scene, base_mesh_name):
     old_objs = set(scene.objects)
     fpath = os.path.join(ROOT_DIR, f'{PREFIX}_{scene.frame_start}.obj')
-    bpy.ops.import_scene.obj(filepath=fpath, split_mode='OFF')
+    bpy.ops.import_scene.obj(
+        filepath=fpath, split_mode='OFF', axis_forward='Y', axis_up='Z')
     obj = list(set(scene.objects) - old_objs)[0]
     obj.name = base_mesh_name
     return obj
@@ -78,8 +79,8 @@ def load_key_frames(scene, base_obj):
 
 
 if __name__ == '__main__':
-    ROOT_DIR = '/home/jxt/PPPM-TDBEM/experiments/rigidbody/output/spolling_bowl/ghost/mesh'
-    file_list = glob(os.path.join(ROOT_DIR, '*.obj')) 
+    ROOT_DIR = '/home/jxt/PPPM-TDBEM/dataset/bowl/pppm/mesh'
+    file_list = glob(os.path.join(ROOT_DIR, '*.obj'))
     PREFIX = os.path.basename(file_list[0]).split('_')[0]
     file_list.sort(key=lambda x: int(
         os.path.basename(x).split('_')[1].split('.')[0]))

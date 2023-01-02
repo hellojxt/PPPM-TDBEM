@@ -146,7 +146,7 @@ class PhysicalAnimation():
         video.release()
         mp4_file = self.video_filename.replace('.avi', '.mp4')
         os.popen(
-            f'ffmpeg -hide_banner -loglevel error -i {self.video_filename} {mp4_file} -y> /dev/null; rm {self.video_filename}')
+            f'ffmpeg -hide_banner -loglevel error -i {self.video_filename} {mp4_file} -y; rm {self.video_filename}')
         self.motion = motion_data
         self.contact = contact_data
 
@@ -159,6 +159,12 @@ class PhysicalAnimation():
         local_point = np.array(p.getMatrixFromQuaternion(obj_ori)).reshape(
             (3, 3)).T.dot(local_point)
         return local_point
+
+    def local_to_global(self, local_point, obj_pos, obj_ori):
+        world_point = np.array(p.getMatrixFromQuaternion(obj_ori)).reshape(
+            (3, 3)).dot(local_point)
+        world_point += obj_pos
+        return world_point
 
     # find closest vertex to the contact point
     def post_process_contacts(self):
@@ -187,7 +193,24 @@ class PhysicalAnimation():
             motion_output[i, 1:8] = self.motion[i, :]
         # remove the zero force contact points
         contact_output = contact_output[contact_output[:, 5] != 0]
+        # calculate the bounding box of the object during the whole simulation
+        stride = self.animation_rate / self.time_step
+        min_pos = np.zeros(3) + 1e10
+        max_pos = np.zeros(3) - 1e10
+        t = contact_output[0, 0]
+        while t < self.time_length:
+            pos = motion_output[int(t / self.time_step), 1:4]
+            ori = motion_output[int(t / self.time_step), 4:8]
+            vertices = self.vertices.copy()
+            # local to global
+            vertices = np.array(p.getMatrixFromQuaternion(ori)).reshape(
+                (3, 3)).dot(vertices.T).T + pos
+            min_pos = np.minimum(min_pos, vertices.min(axis=0))
+            max_pos = np.maximum(max_pos, vertices.max(axis=0))
+            t += stride
+        self.bounding_box = np.array([min_pos, max_pos])
         self.motion = motion_output
         self.contact = contact_output
         np.savetxt(self.dirname + '/motion.txt', motion_output)
         np.savetxt(self.dirname + '/contact.txt', contact_output)
+        np.savetxt(self.dirname + '/bounding_box.txt', self.bounding_box)
