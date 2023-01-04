@@ -93,10 +93,10 @@ class GhostCellSolver
         {
             START_TIME(log)
             grid.fdtd.step();
-            set_solid_cell_zero();
             LOG_TIME("fdtd step")
             set_boundary_condition(neuuman_condition);
             solve_ghost_cell();
+            set_solid_cell_zero();
             LOG_TIME("solve ghost cell")
         }
 

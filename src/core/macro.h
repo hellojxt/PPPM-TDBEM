@@ -74,7 +74,7 @@ namespace pppm
 
 #define PI 3.14159265359
 #define F2I(x) (int)(x + 0.5f)
-#define AIR_WAVE_SPEED 340.29f
+#define AIR_WAVE_SPEED 340.3f
 #define AIR_DENSITY 1.225f
 #define CGPU_FUNC __host__ __device__
 #define GPU_FUNC __device__

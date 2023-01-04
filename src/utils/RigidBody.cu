@@ -35,9 +35,6 @@ void RigidBody::load_data(const std::string &data_dir)
     LoadTetMesh_(std::filesystem::path(data_dir) / "vertices.txt", std::filesystem::path(data_dir) / "tets.txt");
     LoadEigen_(std::filesystem::path(data_dir) / "eigenvalues.txt",
                std::filesystem::path(data_dir) / "eigenvectors.txt");
-    InitIIR_();
-    current_time = 0;
-    animationTimeStamp = 0;
 }
 
 void RigidBody::LoadMotion_(const std::string &displacementPath)
@@ -281,7 +278,6 @@ void RigidBody::InitIIR_()
     }
     cpuQ.resize(eigenNum);
     gpuQ.resize(eigenNum);
-    vertAccs.resize(tetVertices.size());
     modalMatrix.assign(eigenVecs);
     update_surf_matrix();
     currentImpulse.clear();
@@ -401,6 +397,42 @@ void RigidBody::animation_step()
     animationTimeStamp++;
 }
 
+struct bbox_minimum
+{
+        __device__ float3 operator()(const float3 &a, const float3 &b) const { return fminf(a, b); }
+};
+
+struct bbox_maximum
+{
+        __device__ float3 operator()(const float3 &a, const float3 &b) const { return fmaxf(a, b); }
+};
+
+BBox RigidBody::get_bbox()
+{
+    BBox box;
+    box.min = make_float3(1e10, 1e10, 1e10);
+    box.max = make_float3(-1e10, -1e10, -1e10);
+    GArr<float3> verts;
+    verts.assign(tetVertices);
+    int t = 1;
+    while (frameTime[t] < impulses[0].currTime)
+        t++;
+    t--;
+    progressbar bar(translations.size() - t, "Calculating BBox");
+    for (; t < translations.size(); t++)
+    {
+        bar.update();
+        cuExecute(tetVertices.size(), Transform, verts, standardTetVertices, translations[t], rotations[t]);
+        box.min = fminf(box.min, thrust::reduce(thrust::device, verts.begin(), verts.end(),
+                                                make_float3(1e10, 1e10, 1e10), bbox_minimum()));
+        box.max = fmaxf(box.max, thrust::reduce(thrust::device, verts.begin(), verts.end(),
+                                                make_float3(-1e10, -1e10, -1e10), bbox_maximum()));
+    }
+    std::cout << std::endl;
+    verts.clear();
+    return box;
+}
+
 void RigidBody::audio_step()
 {
     if (frameTime[animationTimeStamp] <= current_time)
@@ -425,42 +457,72 @@ void RigidBody::move_to_first_impulse()
     printf("Move to first impulse at time %f\n", current_time);
 }
 
-__global__ void update_fixed_surface_kernel(ParticleGrid pg,
-                                            GArr<float3> vertices,
-                                            GArr<float3> vertices_fixed,
-                                            GArr<int3> surfaces,
-                                            GArr<float3> surfaceNorms)
+__global__ void update_surf_matrix_for_fixed_mesh(GArr2D<float> modalMatrix,
+                                                  GArr2D<float> modelMatrixSurf,
+                                                  GArr<float3> origin_vertices,
+                                                  GArr<int3> origin_surfaces,
+                                                  GArr<float3> vertices,
+                                                  GArr<int3> surfaces)
 {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if (id >= surfaces.size())
         return;
-
     int3 surface = surfaces[id];
-    float3 vs[3] = {vertices_fixed[surface.x], vertices_fixed[surface.y], vertices_fixed[surface.z]};
-    int indices[3] = {0, 0, 0};
+    float3 verts[3] = {vertices[surface.x], vertices[surface.y], vertices[surface.z]};
+    float3 surf_normal = normalize(cross(verts[1] - verts[0], verts[2] - verts[0]));
+    int min_dist_id[3] = {-1, -1, -1};
+    float min_dist[3] = {MAX_FLOAT, MAX_FLOAT, MAX_FLOAT};
 #pragma unroll
-    for (int i = 0; i < 3; i++)
+    for (int f_id = 0; f_id < origin_surfaces.size(); f_id++)
     {
-        float3 v = vs[i];
-        int3 coord = pg.getGridCoord(v);
-        auto &v_neighbors = pg.neighbor_3_square_list(coord);
-        float min_distance = MAXFLOAT;
-        int min_v_id = -1;
-        for (int j = 0; j < v_neighbors.size(); j++)
+        int3 face = origin_surfaces[f_id];
+        float3 o_verts[3] = {origin_vertices[face.x], origin_vertices[face.y], origin_vertices[face.z]};
+        for (int i = 0; i < 3; i++)
         {
-            int v_id = v_neighbors[j];
-            float3 v_neighbor = vertices[v_id];
-            float distance = length(v - v_neighbor);
-            if (distance < min_distance)
+            float3 nearest_p = get_nearest_triangle_point(verts[i], o_verts[0], o_verts[1], o_verts[2]);
+            float dist = length(nearest_p - verts[i]);
+            if (dist < min_dist[i])
             {
-                min_distance = distance;
-                min_v_id = v_id;
+                min_dist[i] = dist;
+                min_dist_id[i] = f_id;
             }
         }
-        indices[i] = min_v_id;
     }
-    surfaces[id] = make_int3(indices[0], indices[1], indices[2]);
-    surfaceNorms[id] = normalize(cross(vs[1] - vs[0], vs[2] - vs[0]));
+    for (int j = 0; j < modalMatrix.size.y; j++)
+    {
+        modelMatrixSurf(id, j) = 0;
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        int3 face = origin_surfaces[min_dist_id[i]];
+        float3 o_verts[3] = {origin_vertices[face.x], origin_vertices[face.y], origin_vertices[face.z]};
+        float3 v = verts[i];
+        // interpolate in the triangle
+        float dist[3] = {length(o_verts[0] - v), length(o_verts[1] - v), length(o_verts[2] - v)};
+        double coeff[3] = {1.0 / (dist[0] + 1e-10), 1.0 / (dist[1] + 1e-10), 1.0 / (dist[2] + 1e-10)};
+        double sum = coeff[0] + coeff[1] + coeff[2];
+        coeff[0] /= sum;
+        coeff[1] /= sum;
+        coeff[2] /= sum;
+        for (int j = 0; j < modalMatrix.size.y; j++)
+        {
+            modelMatrixSurf(id, j) += (modalMatrix(face.x * 3, j) * coeff[0] + modalMatrix(face.y * 3, j) * coeff[1] +
+                                       modalMatrix(face.z * 3, j) * coeff[2]) *
+                                      surf_normal.x;
+            modelMatrixSurf(id, j) +=
+                (modalMatrix(face.x * 3 + 1, j) * coeff[0] + modalMatrix(face.y * 3 + 1, j) * coeff[1] +
+                 modalMatrix(face.z * 3 + 1, j) * coeff[2]) *
+                surf_normal.y;
+            modelMatrixSurf(id, j) +=
+                (modalMatrix(face.x * 3 + 2, j) * coeff[0] + modalMatrix(face.y * 3 + 2, j) * coeff[1] +
+                 modalMatrix(face.z * 3 + 2, j) * coeff[2]) *
+                surf_normal.z;
+        }
+    }
+    for (int j = 0; j < modalMatrix.size.y; j++)
+    {
+        modelMatrixSurf(id, j) /= 3;
+    }
 }
 
 void RigidBody::fix_mesh(float precision, std::string tmp_dir)
@@ -477,25 +539,17 @@ void RigidBody::fix_mesh(float precision, std::string tmp_dir)
     // std::cout << cmd << std::endl;
     system(cmd.c_str());
     Mesh fixedMesh(tmp_dir + "/" + out_mesh_name);
-    Mesh originMesh(tetVertices.cpu(), tetSurfaces.cpu());
-    float3 min_pos = originMesh.bbox().min;
-    float length = originMesh.bbox().width;
-    int res = 32;
-    float grid_size = length / res;
-    ParticleGrid pg;
-    pg.init(min_pos - grid_size * 2, length / res, res + 4, 0.1f);
-    pg.set_only_vertices(originMesh.vertices);
-    pg.construct_neighbor_lists();
-    GArr<float3> gpuVerticesFixed(fixedMesh.vertices);
-    tetSurfaces.assign(fixedMesh.triangles);
-    tetSurfaceNorms.resize(fixedMesh.triangles.size());
-    std::cout << "update fixed surface...";
-    cuExecute(fixedMesh.triangles.size(), update_fixed_surface_kernel, pg, tetVertices, gpuVerticesFixed, tetSurfaces,
-              tetSurfaceNorms);
-    std::cout << "done" << std::endl;
-    gpuVerticesFixed.clear();
-    pg.clear();
-    update_surf_matrix();
+    GArr<float3> fixedVertices = fixedMesh.vertices.gpu();
+    GArr<int3> fixedSurfaces = fixedMesh.triangles.gpu();
+    modelMatrixSurf.resize(fixedSurfaces.size(), modalMatrix.size.y);
+    cuExecute(fixedSurfaces.size(), update_surf_matrix_for_fixed_mesh, modalMatrix, modelMatrixSurf, tetVertices,
+              tetSurfaces, fixedVertices, fixedSurfaces);
+    tetVertices.assign(fixedVertices);
+    fixedVertices.clear();
+    tetSurfaces.assign(fixedSurfaces);
+    fixedSurfaces.clear();
+    standardTetVertices.assign(tetVertices);
+    surfaceAccs.resize(tetSurfaces.size());
 }
 
 void RigidBody::export_surface_mesh(const std::string &output_path)

@@ -25,9 +25,13 @@ GPU_FUNC inline int3 get_base_coord_for_reflect(CellInfo ghost_cell, GhostCellSo
 #ifdef MEMORY_CHECK
     float3 base_point = solver.grid.getCenter(base_coord);
     float3 offset = reflect_point - base_point;
-    // if (offset.x < -EPS || offset.y < -EPS || offset.z < -EPS || offset.x > grid_size + EPS ||
-    //     offset.y > grid_size + EPS || offset.z > grid_size + EPS)
+    float eps = grid_size * 1e-3;
+    // if (offset.x < -eps || offset.y < -eps || offset.z < -eps || offset.x > grid_size + eps ||
+    //     offset.y > grid_size + eps || offset.z > grid_size + eps)
     // {
+    //     float3 tmp = (reflect_point - solver.grid.min_pos) / grid_size;
+    //     printf("%f, %f, %f\n", tmp.x, tmp.y, tmp.z);
+    //     printf("t = %d\n", solver.grid.fdtd.t);
     //     printf("offset: %f %f %f\n", offset.x, offset.y, offset.z);
     //     printf("base_point: %f %f %f\n", base_point.x, base_point.y, base_point.z);
     //     printf("reflect_point: %f %f %f\n", reflect_point.x, reflect_point.y, reflect_point.z);
@@ -36,7 +40,7 @@ GPU_FUNC inline int3 get_base_coord_for_reflect(CellInfo ghost_cell, GhostCellSo
     //     printf("grid_dim: %d\n", solver.grid.grid_dim);
     //     printf("min_pos: %f %f %f\n", solver.grid.min_pos.x, solver.grid.min_pos.y, solver.grid.min_pos.z);
     // }
-    float eps = grid_size * 1e-3;
+
     assert(offset.x >= -eps && offset.y >= -eps && offset.z >= -eps && offset.x <= grid_size + eps &&
            offset.y <= grid_size + eps && offset.z <= grid_size + eps);
 
@@ -310,12 +314,12 @@ __global__ void update_ghost_cell_kernel(GArr<float> x, GhostCellSolver solver)
     if (ghost_idx >= solver.ghost_cell_num)
         return;
     int3 ghost_cell_coord = solver.ghost_cells[ghost_idx];
-    if (abs(x[ghost_idx]) > 1e3)
-    {
-        printf("t = %d\n", solver.grid.fdtd.t);
-        printf("x[%d] = %f at (%d, %d, %d)\n", ghost_idx, x[ghost_idx], ghost_cell_coord.x, ghost_cell_coord.y,
-               ghost_cell_coord.z);
-    }
+    // if (abs(x[ghost_idx]) > 1e3)
+    // {
+    //     printf("t = %d\n", solver.grid.fdtd.t);
+    //     printf("x[%d] = %f at (%d, %d, %d)\n", ghost_idx, x[ghost_idx], ghost_cell_coord.x, ghost_cell_coord.y,
+    //            ghost_cell_coord.z);
+    // }
     solver.grid.fdtd.grids[solver.grid.fdtd.t](ghost_cell_coord) = x[ghost_idx];
 }
 

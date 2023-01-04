@@ -44,15 +44,19 @@ struct ModalInfo
 class RigidBody
 {
     public:
-        RigidBody(const std::string &data_dir,
-                  float sample_rate_,
-                  std::string material_name,
-                  float max_frequncy_ = 20000.0f)
+        RigidBody(const std::string &data_dir, std::string material_name, float max_frequncy_ = 20000.0f)
         {
-            sample_rate = sample_rate_;
             max_frequncy = max_frequncy_;
             material.set_parameters(material_name);
             load_data(data_dir);
+        }
+
+        void set_sample_rate(float sample_rate_)
+        {
+            sample_rate = sample_rate_;
+            InitIIR_();
+            current_time = 0;
+            animationTimeStamp = 0;
         }
 
         void load_data(const std::string &data_dir);
@@ -65,6 +69,7 @@ class RigidBody
         void export_mesh_sequence(const std::string &output_path);
         void export_surface_accs(const std::string &filename);
         void move_to_first_impulse();
+        BBox get_bbox();
         void animation_step();
         void audio_step();
         bool end() { return current_time <= frameTime.last(); }
@@ -85,7 +90,6 @@ class RigidBody
             cpuQ.clear();
             gpuQ.clear();
             modalInfos.clear();
-            vertAccs.clear();
             surfaceAccs.clear();
             impulses.clear();
         }
@@ -109,7 +113,6 @@ class RigidBody
         GArr<float> gpuQ;
         CArr<ModalInfo> modalInfos;
         std::deque<Impulse> currentImpulse;
-        GArr<float3> vertAccs;
         GArr<float> surfaceAccs;
         bool mesh_is_updated;  // used after audio_step is called
 
