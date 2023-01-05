@@ -5,6 +5,7 @@ namespace pppm
 {
 
 #define GRID_TIME_SIZE 3
+
 typedef float value;
 typedef CircularArray<GArr3D<value>, GRID_TIME_SIZE> GridArr;
 

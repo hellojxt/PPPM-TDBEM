@@ -16,6 +16,13 @@ enum CellType
     UNKNOWN
 };
 
+struct cell_fresh_info
+{
+        int3 coord;
+        bool is_fresh;
+        CGPU_FUNC bool is_zero() const { return !is_fresh; }
+};
+
 enum AccuracyOrder
 {
     FIRST_ORDER,
@@ -52,6 +59,7 @@ class GhostCellSolver
         {
             grid.init(min_pos_, grid_size_, grid_dim_, dt);
             cell_data.resize(grid_dim_, grid_dim_, grid_dim_);
+            fresh_cell_list.reserve(grid_dim_ * grid_dim_ * grid_dim_);
             set_condition_number_threshold(25.0f);
             linear_solver.cache_stored = false;
         };
@@ -62,10 +70,14 @@ class GhostCellSolver
             START_TIME(log_time)
             grid.set_mesh(vertices_, triangles_);
             LOG_TIME("set mesh")
-            precompute_cell_data(log_time);
+            precompute_cell_data();
             LOG_TIME("precompute cell data")
             precompute_ghost_matrix(log_time);
             LOG_TIME("precompute ghost matrix")
+            neuuman_data.resize(triangles_.size());
+            neuuman_data_old.resize(triangles_.size());
+            neuuman_data.reset();
+            neuuman_data_old.reset();
         }
         template <typename T>
         void update_mesh(T &verts_, bool log_time = false)
@@ -73,13 +85,22 @@ class GhostCellSolver
             START_TIME(log_time)
             grid.update_mesh(verts_);
             LOG_TIME("update mesh")
-            precompute_cell_data(log_time);
+            cell_data_old.assign(cell_data);
+            precompute_cell_data();
             LOG_TIME("precompute cell data")
+            fill_in_fresh_cell(log_time);
+            LOG_TIME("fill in fresh cell")
             precompute_ghost_matrix(log_time);
             LOG_TIME("precompute ghost matrix")
         }
 
-        void set_boundary_condition(CArr<float> neuuman_condition) { neuuman_data.assign(neuuman_condition); }
+        void fill_in_fresh_cell(bool log_time = false);
+
+        void set_boundary_condition(CArr<float> neuuman_condition)
+        {
+            neuuman_data_old.assign(neuuman_data);
+            neuuman_data.assign(neuuman_condition);
+        }
 
         void set_condition_number_threshold(float threshold) { condition_number_threshold = threshold; }
 
@@ -120,7 +141,9 @@ class GhostCellSolver
 
         void clear()
         {
+            fresh_cell_list.clear();
             cell_data.clear();
+            cell_data_old.clear();
             grid.clear();
             A.clear();
             b.clear();
@@ -129,11 +152,13 @@ class GhostCellSolver
             ghost_cells.clear();
             ghost_order.clear();
             neuuman_data.clear();
+            neuuman_data_old.clear();
             if (condition_number_threshold > 0)
                 linear_solver.clear();
         }
-
-        GArr3D<CellInfo> cell_data;
+        CompactIndexArray<cell_fresh_info> fresh_cell_list;  // list of fresh cells idx
+        GArr3D<CellInfo> cell_data;                          // cell data (cell type, nearest particle idx, etc.)
+        GArr3D<CellInfo> cell_data_old;                      // cell data before last mesh update
         ParticleGrid grid;
         COOMatrix A;                      // matrix for ghost cell solver
         GArr<float> b;                    // right hand side of ghost cell solver
@@ -143,6 +168,7 @@ class GhostCellSolver
         int ghost_cell_num;               // number of ghost cells
         GArr<AccuracyOrder> ghost_order;  // order of ghost cell
         GArr<float> neuuman_data;         // neuuman data for boundary condition
+        GArr<float> neuuman_data_old;     // neuuman data before last mesh update
         BiCGSTAB_Solver linear_solver;
         float condition_number_threshold;  // threshold of condition number
 };

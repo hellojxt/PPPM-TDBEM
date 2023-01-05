@@ -48,6 +48,108 @@ GPU_FUNC inline int3 get_base_coord_for_reflect(CellInfo ghost_cell, GhostCellSo
     return base_coord;
 }
 
+__global__ void get_fresh_cell_list(GhostCellSolver solver)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int z = blockIdx.z * blockDim.z + threadIdx.z;
+    // here we assume grid_dim is (a, a, a).
+    int grid_dim = solver.cell_data.size.x;
+    if (x < 0 || x >= grid_dim || y < 0 || y >= grid_dim || z < 0 || z >= grid_dim)
+        return;
+    auto type = solver.cell_data(x, y, z).type;
+    auto old_type = solver.cell_data_old(x, y, z).type;
+    auto index = solver.cell_data.index(x, y, z);
+    solver.fresh_cell_list[index].coord = make_int3(x, y, z);
+    if (type != CellType::AIR)
+    {
+        solver.fresh_cell_list[index].is_fresh = true;
+    }
+    else
+    {
+        solver.fresh_cell_list[index].is_fresh = false;
+    }
+}
+
+__global__ void solve_fresh_history(GhostCellSolver solver)
+{
+    int list_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (list_idx >= solver.fresh_cell_list.size())
+        return;
+    int3 coord = solver.fresh_cell_list[list_idx].coord;
+    auto &cell = solver.cell_data(coord);
+    solver.grid.fdtd.grids[solver.grid.fdtd.t](coord) = 1e10;
+    if (cell.nearest_particle_idx >= solver.neuuman_data.size())
+        printf("cell.nearest_particle_idx: %d, neuumann_data.size(): %d\n", cell.nearest_particle_idx,
+               solver.neuuman_data.size());
+    // float accs[2] = {solver.neuuman_data[cell.nearest_particle_idx],
+    //                  solver.neuuman_data_old[cell.nearest_particle_idx]};
+    // int ts[2] = {solver.grid.fdtd.t, solver.grid.fdtd.t - 1};
+    // float3 xb = cell.nearst_point;
+    // float3 xf = solver.grid.getCenter(coord);
+    // float3 xr = xb + 2 * (xf - xb);
+    // int3 neighbor_list[8];
+    // float neighbor_coeff_list[8];
+    // int3 base_coord = solver.grid.getGridBaseCoord(xr);
+    // for (int dx = 0; dx < 2; dx++)
+    //     for (int dy = 0; dy < 2; dy++)
+    //         for (int dz = 0; dz < 2; dz++)
+    //         {
+    //             int3 neighbor_coord = base_coord + make_int3(dx, dy, dz);
+    //             int idx = dx * 4 + dy * 2 + dz;
+    //             neighbor_list[idx] = neighbor_coord;
+    //             if (solver.cell_data_old(neighbor_coord).type == AIR && solver.cell_data(neighbor_coord).type == AIR)
+    //             {
+    //                 float3 neighor_center = solver.grid.getCenter(neighbor_coord);
+    //                 float dist = length(neighor_center - xr);
+    //                 neighbor_coeff_list[idx] = 1.0 / (dist * dist);
+    //             }
+    //             else
+    //             {
+    //                 neighbor_coeff_list[idx] = 0;
+    //             }
+    //         }
+
+    // float sum = 0;
+    // for (int i = 0; i < 8; i++)
+    // {
+    //     sum += neighbor_coeff_list[i];
+    // }
+    // for (int i = 0; i < 8; i++)
+    // {
+    //     neighbor_coeff_list[i] /= sum;
+    // }
+
+    // #pragma unroll
+    //     for (int i = 0; i < 2; i++)
+    //     {
+    //         float acc = accs[i];
+    //         int t = ts[i];
+    //         float pr = 0;
+    //         for (int j = 0; j < 8; j++)
+    //         {
+    //             int3 neighbor_coord = neighbor_list[j];
+    //             float coeff = neighbor_coeff_list[j];
+    //             pr += coeff * solver.grid.fdtd.grids[t](neighbor_coord);
+    //         }
+    //         float pf = pr - AIR_DENSITY * acc * length(xf - xr);
+    //         solver.grid.fdtd.grids[t](coord) = pf;
+    //     }
+}
+
+void GhostCellSolver::fill_in_fresh_cell(bool log_time)
+{
+    START_TIME(log_time)
+    cuExecute3D(dim3(grid.grid_dim, grid.grid_dim, grid.grid_dim), get_fresh_cell_list, *this);
+    fresh_cell_list.remove_zeros();
+    if (log_time)
+    {
+        LOG("Fresh cell: " << fresh_cell_list.size())
+    }
+    cuExecute(fresh_cell_list.size(), solve_fresh_history, *this);
+    LOG_TIME("Fill in fresh cell")
+}
+
 __global__ void construct_ghost_cell_list(GhostCellSolver solver)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;

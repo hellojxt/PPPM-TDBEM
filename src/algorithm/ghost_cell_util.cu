@@ -51,8 +51,15 @@ __global__ void fill_in_nearest_kernel(GArr3D<CellInfo> cell_data, ParticleGrid 
         float direction = dot(nearest_particle.normal, grid_center - result.nearst_point);
         result.type = (direction > 0) ? AIR : SOLID;
     }
-    if (thin_shell && grid.grid_face_list(x, y, z).size() > 0)
+    float3 dist_vec = result.nearst_point - grid_center;
+    if (result.nearst_distance < MAX_FLOAT && thin_shell &&
+        (fabs(dist_vec.x) < (grid.grid_size / 2) && fabs(dist_vec.y) < (grid.grid_size / 2) &&
+         fabs(dist_vec.z) < (grid.grid_size / 2)))
+    {
         result.type = SOLID;
+    }
+    else
+        result.type = AIR;
     cell_data(x, y, z) = result;
     return;
 }
@@ -146,10 +153,10 @@ int fill_cell_data(ParticleGrid grid, GArr3D<CellInfo> cell_data, bool thin_shel
     GArr3D<int> ghost_idx_arr;
     type_arr.resize(grid_dim_3D);
     ghost_idx_arr.resize(grid_dim_3D);
-    cuExecute3D(grid_dim_3D, cell_classfication_kernel, cell_data, grid, type_arr, ghost_idx_arr);
-    cuExecute2D(dim2(grid.grid_dim, grid.grid_dim), post_cell_classification_kernel, grid, type_arr);
+    // cuExecute3D(grid_dim_3D, cell_classfication_kernel, cell_data, grid, type_arr, ghost_idx_arr);
+    // cuExecute2D(dim2(grid.grid_dim, grid.grid_dim), post_cell_classification_kernel, grid, type_arr);
     thrust::inclusive_scan(thrust::device, ghost_idx_arr.begin(), ghost_idx_arr.end(), ghost_idx_arr.begin());
-    cuExecute3D(grid_dim_3D, apply_cell_type_kernel, cell_data, grid, type_arr, ghost_idx_arr);
+    // cuExecute3D(grid_dim_3D, apply_cell_type_kernel, cell_data, grid, type_arr, ghost_idx_arr);
     int ghost_cell_num = ghost_idx_arr.data.last_item();
     type_arr.clear();
     ghost_idx_arr.clear();

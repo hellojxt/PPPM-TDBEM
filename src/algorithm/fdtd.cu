@@ -3,9 +3,9 @@
 namespace pppm
 {
 
-GPU_FUNC inline value laplacian(GArr3D<value> &grid, int i, int j, int k, float h)
+GPU_FUNC inline double laplacian(GArr3D<value> &grid, int i, int j, int k, double h)
 {
-    float sum = 0;
+    double sum = 0;
     sum += grid(i - 1, j, k);
     sum += grid(i + 1, j, k);
     sum += grid(i, j - 1, k);
@@ -24,9 +24,11 @@ __global__ void fdtd_inner_kernel(FDTD fdtd)
     if (i >= fdtd.res - 2 || i <= 1 || j >= fdtd.res - 2 || j <= 1 || k >= fdtd.res - 2 || k <= 1)
         return;
     int t = fdtd.t;
-    float h = fdtd.dl, dt = fdtd.dt, c = fdtd.c;
-    fdtd.grids[t + 1](i, j, k) = 2 * fdtd.grids[t](i, j, k) + (c * c * dt * dt) * laplacian(fdtd.grids[t], i, j, k, h) -
-                                 fdtd.grids[t - 1](i, j, k);
+    double h = fdtd.dl, dt = fdtd.dt, c = fdtd.c;
+    double p = 2 * fdtd.grids[t](i, j, k);
+    p += (c * c * dt * dt) * laplacian(fdtd.grids[t], i, j, k, h);
+    p += -fdtd.grids[t - 1](i, j, k);
+    fdtd.grids[t + 1](i, j, k) = p;
 }
 
 // credit : https://stackoverflow.com/a/9614511/15582103

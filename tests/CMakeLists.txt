@@ -13,6 +13,9 @@ target_link_libraries(UITest PRIVATE uilib alglib utillib)
 add_executable(FDTDTest FDTDTest.cu)
 target_link_libraries(FDTDTest PRIVATE uilib alglib utillib)
 
+add_executable(LongTimeFDTDTest LongTimeFDTDTest.cu)
+target_link_libraries(LongTimeFDTDTest PRIVATE uilib alglib utillib)
+
 add_executable(FarFieldCacheTest FarFieldCacheTest.cu)
 target_link_libraries(FarFieldCacheTest PRIVATE uilib alglib utillib)
 
@@ -45,3 +48,6 @@ target_link_libraries(CatchTest PRIVATE Catch2::Catch2WithMain uilib alglib util
 
 add_executable(RigidBodyTest RigidBodyTest.cu)
 target_link_libraries(RigidBodyTest PRIVATE alglib utillib)
+
+add_executable(FreshCellTest FreshCellTest.cu)
+target_link_libraries(FreshCellTest PRIVATE uilib alglib utillib)
