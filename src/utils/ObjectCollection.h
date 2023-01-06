@@ -1,0 +1,41 @@
+#pragma once
+#ifndef OBJECT_COLLECTION_H
+#define OBJECT_COLLECTION_H
+#include "Object.h"
+#include <memory>
+#include <any>
+#include <filesystem>
+
+namespace pppm
+{
+struct ObjectInfo
+{
+    enum class SoundType{
+        Modal,
+        Manual,
+        Audio
+    } type;
+    size_t verticesOffset;
+    size_t surfacesOffset;
+};
+
+class ObjectCollection
+{
+public:
+    ObjectCollection(const std::filesystem::path &dir,
+                     const std::vector<std::pair<std::string, ObjectInfo::SoundType>> &objects,
+                     const std::vector<std::any>& additionalParameters);
+
+    void export_mesh_sequence(const std::string &output_path);
+
+    CArr<ObjectInfo> objectInfos;
+    std::vector<std::unique_ptr<Object>> objects;
+
+    GArr<float3> tetVertices;
+    GArr<int3> tetSurfaces;
+    GArr<float3> tetSurfaceNorms;
+    GArr<float> surfaceAccs;
+};
+
+}
+#endif // OBJECT_COLLECTION_H

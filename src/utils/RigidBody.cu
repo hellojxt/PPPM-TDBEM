@@ -27,41 +27,30 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &ma
     return;
 }
 
-ObjectCollection::ObjectCollection(const std::filesystem::path& dir)
+float RigidBody::GetLastFrameTime()
 {
-    
-}
+    return frameTime.last();
+};
 
-void ObjectCollection::audio_update()
+void RigidBody::UpdateUntil(float time)
 {
-    // NOTE : Here we only update accelerations temporarily.
-    float* rawSurfaceAccPtr = surfaceAccs.data();
-    for(int i = 0; i < objects.size(); i++)
+    while(current_time < time)
     {
-        ObjectInfo& objectInfo = objectInfos[i];
-        std::any& object = objects[i];
-        if(objectInfo.type == ObjectInfo::SoundType::Modal)
-        {
-            RigidBody& rigidbody = std::any_cast<RigidBody&>(object);
-            rigidbody.audio_step();
-            cudaMemcpy(rawSurfaceAccPtr + objectInfo.surfacesOffset, rigidbody.surfaceAccs.data(), 
-                rigidbody.surfaceAccs.size(), cudaMemcpyDeviceToDevice);
-        }
-        else if(objectInfo.type == ObjectInfo::SoundType::Manual)
-        {
-            size_t endRange = (i + 1 == objects.size())
-                                  ? tetSurfaces.size()
-                                  : objectInfos[i + 1].surfacesOffset;
-            cudaMemset(rawSurfaceAccPtr + objectInfo.surfacesOffset, 0,
-                       endRange - objectInfo.surfacesOffset);
-        }
-        else // objectInfo.type == ObjectInfo::SoundType::Audio
-        {
-            // TODO
-        }
+        audio_step();
     }
     return;
-}
+};
+
+GArr<float3> & RigidBody::GetVertices()
+{
+    return tetVertices;
+};
+
+GArr<int3> & RigidBody::GetSurfaces()
+{
+    return tetSurfaces;
+};
+
 
 void RigidBody::load_data(const std::string &data_dir)
 {

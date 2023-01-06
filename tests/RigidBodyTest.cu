@@ -13,6 +13,7 @@
 #include <fstream>
 #include "ghost_cell.h"
 #include "RigidBody.h"
+#include "ObjectCollection.h"
 
 using namespace pppm;
 
@@ -26,5 +27,13 @@ int main()
     rigidbody.export_mesh_with_modes(OUT_DIR);
     rigidbody.export_signal(OUT_DIR, 2.5);
     // rigidbody.export_mesh_sequence(OUT_DIR + "/mesh_sequence");
+
+    ObjectCollection collection(DATASET_DIR, 
+        std::vector<std::pair<std::string, ObjectInfo::SoundType>>{ 
+            {obj_name, ObjectInfo::SoundType::Modal}
+        }, std::vector<std::any>{
+            { std::string{"polystyrene"} }
+        });
+    
     return 0;
 }
