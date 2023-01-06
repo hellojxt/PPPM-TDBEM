@@ -27,6 +27,42 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &ma
     return;
 }
 
+ObjectCollection::ObjectCollection(const std::filesystem::path& dir)
+{
+    
+}
+
+void ObjectCollection::audio_update()
+{
+    // NOTE : Here we only update accelerations temporarily.
+    float* rawSurfaceAccPtr = surfaceAccs.data();
+    for(int i = 0; i < objects.size(); i++)
+    {
+        ObjectInfo& objectInfo = objectInfos[i];
+        std::any& object = objects[i];
+        if(objectInfo.type == ObjectInfo::SoundType::Modal)
+        {
+            RigidBody& rigidbody = std::any_cast<RigidBody&>(object);
+            rigidbody.audio_step();
+            cudaMemcpy(rawSurfaceAccPtr + objectInfo.surfacesOffset, rigidbody.surfaceAccs.data(), 
+                rigidbody.surfaceAccs.size(), cudaMemcpyDeviceToDevice);
+        }
+        else if(objectInfo.type == ObjectInfo::SoundType::Manual)
+        {
+            size_t endRange = (i + 1 == objects.size())
+                                  ? tetSurfaces.size()
+                                  : objectInfos[i + 1].surfacesOffset;
+            cudaMemset(rawSurfaceAccPtr + objectInfo.surfacesOffset, 0,
+                       endRange - objectInfo.surfacesOffset);
+        }
+        else // objectInfo.type == ObjectInfo::SoundType::Audio
+        {
+            // TODO
+        }
+    }
+    return;
+}
+
 void RigidBody::load_data(const std::string &data_dir)
 {
     impulseTimeStamp = 0;

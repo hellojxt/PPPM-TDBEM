@@ -7,6 +7,7 @@
 #include <filesystem>
 #include "material.h"
 #include <deque>
+#include <any>
 
 namespace pppm
 {
@@ -39,6 +40,31 @@ struct ModalInfo
         float q3 = 0;
 
         void SetCoeffs(float timestep, float eigenVal, MaterialParameters &material);
+};
+
+struct ObjectInfo
+{
+    enum class SoundType{
+        Modal,
+        Manual,
+        Audio
+    } type;
+    size_t verticesOffset;
+    size_t surfacesOffset;
+};
+
+class ObjectCollection
+{
+public:
+    ObjectCollection(const std::filesystem::path& dir);
+    void audio_update();
+    CArr<ObjectInfo> objectInfos;
+    CArr<std::any> objects;
+
+    GArr<float3> tetVertices;
+    GArr<int3> tetSurfaces;
+    GArr<float3> tetSurfaceNorms;
+    GArr<float> surfaceAccs;
 };
 
 class RigidBody

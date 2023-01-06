@@ -51,7 +51,7 @@ int main()
     rigidbody.set_sample_rate(frame_rate);
 
     rigidbody.export_mesh_sequence(OUT_DIR + "/mesh");  // can not used together with export_signal
-    return 0;
+
     rigidbody.fix_mesh(grid_size, OUT_DIR);
     rigidbody.move_to_first_impulse();
 
