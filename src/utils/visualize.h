@@ -2,6 +2,7 @@
 #include "gui.h"
 #include "objIO.h"
 #include "pppm.h"
+#include "ghost_cell.h"
 #include "window.h"
 #include "array_writer.h"
 namespace pppm
@@ -117,7 +118,7 @@ static inline void renderArray(RenderElement &e)
 static inline void save_grid(ParticleGrid &grid, std::string filename, float max_value = 1.0f)
 {
     RenderElement e(grid, "save");
-    e.set_params(make_int3(0, 0, grid.grid_dim / 2), 1, max_value);
+    e.set_params(make_int3(grid.grid_dim / 2, 0, 0), 1, max_value);
     e.assign(0, grid.fdtd.grids[grid.fdtd.t]);
     e.update_mesh();
     e.write_image(0, filename);
@@ -130,7 +131,7 @@ static inline void save_all_grid(ParticleGrid &grid, std::string filename, float
     for (int i = 1; i < grid.grid_dim; i++)
     {
         RenderElement e(grid, "save");
-        e.set_params(make_int3(0, 0, i), 1, max_value);
+        e.set_params(make_int3(i, 0, 0), 1, max_value);
         e.assign(0, grid.fdtd.grids[grid.fdtd.t]);
         e.update_mesh();
         e.write_image(0, filename + std::to_string(i) + ".png");
@@ -146,6 +147,38 @@ static inline void renderArray(RenderElement &e1, RenderElement &e2)
     gui.append(&e1.render_window);
     gui.append(&e2.render_window);
     gui.start();
+}
+
+struct view_transformer
+{
+        CGPU_FUNC float operator()(CellInfo &x) const
+        {
+            if (x.type == SOLID)
+                return 0.0f;  // green for solid
+            if (x.type == GHOST)
+                return 1.0f;  // red for ghost
+            if (x.type == AIR)
+                return -1.0f;  // blue for air
+            return 0.5f;       // yellow unknown
+        }
+};
+
+static void save_cell_data(GhostCellSolver &solver, std::string filename, float max_value = 1.0f)
+{
+    GArr3D<float> view_data;
+    CHECK_DIR(filename)
+    view_data.resize(solver.cell_data.size);
+    thrust::transform(thrust::device, solver.cell_data.begin(), solver.cell_data.end(), view_data.begin(),
+                      view_transformer());
+    for (int i = 1; i < solver.grid.grid_dim; i++)
+    {
+        RenderElement e(solver.grid, "save");
+        e.set_params(make_int3(i, 0, 0), 1, max_value);
+        e.assign(0, view_data);
+        e.update_mesh();
+        e.write_image(0, filename + std::to_string(i) + ".png");
+        e.clear();
+    }
 }
 
 }  // namespace pppm

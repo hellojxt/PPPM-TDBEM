@@ -26,16 +26,16 @@ __global__ void set_grid_potential_kernel(GhostCellSolver solver)
 int main(int argc, char *argv[])
 {
     // get condition number threshold from command line
-    float condition_number_threshold = 0;
+    float condition_number_threshold = 15;
     GhostCellSolver *solver = empty_ghost_cell_solver(64);
     solver->set_condition_number_threshold(condition_number_threshold);
     auto filename = ASSET_DIR + std::string("sphere4.obj");
     auto mesh = Mesh::loadOBJ(filename, true);
-    mesh.stretch_to(solver->size().x / 2.0f);
+    mesh.stretch_to(solver->size().x / 1.5f);
     mesh.move_to(solver->center());
     solver->set_mesh(mesh.vertices, mesh.triangles);
     RenderElement re1(solver->grid, "ghost cell");
-    re1.set_params(make_int3(0, 32, 0), 2, solver->grid_size() * 32);
+    re1.set_params(make_int3(0, 0, 32), 2, solver->grid_size() * 32);
     cuExecute3D(dim3(solver->res(), solver->res(), solver->res()), set_grid_potential_kernel, *solver);
     re1.assign(0, solver->grid.fdtd.grids[-2]);
     re1.assign(1, solver->grid.fdtd.grids[-1]);

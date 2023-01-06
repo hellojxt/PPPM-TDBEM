@@ -16,6 +16,20 @@ enum CellType
     UNKNOWN
 };
 
+__device__ inline void print_type(CellType type)
+{
+    if (type == SOLID)
+        printf("SOLID\n");
+    else if (type == AIR)
+        printf("AIR\n");
+    else if (type == UNKNOWN)
+        printf("UNKNOWN\n");
+    else if (type == GHOST)
+        printf("GHOST\n");
+    else
+        printf("ERROR\n");
+}
+
 struct cell_fresh_info
 {
         int3 coord;
@@ -62,6 +76,8 @@ class GhostCellSolver
             fresh_cell_list.reserve(grid_dim_ * grid_dim_ * grid_dim_);
             set_condition_number_threshold(25.0f);
             linear_solver.cache_stored = false;
+            fresh_error.resize(1);
+            fresh_error.reset();
         };
 
         template <typename T1, typename T2>
@@ -78,6 +94,7 @@ class GhostCellSolver
             neuuman_data_old.resize(triangles_.size());
             neuuman_data.reset();
             neuuman_data_old.reset();
+            mesh_set = true;
         }
         template <typename T>
         void update_mesh(T &verts_, bool log_time = false)
@@ -88,7 +105,9 @@ class GhostCellSolver
             cell_data_old.assign(cell_data);
             precompute_cell_data();
             LOG_TIME("precompute cell data")
+            // LOG("value before fresh: " << grid.fdtd.grids[grid.fdtd.t](to_cpu(37, 33, 27)))
             fill_in_fresh_cell(log_time);
+            // LOG("value: after fresh: " << grid.fdtd.grids[grid.fdtd.t](to_cpu(37, 33, 27)))
             LOG_TIME("fill in fresh cell")
             precompute_ghost_matrix(log_time);
             LOG_TIME("precompute ghost matrix")
@@ -113,7 +132,9 @@ class GhostCellSolver
         void update(CArr<float> neuuman_condition, bool log = false)
         {
             START_TIME(log)
+            // LOG("value before: " << grid.fdtd.grids[grid.fdtd.t](to_cpu(37, 33, 27)))
             grid.fdtd.step();
+            // LOG("value: after: " << grid.fdtd.grids[grid.fdtd.t](to_cpu(37, 33, 27)))
             LOG_TIME("fdtd step")
             set_boundary_condition(neuuman_condition);
             solve_ghost_cell();
@@ -171,6 +192,8 @@ class GhostCellSolver
         GArr<float> neuuman_data_old;     // neuuman data before last mesh update
         BiCGSTAB_Solver linear_solver;
         float condition_number_threshold;  // threshold of condition number
+        GArr<int> fresh_error;             // for debug
+        bool mesh_set = false;
 };
 
 }  // namespace pppm

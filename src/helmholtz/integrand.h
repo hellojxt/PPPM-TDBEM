@@ -225,13 +225,19 @@ enum PairType
     FACE_TO_POINT
 };
 
-inline CGPU_FUNC cpx face2FaceIntegrand(const float3 *vertices, int3 src, int3 trg, cpx k, PotentialType type)
+inline CGPU_FUNC cpx
+face2FaceIntegrand(const float3 *vertices, int3 src, int3 trg, cpx k, PotentialType type, float threshold)
 {
 
     float3 src_v[3] = {{vertices[src.x]}, {vertices[src.y]}, {vertices[src.z]}};
     float src_jacobian = jacobian(src_v);
     float3 trg_v[3] = {{vertices[trg.x]}, {vertices[trg.y]}, {vertices[trg.z]}};
     float trg_jacobian = jacobian(trg_v);
+    float3 src_center = (src_v[0] + src_v[1] + src_v[2]) / 3;
+    float3 trg_center = (trg_v[0] + trg_v[1] + trg_v[2]) / 3;
+    float distance = length(src_center - trg_center);
+    if (distance < threshold)
+        trg = src;
     int neighbor_num = triangle_common_vertex_num(src, trg);
     if (neighbor_num == 0)
         return regular_integrand(src_v, trg_v, src_jacobian, trg_jacobian, k, type);

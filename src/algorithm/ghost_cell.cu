@@ -61,9 +61,11 @@ __global__ void get_fresh_cell_list(GhostCellSolver solver)
     auto old_type = solver.cell_data_old(x, y, z).type;
     auto index = solver.cell_data.index(x, y, z);
     solver.fresh_cell_list[index].coord = make_int3(x, y, z);
-    if (type != CellType::AIR)
+    if (old_type != CellType::AIR && type == CellType::AIR)
     {
         solver.fresh_cell_list[index].is_fresh = true;
+        if (solver.cell_data(x, y, z).nearest_particle_idx >= solver.neuuman_data.size())
+            solver.fresh_error[0] = 1;
     }
     else
     {
@@ -78,63 +80,128 @@ __global__ void solve_fresh_history(GhostCellSolver solver)
         return;
     int3 coord = solver.fresh_cell_list[list_idx].coord;
     auto &cell = solver.cell_data(coord);
-    solver.grid.fdtd.grids[solver.grid.fdtd.t](coord) = 1e10;
+    if (solver.fresh_error[0] == 1)
+    {
+        solver.grid.fdtd.grids[solver.grid.time_idx()](coord) = 1e10;
+        if (cell.nearest_particle_idx >= solver.neuuman_data.size())
+        {
+            printf("coord: %d %d %d\n", coord.x, coord.y, coord.z);
+        }
+
+        return;
+    }
+    // for debug
+#ifdef MEMORY_CHECK
     if (cell.nearest_particle_idx >= solver.neuuman_data.size())
-        printf("cell.nearest_particle_idx: %d, neuumann_data.size(): %d\n", cell.nearest_particle_idx,
-               solver.neuuman_data.size());
-    // float accs[2] = {solver.neuuman_data[cell.nearest_particle_idx],
-    //                  solver.neuuman_data_old[cell.nearest_particle_idx]};
-    // int ts[2] = {solver.grid.fdtd.t, solver.grid.fdtd.t - 1};
-    // float3 xb = cell.nearst_point;
-    // float3 xf = solver.grid.getCenter(coord);
-    // float3 xr = xb + 2 * (xf - xb);
-    // int3 neighbor_list[8];
-    // float neighbor_coeff_list[8];
-    // int3 base_coord = solver.grid.getGridBaseCoord(xr);
-    // for (int dx = 0; dx < 2; dx++)
-    //     for (int dy = 0; dy < 2; dy++)
-    //         for (int dz = 0; dz < 2; dz++)
-    //         {
-    //             int3 neighbor_coord = base_coord + make_int3(dx, dy, dz);
-    //             int idx = dx * 4 + dy * 2 + dz;
-    //             neighbor_list[idx] = neighbor_coord;
-    //             if (solver.cell_data_old(neighbor_coord).type == AIR && solver.cell_data(neighbor_coord).type == AIR)
-    //             {
-    //                 float3 neighor_center = solver.grid.getCenter(neighbor_coord);
-    //                 float dist = length(neighor_center - xr);
-    //                 neighbor_coeff_list[idx] = 1.0 / (dist * dist);
-    //             }
-    //             else
-    //             {
-    //                 neighbor_coeff_list[idx] = 0;
-    //             }
-    //         }
-
-    // float sum = 0;
-    // for (int i = 0; i < 8; i++)
+        printf("t: %d, cell.nearest_particle_idx: %d, neuumann_data.size(): %d\n", solver.grid.time_idx(),
+               cell.nearest_particle_idx, solver.neuuman_data.size());
+#endif
+    float accs[2] = {solver.neuuman_data[cell.nearest_particle_idx],
+                     solver.neuuman_data_old[cell.nearest_particle_idx]};
+    int ts[2] = {solver.grid.fdtd.t, solver.grid.fdtd.t - 1};
+    float3 xb = cell.nearst_point;
+    float3 xf = solver.grid.getCenter(coord);
+    float3 xr = xb + 2 * (xf - xb);
+    int3 neighbor_list[8];
+    float neighbor_coeff_list[8];
+    int3 base_coord = solver.grid.getGridBaseCoord(xr);
+    // if (coord.x == 37 && coord.y == 33 && coord.z == 27)
     // {
-    //     sum += neighbor_coeff_list[i];
-    // }
-    // for (int i = 0; i < 8; i++)
-    // {
-    //     neighbor_coeff_list[i] /= sum;
-    // }
+    //     float3 base_point = solver.grid.getCenter(base_coord);
+    //     float3 dist = xr - base_point;
+    //     printf("xr: %f %f %f, base_coord: %d %d %d, base_point: %f %f %f\n", xr.x, xr.y, xr.z, base_coord.x,
+    //            base_coord.y, base_coord.z, base_point.x, base_point.y, base_point.z);
 
-    // #pragma unroll
-    //     for (int i = 0; i < 2; i++)
-    //     {
-    //         float acc = accs[i];
-    //         int t = ts[i];
-    //         float pr = 0;
-    //         for (int j = 0; j < 8; j++)
-    //         {
-    //             int3 neighbor_coord = neighbor_list[j];
-    //             float coeff = neighbor_coeff_list[j];
-    //             pr += coeff * solver.grid.fdtd.grids[t](neighbor_coord);
-    //         }
-    //         float pf = pr - AIR_DENSITY * acc * length(xf - xr);
-    //         solver.grid.fdtd.grids[t](coord) = pf;
-    //     }
+    //     printf("dist: %e %e %e\n", dist.x, dist.y, dist.z);
+    // }
+    bool found_neighbor = false;
+    for (int dx = 0; dx < 2; dx++)
+        for (int dy = 0; dy < 2; dy++)
+            for (int dz = 0; dz < 2; dz++)
+            {
+                int3 neighbor_coord = base_coord + make_int3(dx, dy, dz);
+                int idx = dx * 4 + dy * 2 + dz;
+                neighbor_list[idx] = neighbor_coord;
+                if (solver.cell_data_old(neighbor_coord).type == AIR && solver.cell_data(neighbor_coord).type == AIR)
+                {
+                    float3 neighor_center = solver.grid.getCenter(neighbor_coord);
+                    float dist = length(neighor_center - xr);
+                    neighbor_coeff_list[idx] = 1.0 / (dist * dist + EPS);
+                    found_neighbor = true;
+                }
+                else
+                {
+                    neighbor_coeff_list[idx] = 0;
+                }
+                // if (coord.x == 37 && coord.y == 33 && coord.z == 27)
+                // {
+                //     printf("neighbor_coord: %d %d %d, neighbor_coeff_list: %e\n", neighbor_coord.x, neighbor_coord.y,
+                //            neighbor_coord.z, neighbor_coeff_list[idx]);
+                //     print_type(solver.cell_data(neighbor_coord).type);
+                //     print_type(solver.cell_data_old(neighbor_coord).type);
+                // }
+            }
+    if (!found_neighbor)
+    {
+        float min_dist = 1e10;
+        float pr1 = 0;
+        float pr2 = 0;
+        for (int dx = -1; dx < 3; dx++)
+            for (int dy = -1; dy < 3; dy++)
+                for (int dz = -1; dz < 3; dz++)
+                {
+                    int3 neighbor_coord = base_coord + make_int3(dx, dy, dz);
+                    if (solver.cell_data_old(neighbor_coord).type == AIR &&
+                        solver.cell_data(neighbor_coord).type == AIR)
+                    {
+                        float3 neighor_center = solver.grid.getCenter(neighbor_coord);
+                        float dist = length(neighor_center - xr);
+                        if (dist < min_dist)
+                        {
+                            min_dist = dist;
+                            pr1 = solver.grid.fdtd.grids[ts[0]](neighbor_coord);
+                            pr2 = solver.grid.fdtd.grids[ts[1]](neighbor_coord);
+                        }
+                    }
+                }
+        solver.grid.fdtd.grids[ts[0]](coord) = pr1;
+        solver.grid.fdtd.grids[ts[1]](coord) = pr2;
+        return;
+    }
+
+    float sum = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        sum += neighbor_coeff_list[i];
+    }
+    for (int i = 0; i < 8; i++)
+    {
+        neighbor_coeff_list[i] /= sum;
+    }
+
+#pragma unroll
+    for (int i = 0; i < 2; i++)
+    {
+        float acc = accs[i];
+        int t = ts[i];
+        float pr = 0;
+        for (int j = 0; j < 8; j++)
+        {
+            int3 neighbor_coord = neighbor_list[j];
+            float coeff = neighbor_coeff_list[j];
+            pr += coeff * solver.grid.fdtd.grids[t](neighbor_coord);
+        }
+        float pf = pr - AIR_DENSITY * acc * length(xf - xr);
+        solver.grid.fdtd.grids[t](coord) = pf;
+        // if (coord.x == 37 && coord.y == 33 && coord.z == 27)
+        // {
+        //     printf("t: %d, coord: %d %d %d, acc: %f, pf: %f, pr: %f, xr: %f %f %f, xf: %f %f %f, xb: %f %f %f\n",
+        //            solver.grid.time_idx(), coord.x, coord.y, coord.z, accs[0],
+        //            solver.grid.fdtd.grids[solver.grid.time_idx()](coord),
+        //            solver.grid.fdtd.grids[solver.grid.time_idx() - 1](coord), xr.x, xr.y, xr.z, xf.x, xf.y, xf.z,
+        //            xb.x, xb.y, xb.z);
+        // }
+    }
 }
 
 void GhostCellSolver::fill_in_fresh_cell(bool log_time)
@@ -324,6 +391,12 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
         float b_value = 0;
         if (CONSTRUCT_RHS)
             b_value += -solver.neuuman_data[ghost_cell.nearest_particle_idx] * ghost_cell.nearst_distance * 2;
+        if (isnan(b_value))
+        {
+            printf("b_value is nan, neuuman_data: %f, nearest_distance: %f\n",
+                   solver.neuuman_data[ghost_cell.nearest_particle_idx], ghost_cell.nearst_distance);
+            return;
+        }
         for (int i = 0; i < GHOST_CELL_NEIGHBOR_NUM; i++)
         {
             int3 dcoord = neighbor_idx_to_coord(i);
@@ -338,6 +411,12 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
                         solver.grid_size() / 2;  // correction factor as stencils are transformed to the [−1, 1]^3
                     b_value += solver.p_weight(ghost_idx, i) *
                                (scale_factor * solver.neuuman_data[ghost_cell.nearest_particle_idx]);
+                    if (isnan(b_value))
+                    {
+                        printf("b_value is nan, ghost_idx: %d, i: %d, p_weight: %f, neuuman_data: %f\n", ghost_idx, i,
+                               solver.p_weight(ghost_idx, i), solver.neuuman_data[ghost_cell.nearest_particle_idx]);
+                        return;
+                    }
                 }
             }
             else if (neighbor_cell.type == GHOST)  // other ghost cell, add matrix element
@@ -357,6 +436,16 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
                 {
                     b_value +=
                         solver.p_weight(ghost_idx, i) * solver.grid.fdtd.grids[solver.grid.fdtd.t](neighbor_coord);
+                    if (isnan(b_value))
+                    {
+                        printf(
+                            "b_value is nan, ghost_idx = %d, i = %d, p_weight = %f, grid = %f, neighbor_coord = %d %d "
+                            "%d\n",
+                            ghost_idx, i, solver.p_weight(ghost_idx, i),
+                            solver.grid.fdtd.grids[solver.grid.fdtd.t](neighbor_coord), neighbor_coord.x,
+                            neighbor_coord.y, neighbor_coord.z);
+                        return;
+                    }
                 }
             }
         }
