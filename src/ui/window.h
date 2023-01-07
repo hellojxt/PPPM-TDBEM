@@ -1,4 +1,7 @@
 #pragma once
+#ifndef M_WINDOW_H
+#define M_WINDOW_H
+
 #include <cuda_gl_interop.h>
 #include <cuda_runtime.h>  // CUDA
 #include <device_launch_parameters.h>
@@ -10,10 +13,12 @@ namespace pppm
 class Window
 {
     public:
+        Window() = default;
         std::string title;
         virtual void update() = 0;
         virtual void init() = 0;
         void called();
+        virtual ~Window() {};
 };
 
 class CudaRender : public Window
@@ -58,3 +63,4 @@ class CudaRender : public Window
 };
 
 }  // namespace pppm
+#endif
