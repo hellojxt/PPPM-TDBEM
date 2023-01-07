@@ -21,8 +21,8 @@ using namespace pppm;
 
 void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine, MonoPole &mp, std::string dirname)
 {
-    TICK(PPPMPrecompute)
-    solver.set_mesh(mesh.vertices, mesh.triangles, true);
+    TICK(PPPMPrecompute) // 预计算开始计时
+    solver.set_mesh(mesh.vertices, mesh.triangles, true); // 初始化网格和预计算网格与三角面邻居关系等,分配内存与设置缓存等
 
     float cost_time = TOCK_VALUE(PPPMPrecompute);
     // print cost time to "cost_time.txt"
@@ -30,31 +30,31 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, int3 check_cell, SineSource &sine
     ofs0 << "pppm_precompute = " << cost_time << std::endl;
     ofs0.close();
 
-    CArr<float> neuuman_condition;
+    CArr<float> neuuman_condition; // Neumann boundary(第二类边界条件)—待求变量边界外法线的方向导数被指定
     neuuman_condition.resize(solver.pg.triangles.size());
     auto triangles = solver.pg.triangles.cpu();
 
     int all_step = ALL_TIME / solver.dt();
-    CArr<float> pppm_solution(all_step);
+    CArr<float> pppm_solution(all_step); // 创建储存pppm运算结果的数组，并开始计时
     TICK(PPPM)
 
 #ifdef USE_UI
-    RenderElement re(solver.pg, "PPPM");
+    RenderElement re(solver.pg, "PPPM"); // 如果使用UI,创建一个渲染器可视化
     re.set_params(make_int3(solver.res() / 2, 0, 0), UI_FRAME_NUM, 0.5f);
 #endif
 
     for (int i = 0; i < all_step; i++)
     {
-        solver.pg.fdtd.step(i == all_step - 1);
-        solver.solve_fdtd_far(i == all_step - 1);
+        solver.pg.fdtd.step(i == all_step - 1); // 进行一次时域有限差分,不加区分物体和空气地计算每个网格(包括外部边界)的当前波值
+        solver.solve_fdtd_far(i == all_step - 1); // 对所有3*3*3范围内非空的网格,计算其far field(问题:far field 和 near field究竟是什么?)
         for (int p_id = 0; p_id < neuuman_condition.size(); p_id++)
         {
             auto &p = triangles[p_id];
-            neuuman_condition[p_id] = (mp.neumann(p.center, p.normal) * sine(solver.dt() * i)).real();
+            neuuman_condition[p_id] = (mp.neumann(p.center, p.normal) * sine(solver.dt() * i)).real(); // 指明边界法线的方向导数
         }
         solver.set_neumann_condition(neuuman_condition);
-        solver.update_dirichlet(i == all_step - 1);
-        solver.solve_fdtd_near(i == all_step - 1);
+        solver.update_dirichlet(i == all_step - 1); // Dirichlet boundary这一步在做什么?
+        solver.solve_fdtd_near(i == all_step - 1); // 这一步在做什么?
         pppm_solution[i] = solver.pg.fdtd.grids[i](to_cpu(check_cell));
 #ifdef USE_UI
         if (i < UI_FRAME_NUM)
@@ -147,9 +147,9 @@ void Analytical_test(SineSource &sine, MonoPole &mp, float3 check_point, int all
 
 int main(int argc, char *argv[])
 {
-    std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035};
+    std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035}; // 可选择的网格大小
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    auto obj_name = std::string("sphere4.obj");
+    auto obj_name = std::string("plane.obj");
     auto filename = ASSET_DIR + obj_name;
     auto mesh = Mesh::loadOBJ(filename, true);
     auto check_point = make_float3(0.25f, 0.0f, 0.0f);
@@ -158,15 +158,15 @@ int main(int argc, char *argv[])
     if (argc > 1)
         scale = std::stof(argv[1]);
     else
-        scale = 4.0f;
+        scale = 4.0f; // 物体的缩小比例
     for (auto grid_size : grid_size_list)
     {
-        float dt = grid_size / (std::sqrt(3) * AIR_WAVE_SPEED * 1.1);
-        int res = 0.7 / grid_size + 2;
+        float dt = grid_size / (std::sqrt(3) * AIR_WAVE_SPEED * 1.1); // 声波传过一个网格的时间 (为什么要除以1.1*sqrt(3)?)
+        int res = 0.7 / grid_size + 2; // 总长度有多少个网格长
         float3 center = make_float3(res * grid_size / 2);
         int3 check_cell = make_int3((check_point + center) / grid_size);
-        auto sine = SineSource(2 * PI * 1000);
-        float wave_number = sine.omega / AIR_WAVE_SPEED;
+        auto sine = SineSource(2 * PI * 1000); // 1000Hz正弦波源
+        float wave_number = sine.omega / AIR_WAVE_SPEED; 
         auto mp = MonoPole(center, wave_number);
         std::stringstream stream1;
         stream1 << std::fixed << std::setprecision(1) << scale << "/";
@@ -176,10 +176,10 @@ int main(int argc, char *argv[])
         if (!std::filesystem::exists(dirname))
             std::filesystem::create_directories(dirname);
         // PPPM
-        PPPMSolver pppm(res, grid_size, dt);
+        PPPMSolver pppm(res, grid_size, dt); // 初始化PPPM solver，包括pg, bem, grid_far_field
         mesh.stretch_to(pppm.size().x / scale);
-        mesh.move_to(pppm.center());
-        PPPM_test(pppm, mesh, check_cell, sine, mp, dirname);
+        mesh.move_to(pppm.center()); // 以上两行把mesh resize到适应网格大小并放到网格中心
+        PPPM_test(pppm, mesh, check_cell, sine, mp, dirname); // 进行PPPM运算
         pppm.clear();
 
         // First order Ghost cell

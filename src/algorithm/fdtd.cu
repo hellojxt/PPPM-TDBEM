@@ -84,7 +84,7 @@ GPU_FUNC inline void Solve4x4Linear(float a[4][4], float b[4], float result[4])
 #define Y_IDX(x) (((x) + 1) % 3)
 #define Z_IDX(x) (((x) + 2) % 3)
 
-__device__ void ab_condition_solve(FDTD &fdtd, int i, int j, int k)
+__device__ void ab_condition_solve(FDTD &fdtd, int i, int j, int k) // 似乎是计算边界条件的?
 {
     int t = fdtd.t;
     float dt = fdtd.dt, h = fdtd.dl, c = fdtd.c;
@@ -92,7 +92,7 @@ __device__ void ab_condition_solve(FDTD &fdtd, int i, int j, int k)
     int3 d_coord[3] = {make_int3(1, 0, 0), make_int3(0, 1, 0), make_int3(0, 0, 1)};
     int3 coord = make_int3(i, j, k);
 
-    float a[4][4], b[4];
+    float a[4][4], b[4]; // 这是啥?
     // for wave equation (4th equation with index 3)
     float coef = c * c * dt * dt / (h * h);
     a[3][3] = 1;

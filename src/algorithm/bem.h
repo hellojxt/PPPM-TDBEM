@@ -263,10 +263,10 @@ class TDBEM
             this->dt = dt;
             lambda =
                 std::max(pow((double)(dt * AIR_WAVE_SPEED), 3.0 / STEP_NUM), pow((double)EPS, 1.0 / (2 * STEP_NUM)));
-            for (int k = 0; k < STEP_NUM; k++)
+            for (int k = 0; k < STEP_NUM; k++) // 初始化时计算每个时间步的波数？
             {
-                cpx s_k = lambda * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k);
-                wave_numbers[k] = BDF2(s_k) / (dt * AIR_WAVE_SPEED) * cpx(0, 1);
+                cpx s_k = lambda * exp(-2 * PI * cpx(0, 1) / STEP_NUM * k); // 这是啥？
+                wave_numbers[k] = BDF2(s_k) / (dt * AIR_WAVE_SPEED) * cpx(0, 1); // 这又是啥？
                 // printf("%f %f\n", BDF2(s_k).imag(), BDF2(s_k).real());
                 // printf("wave number %d: %f %f\n", k, wave_numbers[k].real(), wave_numbers[k].imag());
             }

@@ -118,7 +118,7 @@ class ParticleGrid
             faces.assign(faces_);
             triangles.resize(faces.size());
             grid_face_list.reset();
-            construct_grid();
+            construct_grid(); // 初始化网格中物体的面元信息和每个网格和面元的包含关系
             empty_grid = false;
         }
 

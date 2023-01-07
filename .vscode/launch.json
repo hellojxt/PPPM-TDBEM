@@ -19,6 +19,13 @@
             "cwd": "${workspaceFolder}/build",
         },
         {
+            "name": "CUDA C++: Experiments Launch xcx",
+            "type": "cuda-gdb",
+            "request": "launch",
+            "program": "${workspaceFolder}/${relativeFile}",
+            "cwd": "${workspaceFolder}",
+        },
+        {
             "name": "CUDA C++: Attach",
             "type": "cuda-gdb",
             "request": "attach"

@@ -6,8 +6,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For CUDA-GDB
-# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
+add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-G>)
 # For nsight compute
+
+include_directories(/usr/local/cuda/include)
+
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DNDEBUG>)
