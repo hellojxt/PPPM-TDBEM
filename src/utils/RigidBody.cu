@@ -27,6 +27,31 @@ void ModalInfo::SetCoeffs(float timestep, float eigenVal, MaterialParameters &ma
     return;
 }
 
+float RigidBody::GetLastFrameTime()
+{
+    return frameTime.last();
+};
+
+void RigidBody::UpdateUntil(float time)
+{
+    while(current_time < time)
+    {
+        audio_step();
+    }
+    return;
+};
+
+GArr<float3> & RigidBody::GetVertices()
+{
+    return tetVertices;
+};
+
+GArr<int3> & RigidBody::GetSurfaces()
+{
+    return tetSurfaces;
+};
+
+
 void RigidBody::load_data(const std::string &data_dir)
 {
     impulseTimeStamp = 0;

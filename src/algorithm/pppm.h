@@ -27,6 +27,8 @@ class PPPMSolver
         GridCache grid_cache;  // cache for near field computation weights
         FaceCache face_cache;  // cache for near field computation weights
 
+        bool mesh_set = false;
+
         /**
          *   Constructor of PPPMSolver
          *   @param res_: resolution of the fdtd grid
@@ -35,8 +37,8 @@ class PPPMSolver
          */
         PPPMSolver(int res_, float dl_, float dt_, float3 min_pos = make_float3(0, 0, 0))
         {
-            pg.init(min_pos, dl_, res_, dt_); 
-            bem.init(dt_);
+            pg.init(min_pos, dl_, res_, dt_);
+            bem.init(dt_, dl_);
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
                 grid_far_field[i].resize(res_, res_, res_);
@@ -82,6 +84,7 @@ class PPPMSolver
             face_far_field.resize(tris_.size());
             face_near_field.resize(tris_.size(), BUFFER_SIZE_NEIGHBOR_NUM_4_4_4);
             face_factor.resize(tris_.size(), BUFFER_SIZE_NEIGHBOR_NUM_4_4_4);
+            mesh_set = true;
         }
 
         template <typename T>

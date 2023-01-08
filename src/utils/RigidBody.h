@@ -7,6 +7,7 @@
 #include <filesystem>
 #include "material.h"
 #include <deque>
+#include "Object.h"
 
 namespace pppm
 {
@@ -41,10 +42,10 @@ struct ModalInfo
         void SetCoeffs(float timestep, float eigenVal, MaterialParameters &material);
 };
 
-class RigidBody
+class RigidBody : public Object
 {
     public:
-        RigidBody(const std::string &data_dir, std::string material_name, float max_frequncy_ = 20000.0f)
+        RigidBody(const std::string &data_dir, const std::string material_name, float max_frequncy_ = 20000.0f)
         {
             max_frequncy = max_frequncy_;
             material.set_parameters(material_name);
@@ -58,6 +59,11 @@ class RigidBody
             current_time = 0;
             animationTimeStamp = 0;
         }
+
+        virtual float GetLastFrameTime() override;
+        virtual void UpdateUntil(float time) override;
+        virtual GArr<float3> &GetVertices() override;
+        virtual GArr<int3> &GetSurfaces() override;
 
         void load_data(const std::string &data_dir);
         void fix_mesh(float precision, std::string tmp_dir);

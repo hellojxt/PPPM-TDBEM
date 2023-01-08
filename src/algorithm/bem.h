@@ -241,10 +241,11 @@ class LayerWeightHalf
 CGPU_FUNC inline cpx pair_integrand(const float3 *vertices,
                                     PairInfo pair,
                                     cpx wave_number,
-                                    PotentialType potential_type)
+                                    PotentialType potential_type,
+                                    float threshold)
 {
     if (pair.pair_type == FACE_TO_FACE)
-        return face2FaceIntegrand(vertices, pair.src, pair.dst_face, wave_number, potential_type);
+        return face2FaceIntegrand(vertices, pair.src, pair.dst_face, wave_number, potential_type, threshold);
     else
         return face2PointIntegrand(vertices, pair.src, pair.dst_point, wave_number, potential_type);
 };
@@ -256,9 +257,11 @@ class TDBEM
                                      // domain to time domain and vice versa
         float lambda;                // origin for integration
         float dt;                    // time step
+        float face2face_threshold;   // threshold for face2face integral, if the distance between two faces is smaller
+                                     // than this value, we regard them as the same face
 
         TDBEM(){};
-        void init(float dt)
+        void init(float dt, float grid_size)
         {
             this->dt = dt;
             lambda =
@@ -270,6 +273,7 @@ class TDBEM
                 // printf("%f %f\n", BDF2(s_k).imag(), BDF2(s_k).real());
                 // printf("wave number %d: %f %f\n", k, wave_numbers[k].real(), wave_numbers[k].imag());
             }
+            face2face_threshold = grid_size * 0.1;
         }
 
         CGPU_FUNC inline void scaledIDFT(cpx *in, float *out)
@@ -307,7 +311,7 @@ class TDBEM
             cpx v[STEP_NUM];
             for (int k = 0; k <= STEP_NUM / 2; k++)
             {
-                v[k] = pair_integrand(vertices, pair, wave_numbers[k], potential_type);
+                v[k] = pair_integrand(vertices, pair, wave_numbers[k], potential_type, face2face_threshold);
             }
             for (int k = STEP_NUM / 2 + 1; k < STEP_NUM; k++)
             {
@@ -332,7 +336,7 @@ class TDBEM
         {
             for (int k = 0; k <= STEP_NUM / 2; k++)
             {
-                v[k] = pair_integrand(vertices, pair, wave_numbers[k], potential_type);
+                v[k] = pair_integrand(vertices, pair, wave_numbers[k], potential_type, face2face_threshold);
             }
             for (int k = STEP_NUM / 2 + 1; k < STEP_NUM; k++)
             {
@@ -369,8 +373,8 @@ class TDBEM
                                        cpx src_dirichlet,
                                        cpx wave_number)
         {
-            cpx single_layer_weight = pair_integrand(vertices, pair, wave_number, SINGLE_LAYER);
-            cpx double_layer_weight = pair_integrand(vertices, pair, wave_number, DOUBLE_LAYER);
+            cpx single_layer_weight = pair_integrand(vertices, pair, wave_number, SINGLE_LAYER, face2face_threshold);
+            cpx double_layer_weight = pair_integrand(vertices, pair, wave_number, DOUBLE_LAYER, face2face_threshold);
             return -single_layer_weight * src_neumann + double_layer_weight * src_dirichlet;
         }
 };

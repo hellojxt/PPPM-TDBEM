@@ -6,7 +6,7 @@
 
 namespace pppm
 {
-#define BUFFER_SIZE_FACE_NUM_PER_CELL 32
+#define BUFFER_SIZE_FACE_NUM_PER_CELL 128
 #define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 256
 #define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 512
 
@@ -70,9 +70,11 @@ class ParticleGrid
         int grid_dim;
         float delta_t;
         bool empty_grid = true;
-        GArr<float3> vertices;                  // vertex position
-        GArr<int3> faces;                       // directly store the indices of vertices
-        GArr<Triangle> triangles;               // store the triangle information
+        GArr<float3> vertices;                                    // vertex position
+        GArr<GridElementList<int, 32>> vertex_neigbor_face_list;  // vertex_neigbor_face_list(i) contain the index of
+                                                                  // all the faces that contain the vertex i
+        GArr<int3> faces;                                         // directly store the indices of vertices
+        GArr<Triangle> triangles;                                 // store the triangle information
         GArr3D<FaceList> grid_face_list;        // grid_face_list(i,j,k) contain the index of all the faces in the cell
         GArr3D<FaceList> base_coord_face_list;  // base_coord_face_list(i,j,k) contain the index of the faces in
                                                 // the interpolation cube (with 2*2*2 neighbor cell centers as vertices)
@@ -103,14 +105,6 @@ class ParticleGrid
             neighbor_3_square_nonempty.reserve(grid_dim * grid_dim * grid_dim);
         }
 
-        void set_only_vertices(CArr<float3> vertices_)
-        {
-            vertices.assign(vertices_);
-            grid_face_list.reset();
-            empty_grid = true;
-            construct_vertices_grid();
-        }
-
         template <typename T1, typename T2>
         void set_mesh(T1 vertices_, T2 faces_)
         {
@@ -118,9 +112,13 @@ class ParticleGrid
             faces.assign(faces_);
             triangles.resize(faces.size());
             grid_face_list.reset();
-            construct_grid(); // 初始化网格中物体的面元信息和每个网格和面元的包含关系
+            vertex_neigbor_face_list.resize(vertices.size());
+            construct_grid();
+            update_vertex_neighbor_face_list();
             empty_grid = false;
         }
+
+        void update_vertex_neighbor_face_list();
 
         template <typename T>
         void update_mesh(T vertices_)

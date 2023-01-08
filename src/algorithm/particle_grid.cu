@@ -2,6 +2,24 @@
 
 namespace pppm
 {
+
+__global__ void update_vertices_neighbor_face_list_kernel(ParticleGrid pg)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= pg.faces.size())
+        return;
+    int3 indices = pg.faces[i];
+    pg.vertex_neigbor_face_list[indices.x].atomic_append(i);
+    pg.vertex_neigbor_face_list[indices.y].atomic_append(i);
+    pg.vertex_neigbor_face_list[indices.z].atomic_append(i);
+}
+
+void ParticleGrid::update_vertex_neighbor_face_list()
+{
+    vertex_neigbor_face_list.reset();
+    cuExecute(faces.size(), update_vertices_neighbor_face_list_kernel, *this);
+}
+
 __global__ void update_vertices_grid_kernel(ParticleGrid pg)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;

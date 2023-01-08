@@ -77,7 +77,7 @@ void static inline write_to_png(std::string filename, CArr2D<uchar4> data)
     {
         for (int j = 0; j < data.cols; j++)
         {
-            img(j, i) = data(i, j);
+            img(data.cols - j - 1, i) = data(i, j);
         }
     }
     write_to_png(filename, img.begin(), img.rows, img.cols);
