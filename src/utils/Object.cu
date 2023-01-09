@@ -3,6 +3,32 @@
 #include <fstream>
 namespace pppm
 {
+__device__ inline float3 rotate(const float4 q, const float3 v)
+{
+    float3 u = make_float3(q.x, q.y, q.z);
+    float s = q.w;
+    return 2.0f * dot(u, v) * u + (s * s - dot(u, u)) * v + 2.0f * s * cross(u, v);
+}
+
+__global__ void Transform(GArr<float3> vertices, GArr<float3> standard_vertices, float3 translation, float4 rotation)
+{
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= vertices.size())
+        return;
+    vertices[id] = rotate(rotation, standard_vertices[id]) + translation;
+    return;
+}
+
+__global__ void Fill(float* arr, float num, size_t size)
+{
+    int id = (threadIdx.x + blockIdx.x * blockDim.x) * 64;
+    for(int i = 0; i < 64 && id + i < size; i++)
+    {
+        arr[id + i] = num;
+    }
+    return;
+}
+
 std::pair<CArr<int3>, CArr<float3>> FindAllSurfaces(CArr<int4> &tetrahedrons, CArr<float3> &tetraVerts)
 {
     CArr<int3> surfaceTriangles;
@@ -75,7 +101,6 @@ std::pair<CArr<int3>, CArr<float3>> FindAllSurfaces(CArr<int4> &tetrahedrons, CA
     return {surfaceTriangles, surfaceNorms};
 }
 
-
 void Object::LoadTetMesh_(const std::string &vertsPath, const std::string &tetPath,
                           GArr<float3> &tetVertices, GArr<int3> &tetSurfaces, 
                           GArr<float3> &tetSurfaceNorms)
@@ -122,6 +147,51 @@ void Object::LoadTetMesh_(const std::string &vertsPath, const std::string &tetPa
     auto [surfaceTris, surfaceNorms] = FindAllSurfaces(tetrahedrons, cpuTetVertices);
     tetSurfaces.assign(surfaceTris);
     tetSurfaceNorms.assign(surfaceNorms);
+    return;
+}
+
+void Object::LoadMotion_(const std::string &path, CArr<float3> &translations,
+                         CArr<float4> &rotations, CArr<float>& frameTime)
+{
+    std::ifstream fin(path);
+
+    float currTime = 0;
+    float3 currTranslation;
+    float4 currRotation;
+    if (!fin.good())
+    {
+        LOG_ERROR("Fail to load displacement file.\n");
+        std::exit(EXIT_FAILURE);
+    }
+    std::string line;
+    while (getline(fin, line))
+    {
+        if (line.empty())
+            continue;
+        std::istringstream iss(line);
+        iss >> currTime >> currTranslation.x >> currTranslation.y >> currTranslation.z >> currRotation.x >>
+            currRotation.y >> currRotation.z >> currRotation.w;
+        translations.pushBack(currTranslation);
+        rotations.pushBack(currRotation);
+        frameTime.pushBack(currTime);
+    }
+    return;
+};
+
+void AudioObject::LoadAccs_(const std::string& path)
+{
+    std::ifstream fin(path);
+    float currAcc = 0;
+    while(true)
+    {
+        fin >> currAcc;
+        if(!fin.good())
+        {
+            assert(fin.eof());
+            break;
+        }
+        accelerations.pushBack(currAcc);
+    }
     return;
 }
 

@@ -5,6 +5,8 @@
 #include <memory>
 #include <any>
 #include <filesystem>
+#include <vector>
+#include <string>
 
 namespace pppm
 {
@@ -27,6 +29,7 @@ public:
                      const std::vector<std::any>& additionalParameters);
 
     void export_mesh_sequence(const std::string &output_path);
+    void export_modes(const std::string &output_path);
 
     CArr<ObjectInfo> objectInfos;
     std::vector<std::unique_ptr<Object>> objects;

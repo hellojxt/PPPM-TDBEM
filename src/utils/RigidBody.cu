@@ -51,6 +51,12 @@ GArr<int3> & RigidBody::GetSurfaces()
     return tetSurfaces;
 };
 
+void RigidBody::SubmitAccelerations(float* begin)
+{
+    cudaMemcpy(begin, surfaceAccs.data(), surfaceAccs.size() * sizeof(float),
+               cudaMemcpyDeviceToDevice);
+    return;
+}
 
 void RigidBody::load_data(const std::string &data_dir)
 {
@@ -64,33 +70,7 @@ void RigidBody::load_data(const std::string &data_dir)
 
 void RigidBody::LoadMotion_(const std::string &displacementPath)
 {
-    std::ifstream fin(displacementPath);
-
-    float currTime = 0;
-    float3 currTranslation;
-    float4 currRotation;
-    CArr<float3> cpuTranslations;
-    CArr<float4> cpuRotations;
-
-    if (!fin.good())
-    {
-        LOG_ERROR("Fail to load displacement file.\n");
-        std::exit(EXIT_FAILURE);
-    }
-    std::string line;
-    while (getline(fin, line))
-    {
-        if (line.empty())
-            continue;
-        std::istringstream iss(line);
-        iss >> currTime >> currTranslation.x >> currTranslation.y >> currTranslation.z >> currRotation.x >>
-            currRotation.y >> currRotation.z >> currRotation.w;
-        cpuTranslations.pushBack(currTranslation);
-        cpuRotations.pushBack(currRotation);
-        frameTime.pushBack(currTime);
-    }
-    translations.assign(cpuTranslations);
-    rotations.assign(cpuRotations);
+    Object::LoadMotion_(displacementPath, translations, rotations, frameTime);
     return;
 };
 
@@ -286,22 +266,6 @@ void RigidBody::CalculateIIR_()
     return;
 }
 
-__device__ inline float3 rotate(const float4 q, const float3 v)
-{
-    float3 u = make_float3(q.x, q.y, q.z);
-    float s = q.w;
-    return 2.0f * dot(u, v) * u + (s * s - dot(u, u)) * v + 2.0f * s * cross(u, v);
-}
-
-__global__ void Transform(GArr<float3> vertices, GArr<float3> standard_vertices, float3 translation, float4 rotation)
-{
-    int id = blockIdx.x * blockDim.x + threadIdx.x;
-    if (id >= vertices.size())
-        return;
-    vertices[id] = rotate(rotation, standard_vertices[id]) + translation;
-    return;
-}
-
 void RigidBody::animation_step()
 {
     cuExecute(tetVertices.size(), Transform, tetVertices, standardTetVertices, translations[animationTimeStamp],
@@ -472,6 +436,16 @@ void RigidBody::export_surface_mesh(const std::string &output_path)
     surfaceMesh.writeOBJ(output_path + "/surface.obj");
 }
 
+void RigidBody::separate_mode(int mode)
+{
+    assert(mode < modalMatrix.cols);
+    cpuQ.reset();
+    cpuQ[mode] = 1;
+    gpuQ.assign(cpuQ);
+    Q_to_Accs_();
+    return;
+}
+
 // export the surface mesh with all the modes.
 void RigidBody::export_mesh_with_modes(const std::string &output_path)
 {
@@ -492,13 +466,7 @@ void RigidBody::export_mesh_with_modes(const std::string &output_path)
     for (int i = 0; i < modalAmount; i++)
     {
         bar.update();
-        for (int j = 0; j < modalAmount; j++)
-        {
-            cpuQ[j] = 0;
-        }
-        cpuQ[i] = 1;
-        gpuQ.assign(cpuQ);
-        Q_to_Accs_();
+        separate_mode(i);
         auto surf_accs = surfaceAccs.cpu();
         for (int j = 0; j < surf_accs.size(); j++)
         {

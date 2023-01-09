@@ -41,7 +41,9 @@ ObjectCollection::ObjectCollection(const std::filesystem::path& dir,
         }
         else if(objectName.second == ObjectInfo::SoundType::Audio)
         {
-
+            auto ptr = std::make_unique<AudioObject>(dir / objectName.first);
+            ptr->SetSampleRate(44100);
+            objects.push_back(std::move(ptr));
         }
         auto& currObject = objects.back();
         auto currObjectVerticesSize = currObject->GetVertices().size(),
@@ -50,6 +52,7 @@ ObjectCollection::ObjectCollection(const std::filesystem::path& dir,
         verticesSize += currObjectVerticesSize, surfacesSize += currObjectSurfacesSize;
     }
     tetVertices.resize(verticesSize), tetSurfaces.resize(surfacesSize);
+    surfaceAccs.resize(surfacesSize);
     return;
 }
 
@@ -94,6 +97,32 @@ void ObjectCollection::export_mesh_sequence(const std::string &output_path)
         bar.update();
     }
     std::cout << std::endl;
+    return;
+}
+
+void ObjectCollection::export_modes(const std::string& output_path)
+{
+    CHECK_DIR(output_path);
+    std::ofstream fout(output_path + "/modes.txt");
+    std::cout << std::endl;
+    for(int i = 0; i < objects.size(); i++)
+    {
+        auto& object = objects[i];
+        auto& objectInfo = objectInfos[i];
+        if(objectInfo.type == ObjectInfo::SoundType::Modal)
+        {
+            static_cast<RigidBody*>(object.get())->separate_mode(0);
+        }
+        object->SubmitAccelerations(surfaceAccs.data() + objectInfo.surfacesOffset);
+    }
+    auto surf_accs = surfaceAccs.cpu();
+    for (int j = 0; j < surf_accs.size(); j++)
+    {
+        fout << surf_accs[j] << " ";
+    }
+    fout << std::endl;
+
+    fout.close();
     return;
 }
 
