@@ -192,7 +192,7 @@ __global__ void compute_face_compute_list_kernel(FaceCache pc, ParticleGrid pg)
     int neighbor_num = neighbor_list.size();
     int total_num = center_num * neighbor_num;
     LayerWeight w;
-    for (int i = threadIdx.x; i < total_num; i += blockDim.x)
+    for (int i = threadIdx.x; i < total_num; i += blockDim.x) // total_num ~ 2e6
     {
         int neighbor_i = i / center_num;
         int center_i = i % center_num;

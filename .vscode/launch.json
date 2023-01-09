@@ -20,10 +20,20 @@
         },
         {
             "name": "CUDA C++: Experiments Launch xcx",
-            "type": "cuda-gdb",
+            "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/${relativeFile}",
+            "program": "${workspaceFolder}/build/${relativeFileDirname}",
             "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/local/cuda/bin/cuda-gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         },
         {
             "name": "CUDA C++: Attach",

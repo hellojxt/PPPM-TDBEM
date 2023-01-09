@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <fstream>
 #include "ghost_cell.h"
+#include <sys/stat.h> 
+
 
 #define ALL_TIME 0.02f
 #define OUTPUT_DIR (EXP_DIR + std::string("static/output/"))
@@ -147,11 +149,13 @@ void Analytical_test(SineSource &sine, MonoPole &mp, float3 check_point, int all
 
 int main(int argc, char *argv[])
 {
-    std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035}; // 可选择的网格大小
+    // std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035};
+    std::vector<float> grid_size_list = {0.01};
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
     auto obj_name = std::string("plane.obj");
     auto filename = ASSET_DIR + obj_name;
     auto mesh = Mesh::loadOBJ(filename, true);
+
     auto check_point = make_float3(0.25f, 0.0f, 0.0f);
     // get scale from argv[0]
     float scale;
@@ -161,8 +165,17 @@ int main(int argc, char *argv[])
         scale = 4.0f; // 物体的缩小比例
     for (auto grid_size : grid_size_list)
     {
+        // PPPM
         float dt = grid_size / (std::sqrt(3) * AIR_WAVE_SPEED * 1.1); // 声波传过一个网格的时间 (为什么要除以1.1*sqrt(3)?)
         int res = 0.7 / grid_size + 2; // 总长度有多少个网格长
+        PPPMSolver pppm(res, grid_size, dt); // 初始化PPPM solver，包括pg, bem, grid_far_field
+
+        // fix mesh
+        mesh.stretch_to(pppm.size().x / scale);
+        mesh.move_to(pppm.center()); // 以上两行把mesh resize到适应网格大小并放到网格中心
+        std::string OUT_DIR = ASSET_DIR + std::string("fixed");
+        mesh.fix_mesh(grid_size, OUT_DIR, obj_name); // 这里需要对每一个grid_size各生成一个fixed_mesh
+
         float3 center = make_float3(res * grid_size / 2);
         int3 check_cell = make_int3((check_point + center) / grid_size);
         auto sine = SineSource(2 * PI * 1000); // 1000Hz正弦波源
@@ -175,9 +188,8 @@ int main(int argc, char *argv[])
         auto dirname = OUTPUT_DIR + obj_name + "/" + stream1.str() + stream2.str();
         if (!std::filesystem::exists(dirname))
             std::filesystem::create_directories(dirname);
-        // PPPM
-        PPPMSolver pppm(res, grid_size, dt); // 初始化PPPM solver，包括pg, bem, grid_far_field
-        mesh.stretch_to(pppm.size().x / scale);
+        
+        // mesh.stretch_to(pppm.size().x / scale);
         mesh.move_to(pppm.center()); // 以上两行把mesh resize到适应网格大小并放到网格中心
         PPPM_test(pppm, mesh, check_cell, sine, mp, dirname); // 进行PPPM运算
         pppm.clear();

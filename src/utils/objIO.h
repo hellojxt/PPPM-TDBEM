@@ -27,6 +27,10 @@ class Mesh
         void remove_isolated_vertices();
         BBox bbox();
         static Mesh loadOBJ(std::string file_name, bool log = false);
+
+        // xcx add fix_mesh
+        void fix_mesh(float precision, std::string tmp_dir, std::string mesh_name);
+        void export_surface_mesh(const std::string &output_path, std::string mesh_name);
 };
 
 }  // namespace pppm

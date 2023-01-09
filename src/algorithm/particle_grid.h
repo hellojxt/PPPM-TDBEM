@@ -6,9 +6,11 @@
 
 namespace pppm
 {
-#define BUFFER_SIZE_FACE_NUM_PER_CELL 128
-#define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 256
-#define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 512
+// 因为fix_mesh导致面元数量巨幅提升，这么大的buffer不够用了！
+#define BUFFER_MUL 5
+#define BUFFER_SIZE_FACE_NUM_PER_CELL 128*BUFFER_MUL
+#define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 256*BUFFER_MUL
+#define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 512*BUFFER_MUL
 
 // attention: need to be used as reference for performance
 template <typename T, int N>
@@ -71,8 +73,9 @@ class ParticleGrid
         float delta_t;
         bool empty_grid = true;
         GArr<float3> vertices;                                    // vertex position
-        GArr<GridElementList<int, 32>> vertex_neigbor_face_list;  // vertex_neigbor_face_list(i) contain the index of
+        // GArr<GridElementList<int, 32>> vertex_neigbor_face_list;  // vertex_neigbor_face_list(i) contain the index of
                                                                   // all the faces that contain the vertex i
+        GArr<GridElementList<int, 3200>> vertex_neigbor_face_list;
         GArr<int3> faces;                                         // directly store the indices of vertices
         GArr<Triangle> triangles;                                 // store the triangle information
         GArr3D<FaceList> grid_face_list;        // grid_face_list(i,j,k) contain the index of all the faces in the cell

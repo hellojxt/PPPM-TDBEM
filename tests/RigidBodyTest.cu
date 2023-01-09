@@ -21,7 +21,8 @@ int main()
 {
     std::string obj_name = "bowl";
     std::string OUT_DIR = DATASET_DIR + obj_name + std::string("/output/pppm");
-    RigidBody rigidbody(DATASET_DIR + obj_name, "polystyrene");
+    // RigidBody rigidbody(DATASET_DIR + obj_name, "polystyrene");
+    RigidBody rigidbody;
     rigidbody.set_sample_rate(44100);
     rigidbody.fix_mesh(1e-2, OUT_DIR);
     rigidbody.export_mesh_with_modes(OUT_DIR);

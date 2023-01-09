@@ -51,6 +51,7 @@ class RigidBody : public Object
             material.set_parameters(material_name);
             load_data(data_dir);
         }
+        RigidBody(){}
 
         void set_sample_rate(float sample_rate_)
         {
