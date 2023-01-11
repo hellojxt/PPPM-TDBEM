@@ -7,7 +7,7 @@
 namespace pppm
 {
 // 因为fix_mesh导致面元数量巨幅提升，这么大的buffer不够用了！
-#define BUFFER_MUL 5
+#define BUFFER_MUL 3
 #define BUFFER_SIZE_FACE_NUM_PER_CELL 128*BUFFER_MUL
 #define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 256*BUFFER_MUL
 #define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 512*BUFFER_MUL
@@ -75,7 +75,7 @@ class ParticleGrid
         GArr<float3> vertices;                                    // vertex position
         // GArr<GridElementList<int, 32>> vertex_neigbor_face_list;  // vertex_neigbor_face_list(i) contain the index of
                                                                   // all the faces that contain the vertex i
-        GArr<GridElementList<int, 3200>> vertex_neigbor_face_list;
+        GArr<GridElementList<int, 32>> vertex_neigbor_face_list;
         GArr<int3> faces;                                         // directly store the indices of vertices
         GArr<Triangle> triangles;                                 // store the triangle information
         GArr3D<FaceList> grid_face_list;        // grid_face_list(i,j,k) contain the index of all the faces in the cell
@@ -95,14 +95,14 @@ class ParticleGrid
             grid_dim = grid_dim_;
             delta_t = delta_t_;
             max_pos = min_pos + make_float3(grid_dim, grid_dim, grid_dim) * grid_size;
-            fdtd.init(grid_dim, grid_size, delta_t);
-            grid_face_list.resize(grid_dim, grid_dim, grid_dim);
+            fdtd.init(grid_dim, grid_size, delta_t); // 211
+            grid_face_list.resize(grid_dim, grid_dim, grid_dim); // 914
             grid_face_list.reset();
-            base_coord_face_list.resize(grid_dim, grid_dim, grid_dim);
+            base_coord_face_list.resize(grid_dim, grid_dim, grid_dim); // 914
             base_coord_face_list.reset();
-            neighbor_3_square_list.resize(grid_dim, grid_dim, grid_dim);
+            neighbor_3_square_list.resize(grid_dim, grid_dim, grid_dim); // 1824
             neighbor_3_square_list.reset();
-            neighbor_4_square_list.resize(grid_dim, grid_dim, grid_dim);
+            neighbor_4_square_list.resize(grid_dim, grid_dim, grid_dim); // 3648
             neighbor_4_square_list.reset();
             base_coord_nonempty.reserve(grid_dim * grid_dim * grid_dim);
             neighbor_3_square_nonempty.reserve(grid_dim * grid_dim * grid_dim);
@@ -136,10 +136,19 @@ class ParticleGrid
             vertices.clear();
             faces.clear();
             triangles.clear();
-            grid_face_list.reset();
-            base_coord_face_list.reset();
-            neighbor_3_square_list.reset();
-            neighbor_4_square_list.reset();
+
+            vertex_neigbor_face_list.clear();
+            
+            // grid_face_list.reset();
+            // base_coord_face_list.reset();
+            // neighbor_3_square_list.reset();
+            // neighbor_4_square_list.reset();
+            // why not use clear() instead of reset()?
+            grid_face_list.clear();
+            base_coord_face_list.clear();
+            neighbor_3_square_list.clear();
+            neighbor_4_square_list.clear();
+
             base_coord_nonempty.clear();
             neighbor_3_square_nonempty.clear();
             empty_grid = true;

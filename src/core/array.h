@@ -90,8 +90,10 @@ class CompactIndexArray
         {
                 CGPU_FUNC bool operator()(const Index &x) const { return x.is_zero(); }
         };
-        void remove_zeros()
+        void remove_zeros() 
         {
+            // 下面这个函数导致了400M的内存占用！并且无法被data.clear()释放！
+            // 第一次调用thrust库会导致巨量内存泄漏？
             Index *new_end = thrust::remove_if(thrust::device, data.begin(), data.end(), is_zero());
             non_zero_size = new_end - data.begin();
         }

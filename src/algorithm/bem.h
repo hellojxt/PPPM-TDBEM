@@ -377,6 +377,11 @@ class TDBEM
             cpx double_layer_weight = pair_integrand(vertices, pair, wave_number, DOUBLE_LAYER, face2face_threshold);
             return -single_layer_weight * src_neumann + double_layer_weight * src_dirichlet;
         }
+
+        // void clear()
+        // {
+        //     ;
+        // }
 };
 
 }  // namespace pppm

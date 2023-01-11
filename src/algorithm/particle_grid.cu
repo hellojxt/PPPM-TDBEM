@@ -225,8 +225,8 @@ void ParticleGrid::construct_neighbor_lists()
 {
     neighbor_3_square_nonempty.reset();
     base_coord_nonempty.reset();
-    cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), init_neigbor_list_size_kernel, *this); // 初始化每个网格和周围网格的邻居关系
-    neighbor_3_square_nonempty.remove_zeros();
+    cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), init_neigbor_list_size_kernel, *this); // 初始化每个网格和周围网格的邻居关系 
+    neighbor_3_square_nonempty.remove_zeros(); // 426 为什么这里会占内存？
     base_coord_nonempty.remove_zeros();
     neighbor_3_square_list.reset();
     neighbor_4_square_list.reset();

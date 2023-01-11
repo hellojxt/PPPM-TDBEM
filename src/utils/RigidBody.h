@@ -1,4 +1,6 @@
 #pragma once
+#ifndef RIGID_BODY_H
+#define RIGID_BODY_H
 
 #include <string>
 #include "objIO.h"
@@ -65,7 +67,9 @@ class RigidBody : public Object
         virtual void UpdateUntil(float time) override;
         virtual GArr<float3> &GetVertices() override;
         virtual GArr<int3> &GetSurfaces() override;
+        virtual void SubmitAccelerations(float* begin) override;
 
+        void separate_mode(int mode);
         void load_data(const std::string &data_dir);
         void fix_mesh(float precision, std::string tmp_dir);
         void update_surf_matrix();
@@ -144,3 +148,5 @@ class RigidBody : public Object
 };
 
 }  // namespace pppm
+
+#endif

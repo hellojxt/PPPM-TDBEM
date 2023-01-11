@@ -39,6 +39,13 @@
             "name": "CUDA C++: Attach",
             "type": "cuda-gdb",
             "request": "attach"
+        },
+        {
+            "name": "python: current file",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
         }
     ]
 }

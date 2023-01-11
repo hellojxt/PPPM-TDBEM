@@ -69,13 +69,15 @@ class RenderElement
 
         void update_mesh()
         {
-            // render_window.setData(data, max_abs_value, 0.5f, last_mesh_update + 1, current_data_idx + 1);
+            // render_window中的256*1080*1080的data没有被释放！！！
+            render_window.setData(data, max_abs_value, 0.5f, last_mesh_update + 1, current_data_idx + 1); 
+
             auto p = normal2plane(make_float3(plane));
             auto normal = plane2normal(p);
             auto plane_pos = (grid.max_pos + grid.min_pos) / 2;
             plane_pos += (length(make_float3(plane)) - grid.grid_dim / 2.0f + 0.5f) * normal * grid.grid_size;
-            // render_window.add_mesh_to_images(grid.vertices, grid.faces, grid.min_pos, grid.max_pos, p, plane_pos, 1.0f,
-            //                                  last_mesh_update + 1, current_data_idx + 1);
+            render_window.add_mesh_to_images(grid.vertices, grid.faces, grid.min_pos, grid.max_pos, p, plane_pos, 1.0f,
+                                             last_mesh_update + 1, current_data_idx + 1);
             last_mesh_update = current_data_idx;
         }
 
@@ -103,7 +105,7 @@ class RenderElement
         void clear()
         {
             data.clear();
-            // render_window.clear();
+            render_window.clear();
         }
 };
 

@@ -46,7 +46,7 @@ GArr<float> RenderElement::get_time_siganl(int x, int y)
 
 void RenderElement::write_image(int idx, std::string filename)
 {
-    update_mesh();
+    update_mesh(); // 这次update_mesh调用把data从1080*1080变成了72*72并且没有释放内存！
     auto image = render_window.data[idx].cpu();
     write_to_png(filename, image);
 }

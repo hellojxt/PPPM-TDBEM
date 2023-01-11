@@ -92,7 +92,8 @@ class FDTD
         {
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
-                grids[i].reset();
+                // grids[i].reset();
+                grids[i].clear();
             }
             t = -1;
         }
