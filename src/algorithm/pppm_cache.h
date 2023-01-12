@@ -76,7 +76,7 @@ class GridCache
         }
 };
 
-#define PARTICLE_CACHE_SIZE 1024
+#define PARTICLE_CACHE_SIZE 1024 * 5 // 需要改大！
 #define INTERPOLATION_WEIGHT_SIZE 8
 class FaceCache
 {
@@ -108,9 +108,9 @@ class FaceCache
 
         void init(int triangle_num)
         {
-            cache_index.resize(triangle_num, triangle_num);
+            cache_index.resize(triangle_num, triangle_num); // 注意：当网格大小=0.02时,fix_mesh有100000triangle，占用8G显存！
             cache_index.reset_minus_one();
-            cache.resize(triangle_num, PARTICLE_CACHE_SIZE);
+            cache.resize(triangle_num, PARTICLE_CACHE_SIZE); // 这个占用的更多！这丫的显存占用和网格大小的四次方成反比！
             recompute_list.reserve(triangle_num * PARTICLE_CACHE_SIZE);
             cache_size.resize(triangle_num);
             cache_size.reset();

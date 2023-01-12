@@ -82,7 +82,7 @@ namespace pppm
 #define RAND_F (float)rand() / (float)RAND_MAX
 #define RAND_I(min, max) (min + rand() % (max - min + 1))
 #define RAND_SIGN (rand() % 2 == 0 ? 1 : -1)
-#define BDF2(x) 0.5 * ((x) * (x)-4 * (x) + 3)
+#define BDF2(x) 0.5 * ((x) * (x)-4 * (x) + 3) // 这是啥？
 #define MAX_FLOAT 3.402823466e+38F
 #define CHECK_DIR(dir)                          \
     if (!std::filesystem::exists(dir))          \

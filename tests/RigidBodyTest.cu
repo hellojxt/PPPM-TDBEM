@@ -20,7 +20,7 @@ using namespace pppm;
 int main()
 {
     std::string obj_name = "bowl";
-    std::string OUT_DIR = DATASET_DIR "total" + std::string("/output/pppm");
+    std::string OUT_DIR = DATASET_DIR + "total" + std::string("/output/pppm");
     // RigidBody rigidbody(DATASET_DIR + obj_name, "polystyrene");
     // rigidbody.set_sample_rate(44100);
     // rigidbody.fix_mesh(1e-2, OUT_DIR);

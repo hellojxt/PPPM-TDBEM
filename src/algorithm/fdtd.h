@@ -4,7 +4,7 @@
 namespace pppm
 {
 
-#define GRID_TIME_SIZE 3
+#define GRID_TIME_SIZE 3 // 记录三个历史步长的网格
 
 typedef float value;
 typedef CircularArray<GArr3D<value>, GRID_TIME_SIZE> GridArr;
@@ -72,8 +72,8 @@ class FDTD
         void step(bool log_time = false)
         {
             START_TIME(log_time)
-            step_inner_grid();
-            step_boundary_grid();
+            step_inner_grid(); // fdtd计算内部网格
+            step_boundary_grid(); // fdtd计算似乎是整个网格的边界!(6*res*res)
             if (use_reflect_boundary)
                 step_reflect_boundary(reflect_center_coord, reflect_normal);
             t++;
@@ -92,7 +92,8 @@ class FDTD
         {
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
-                grids[i].reset();
+                // grids[i].reset();
+                grids[i].clear();
             }
             t = -1;
         }

@@ -7,3 +7,4 @@ dataset/**/*.txt
 **/*.mp4
 **/*.avi
 **/*.wav
+experiments/**/*.txt

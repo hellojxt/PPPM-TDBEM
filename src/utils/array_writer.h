@@ -28,6 +28,22 @@ void static inline write_to_txt(std::string filename, float *data, int num)
     fclose(fp);
 }
 
+// mode为0时为单次重新向文件写入字符，mode为1时为向文件末尾添加字符
+void static inline write_to_txt(std::string filename, float *data, int num, int mode)
+{
+    FILE *fp;
+    if(mode == 1)
+        fp = fopen(filename.c_str(), "a");
+    else
+        fp = fopen(filename.c_str(), "w");
+
+    for (int i = 0; i < num; i++)
+    {
+        fprintf(fp, "%e\n", data[i]);
+    }
+    fclose(fp);
+}
+
 void static inline write_to_txt(std::string filename, uchar4 *data, int num)
 {
     FILE *fp = fopen(filename.c_str(), "w");
@@ -42,6 +58,19 @@ template <typename T>
 void static inline write_to_txt(std::string filename, CArr<T> data)
 {
     write_to_txt(filename, data.data(), data.size());
+}
+
+template <typename T>
+void static inline write_to_txt(std::string filename, CArr2D<T> data)
+{
+    // 清除文件内容
+    FILE* fp = fopen(filename.c_str(), "w");
+    fclose(fp);
+    for(int i = 0; i < data.rows; i++)
+    {
+        write_to_txt(filename, data[i].data(), data[i].size(), 1);
+    }
+    // write_to_txt(filename, data.data.data(), data.data.size());
 }
 
 void static inline write_to_png(std::string filename, uchar4 *data, int width, int height)

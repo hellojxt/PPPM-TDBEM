@@ -11,12 +11,12 @@ class PPPMSolver
 {
     public:
         TDBEM bem;        // boundary element method solver
-        ParticleGrid pg;  // The left corner of the fdtd grid is at (0,0,0)
-
+        ParticleGrid pg;  // The left corner of the fdtd grid is at (0,0,0)  
+        // pg储存了每个顶点、边、三角面、每个网格包含的面，每个网格用来插值的面，非空网格，3x3x3范围邻居面及其对应非空网格，4x4x4范围邻居面
         GArr<History> dirichlet;      // Dirichlet boundary condition
         GArr<History> neumann;        // Neumann boundary condition
         GArr<float> current_neumann;  // Neumann boundary condition for current
-        GridArr grid_far_field;       // far field potential of grid cells
+        GridArr grid_far_field;       // far field potential of grid cells 远场是用作什么的？
 
         // following are used for updating the dirichlet boundary values
         GArr<float> face_far_field;     // far field potential of faces
@@ -69,15 +69,15 @@ class PPPMSolver
         void set_mesh(T1 &verts_, T2 &tris_, bool log_time = false)
         {
             START_TIME(log_time)
-            pg.set_mesh(verts_, tris_);
+            pg.set_mesh(verts_, tris_); // 初始化网格(包括物体节点面元与每个网格与物体面的包含关系)
             LOG_TIME("particle grid: set_mesh")
-            pg.construct_neighbor_lists();
+            pg.construct_neighbor_lists(); // 初始化网格邻居关系
             LOG_TIME("particle grid: construct_neighbor_lists")
             grid_cache.init(tris_.size());
             face_cache.init(tris_.size());
-            grid_cache.update_cache(pg, bem, log_time);
+            grid_cache.update_cache(pg, bem, log_time); 
             face_cache.update_cache(pg, bem, log_time);
-            dirichlet.resize(tris_.size());
+            dirichlet.resize(tris_.size()); // 初始化dirichlet和neumann边界条件
             dirichlet.reset();
             neumann.resize(tris_.size());
             neumann.reset();

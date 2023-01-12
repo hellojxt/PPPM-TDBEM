@@ -19,9 +19,33 @@
             "cwd": "${workspaceFolder}/build",
         },
         {
+            "name": "CUDA C++: Experiments Launch xcx",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/${relativeFileDirname}",
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/local/cuda/bin/cuda-gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "CUDA C++: Attach",
             "type": "cuda-gdb",
             "request": "attach"
+        },
+        {
+            "name": "python: current file",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
         }
     ]
 }

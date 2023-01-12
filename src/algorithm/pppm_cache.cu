@@ -58,9 +58,9 @@ __global__ void construct_compute_list_kernel(GridCache gc, ParticleGrid pg)
     GridCache::CacheElement &e = gc.cache[idx];
     Triangle &tri = pg.triangles[idx];
     gc.recompute_list[idx].face_idx = idx;
-    gc.recompute_list[idx].need_recompute = gc.empty_cache || gc.need_recompute(e, tri, pg.grid_size);
+    gc.recompute_list[idx].need_recompute = gc.empty_cache || gc.need_recompute(e, tri, pg.grid_size); // 将需要计算的三角面元放入缓存
 }
-
+// 这个函数在干啥?
 __global__ void update_grid_cache_kernel(GridCache gc, ParticleGrid pg, TDBEM bem)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -125,10 +125,10 @@ __global__ void update_grid_cache_kernel(GridCache gc, ParticleGrid pg, TDBEM be
 void GridCache::update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time)
 {
     START_TIME(log_time)
-    cuExecute(pg.triangles.size(), construct_compute_list_kernel, *this, pg);
+    cuExecute(pg.triangles.size(), construct_compute_list_kernel, *this, pg); // 建立需要计算的三角面表,放入缓存
     recompute_list.remove_zeros();
     LOG_TIME("construct compute list")
-    cuExecute(GRID_CACHE_SIZE * recompute_list.size(), update_grid_cache_kernel, *this, pg, bem);
+    cuExecute(GRID_CACHE_SIZE * recompute_list.size(), update_grid_cache_kernel, *this, pg, bem); // 这个函数在干啥?
     LOG_TIME("update grid cache")
     empty_cache = false;
 }
@@ -192,7 +192,7 @@ __global__ void compute_face_compute_list_kernel(FaceCache pc, ParticleGrid pg)
     int neighbor_num = neighbor_list.size();
     int total_num = center_num * neighbor_num;
     LayerWeight w;
-    for (int i = threadIdx.x; i < total_num; i += blockDim.x)
+    for (int i = threadIdx.x; i < total_num; i += blockDim.x) // total_num ~ 2e6
     {
         int neighbor_i = i / center_num;
         int center_i = i % center_num;
@@ -230,7 +230,7 @@ GPU_FUNC inline void add_particle_near_field(ParticleGrid &pg,
     bem.laplace_weight(pg.vertices.data(), PairInfo(src, dst), &w);
     layer_weight.add(w, scale, offset);
 }
-
+// 这个函数又是做什么的?
 __global__ void update_particle_cache_kernel(FaceCache pc, ParticleGrid pg, TDBEM bem)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -273,10 +273,10 @@ __global__ void update_particle_cache_kernel(FaceCache pc, ParticleGrid pg, TDBE
 void FaceCache::update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_time)
 {
     START_TIME(log_time)
-    cuExecute(pg.triangles.size(), update_interpolation_weight_kernel, *this, pg);
+    cuExecute(pg.triangles.size(), update_interpolation_weight_kernel, *this, pg); // 计算插值权重
     LOG_TIME("update interpolation weight")
     recompute_list.reset();
-    cuExecuteBlock(pg.base_coord_nonempty.size(), 64, compute_face_compute_list_kernel, *this, pg);
+    cuExecuteBlock(pg.base_coord_nonempty.size(), 64, compute_face_compute_list_kernel, *this, pg); // 大概是计算哪些面需要重新计算?
     recompute_list.remove_zeros();
     recompute_list.sort();
     LOG_TIME("compute face compute list")
@@ -284,7 +284,7 @@ void FaceCache::update_cache(const ParticleGrid &pg, const TDBEM &bem, bool log_
     {
         LOG("recompute list size: " << recompute_list.size());
     }
-    cuExecute(recompute_list.size(), update_particle_cache_kernel, *this, pg, bem);
+    cuExecute(recompute_list.size(), update_particle_cache_kernel, *this, pg, bem); // 这是在干啥?
     LOG_TIME("update particle cache")
 }
 }  // namespace pppm
