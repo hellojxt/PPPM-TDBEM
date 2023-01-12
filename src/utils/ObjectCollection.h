@@ -30,6 +30,11 @@ public:
 
     void export_mesh_sequence(const std::string &output_path);
     void export_modes(const std::string &output_path);
+    void UpdateMesh();
+    void UpdateAcc();
+    void UpdateTimeStep();
+    void FixMesh(float);
+    BBox GetBBox();
 
     CArr<ObjectInfo> objectInfos;
     std::vector<std::unique_ptr<Object>> objects;
@@ -38,6 +43,11 @@ public:
     GArr<int3> tetSurfaces;
     GArr<float3> tetSurfaceNorms;
     GArr<float> surfaceAccs;
+
+    float timeStep;
+    std::filesystem::path rootDir;
+private:
+    void LoadObjectMesh_(int objID);
 };
 
 }
