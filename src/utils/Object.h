@@ -109,6 +109,7 @@ public:
         LoadAccs_(dir + "/accs.txt");
         return;
     }
+    virtual float GetTimeStep() { return sampleTime; };
     void SetSampleRate(float sampleRate) { sampleTime = 1 / sampleRate; return; }
     virtual float GetLastFrameTime() override { return frameTime.last(); }
     virtual bool UpdateUntil(float time) override { 

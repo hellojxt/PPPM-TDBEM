@@ -18,7 +18,7 @@
 
 using namespace pppm;
 
-int main()
+void ModalAndManualTest()
 {
     std::string data_dir = DATASET_DIR;
     std::string OUT_DIR = data_dir + "total/output/pppm4";
@@ -66,23 +66,14 @@ int main()
 
     int mute_frame_num = int(bowl->current_time / dt);
     CArr<float> result(mute_frame_num + frame_num + 2);
-    // CArr<float> origin_signal(mute_frame_num + frame_num + 2);
     result.reset();
-    // origin_signal.reset();
     result[0] = frame_rate;
-    // origin_signal[0] = frame_rate;
 
     auto currTime = bowl->current_time;
     auto timeStep = collection.timeStep;
     progressbar bar(frame_num);
     while (bar.get_progress() <= frame_num)
     {
-        // if (bar.get_progress() < 20000)
-        // {
-        //     rigidbody.audio_step();
-        //     bar.update();
-        //     continue;
-        // }
         bool meshUpdated = false;
         for(auto& object : collection.objects)
         {
@@ -91,7 +82,6 @@ int main()
         currTime += timeStep;
         collection.UpdateMesh();
         collection.UpdateAcc();
-        // auto m = collection.surfaceAccs.cpu();
 
         if (!solver.mesh_set)
         {
@@ -101,25 +91,8 @@ int main()
         {
             solver.update_mesh(collection.tetVertices);
         }
-        // for (int j = 0; j < rigidbody.cpuQ.size(); j++)
-        // {
-        //     origin_signal[mute_frame_num + bar.get_progress() + 1] += rigidbody.cpuQ[j];
-        // }
-        // if (bar.get_progress() > 10)
-        // {
-        //     rigidbody.surfaceAccs.reset();
-        // }
         solver.update_grid_and_face(collection.surfaceAccs);
         result[mute_frame_num + bar.get_progress() + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
-        // if (bar.get_progress() <= 5000 && bar.get_progress() % 10 == 0)
-        // {
-        //     auto sub_filename = IMG_DIR + "grid" + std::to_string(bar.get_progress()) + ".png";
-        //     auto sub_img_dir = IMG_DIR + "grid" + std::to_string(bar.get_progress()) + "/";
-        //     save_grid(solver.pg, sub_filename, 1000);
-        //     // save_all_grid(solver.pg, sub_img_dir, 1);
-        // }
-        // if (bar.get_progress() == 50000)
-        //     break;
         if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
         {
             LOG("NAN")
@@ -129,6 +102,94 @@ int main()
     }
     std::cout << "Done" << std::endl;
     write_to_txt(OUT_DIR + "/result.txt", result);
-    // write_to_txt(OUT_DIR + "/origin.txt", origin_signal);
+    bowl->clear();
+    solver.clear();
+    return;
+}
+
+void AudioAndManualTest()
+{
+    std::string data_dir = DATASET_DIR "test";
+    std::string OUT_DIR = DATASET_DIR "phone/output/pppm";
+    CHECK_DIR(OUT_DIR);
+
+    ObjectCollection collection(data_dir, 
+        std::vector<std::pair<std::string, ObjectInfo::SoundType>>{ 
+            {"phone", ObjectInfo::SoundType::Audio},
+            // {"cup", ObjectInfo::SoundType::Manual}
+        }, std::vector<std::any>{
+            {},
+            // std::string{ "polystyrene" }, 
+            // {}
+    });
+
+    BBox bbox = collection.GetBBox();
+    float3 grid_center = bbox.center();
+    float grid_length = bbox.length() * 2;
+    int res = 40;
+    float grid_size = grid_length / res;
+    float3 min_pos = grid_center - grid_length / 2;
+    int frame_rate = 1.01f / (grid_size / std::sqrt(3) / AIR_WAVE_SPEED);
+
+    collection.UpdateTimeStep();
+    collection.FixMesh(grid_size);
+    collection.UpdateMesh();
+
+    float dt = 1.0f / frame_rate;
+    float max_time = 2.5f;
+    LOG("min pos: " << min_pos);
+    LOG("grid size: " << grid_size)
+    LOG("dt: " << dt)
+    LOG("frame rate: " << frame_rate)
+
+    PPPMSolver solver(res, grid_size, dt, min_pos);
+
+    int frame_num = max_time/ dt;
+    int3 check_coord = make_int3(res / 8 * 7);
+
+    const int mute_frame_num = 0;
+    CArr<float> result(mute_frame_num + frame_num + 2);
+    result.reset();
+    result[0] = frame_rate;
+
+    float currTime = 0.0f;
+    progressbar bar(frame_num);
+    while (bar.get_progress() <= frame_num)
+    {
+        bool meshUpdated = false;
+        for(auto& object : collection.objects)
+        {
+            meshUpdated = meshUpdated || object->UpdateUntil(currTime + dt);
+        }
+        currTime += dt;
+        collection.UpdateMesh();
+        collection.UpdateAcc();
+
+        if (!solver.mesh_set)
+        {
+            solver.set_mesh(collection.tetVertices, collection.tetSurfaces);
+        }
+        else if (meshUpdated)
+        {
+            solver.update_mesh(collection.tetVertices);
+        }
+        solver.update_grid_and_face(collection.surfaceAccs);
+        result[mute_frame_num + bar.get_progress() + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
+        if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
+        {
+            LOG("NAN")
+            break;
+        }
+        bar.update();
+    }
+    std::cout << "Done" << std::endl;
+    write_to_txt(OUT_DIR + "/result.txt", result);
+    solver.clear();
+    return;   
+}
+
+int main()
+{
+    AudioAndManualTest();
     return 0;
 }
