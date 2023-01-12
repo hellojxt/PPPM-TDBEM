@@ -87,7 +87,7 @@ public:
         return mesh.bbox();
     };
 
-    virtual void ~ManualObject(){
+    virtual ~ManualObject(){
         vertices.clear();
         surfaces.clear();
     }
