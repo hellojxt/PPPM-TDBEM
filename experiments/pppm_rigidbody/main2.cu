@@ -18,6 +18,23 @@
 
 using namespace pppm;
 
+template <typename T>
+void SaveGridIf(T func, bool saveAll, const std::string &dir, int frameNum,
+                ParticleGrid &grid, float max_value = 1.0f)
+{
+    if(func(frameNum))
+    {
+        if(saveAll)
+        {
+            save_all_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value);
+        }
+        else
+        {
+            save_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value);
+        }
+    }
+}
+
 void ModalAndManualTest()
 {
     std::string data_dir = DATASET_DIR;
@@ -145,12 +162,17 @@ void AudioAndManualTest()
     PPPMSolver solver(res, grid_size, dt, min_pos);
 
     int frame_num = max_time/ dt;
+    auto IMG_DIR = OUT_DIR + "/img/";
+    CHECK_DIR(IMG_DIR)
+
     int3 check_coord = make_int3(res / 8 * 7);
 
     const int mute_frame_num = 0;
     CArr<float> result(mute_frame_num + frame_num + 2);
     result.reset();
     result[0] = frame_rate;
+
+    const int beginFrame = 0, endFrame = 1000;
 
     float currTime = 0.0f;
     progressbar bar(frame_num);
@@ -174,6 +196,15 @@ void AudioAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
+        
+        // save every 1000 frames.
+        // SaveGridIf([](int frame_num){ return frame_num % 1000 == 0;},
+        //                 false, IMG_DIR, frame_num, solver.pg);
+        // save when in some range.
+        // SaveGridIf([beginFrame, endFrame](int frame_num) { 
+        //                 return frame_num >= beginFrame && frame_num < endFrame; 
+        //             }, true, IMG_DIR, frame_num, solver.pg);
+
         result[mute_frame_num + bar.get_progress() + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
         {
