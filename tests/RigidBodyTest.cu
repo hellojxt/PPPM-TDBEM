@@ -19,8 +19,7 @@ using namespace pppm;
 
 int main()
 {
-    std::string obj_name = "bowl";
-    std::string OUT_DIR = DATASET_DIR + "total" + std::string("/output/pppm");
+    std::string OUT_DIR = DATASET_DIR "total" + std::string("/output/pppm6");
     // RigidBody rigidbody(DATASET_DIR + obj_name, "polystyrene");
     // rigidbody.set_sample_rate(44100);
     // rigidbody.fix_mesh(1e-2, OUT_DIR);
@@ -28,14 +27,20 @@ int main()
     // rigidbody.export_signal(OUT_DIR, 2.5);
     // rigidbody.export_mesh_sequence(OUT_DIR + "/mesh_sequence");
 
-    ObjectCollection collection(DATASET_DIR, 
-        std::vector<std::pair<std::string, ObjectInfo::SoundType>>{ 
-            {obj_name, ObjectInfo::SoundType::Modal},
-            {"plane", ObjectInfo::SoundType::Manual}
-        }, std::vector<std::any>{
-            { std::string{"polystyrene"}, {} }
-        });
-    collection.export_modes(OUT_DIR);
-    // collection.export_mesh_sequence(OUT_DIR + "/mesh_sequence");
+    ObjectCollection collection("/home/jiaming/Downloads/cup_phone/test",
+                                std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
+                                    {"phone", ObjectInfo::SoundType::Audio}, 
+                                    {"cup", ObjectInfo::SoundType::Manual}
+                                },
+                                std::vector<std::any>{
+                                    {},
+                                    // std::string{ "polystyrene" },
+                                    {}
+                                });
+    // collection.export_modes(OUT_DIR);
+    // collection.objects[0]->UpdateUntil(8.5);
+    // collection.UpdateMesh();
+    // collection.export_mesh(OUT_DIR + "/mesh_sequence2/surface2.obj");
+    collection.export_mesh_sequence(OUT_DIR + "/mesh_sequence2");
     return 0;
 }

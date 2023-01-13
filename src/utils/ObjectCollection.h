@@ -28,6 +28,7 @@ public:
                      const std::vector<std::pair<std::string, ObjectInfo::SoundType>> &objects,
                      const std::vector<std::any>& additionalParameters);
 
+    void export_mesh(const std::string &output_path);
     void export_mesh_sequence(const std::string &output_path);
     void export_modes(const std::string &output_path);
     void UpdateMesh();

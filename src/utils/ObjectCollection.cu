@@ -146,10 +146,17 @@ void ObjectCollection::UpdateAcc()
     return;
 }
 
+void ObjectCollection::export_mesh(const std::string &output_path)
+{
+    Mesh surfaceMesh(tetVertices, tetSurfaces);
+    surfaceMesh.remove_isolated_vertices();
+    surfaceMesh.writeOBJ(output_path);
+}
+
 void ObjectCollection::export_mesh_sequence(const std::string &output_path)
 {
     CHECK_DIR(output_path);
-    float animation_export_timestep = 1.0f / 60.0f;
+    float animation_export_timestep = 1.0f / 24.0f;
     float lastFrameTime = FLT_MAX;
     for (auto &object : objects)
     {
@@ -167,11 +174,7 @@ void ObjectCollection::export_mesh_sequence(const std::string &output_path)
 
             LoadObjectMesh_(j);
         }
-
-        Mesh surfaceMesh(tetVertices, tetSurfaces);
-        surfaceMesh.remove_isolated_vertices();
-        surfaceMesh.writeOBJ(output_path + "/surface_" + std::to_string(i) + ".obj");
-
+        export_mesh(output_path + "/surface_" + std::to_string(i) + ".obj");
         bar.update();
     }
     std::cout << std::endl;

@@ -122,7 +122,7 @@ public:
     virtual void SubmitAccelerations(float* begin) override {
         assert(accTimeStep <= accelerations.size());
         cuExecute(surfaces.size() / 64, Fill, begin,
-                  accelerations[accTimeStep - 1], surfaces.size());
+                  accelerations[accTimeStep], surfaces.size());
         return;
     }
 
@@ -187,23 +187,33 @@ private:
 
     bool AnimationUpdateUntil_(float time)
     {
+        if(animationTimeStep >= frameTime.size() - 1)
+            return false;
+        
+        animationTimeStep++;
         bool flag = false;
-        while(frameTime[animationTimeStep] < time)
+        while(frameTime[animationTimeStep] <= time)
         {
-            cuExecute(vertices.size(), Transform, vertices, standardVertices,
-                      translations[animationTimeStep], rotations[animationTimeStep]);
             animationTimeStep++;
             flag = true;
+        }
+        animationTimeStep--;
+        if(flag)
+        {
+            cuExecute(vertices.size(), Transform, vertices, standardVertices,
+                  translations[animationTimeStep], rotations[animationTimeStep]);
         }
         return flag;
     };
     
     void AccelerationUpdateUntil_(float time)
     {
-        while(sampleTime * accTimeStep < time)
+        accTimeStep++;
+        while(sampleTime * accTimeStep <= time)
         {
             accTimeStep++;
-        }
+        } 
+        accTimeStep--;
         return;
     };
 
