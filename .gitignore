@@ -9,3 +9,4 @@ dataset/**/*.txt
 **/*.wav
 experiments/**/*.txt
 dataset/test
+dataset/test2

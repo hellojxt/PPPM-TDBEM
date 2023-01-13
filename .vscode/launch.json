@@ -6,10 +6,20 @@
     "configurations": [
         {
             "name": "CUDA C++: Test Launch",
-            "type": "cuda-gdb",
+            "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/${relativeFileDirname}/${fileBasenameNoExtension}",
             "cwd": "${workspaceFolder}/build",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/local/cuda/bin/cuda-gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         },
         {
             "name": "CUDA C++: Experiments Launch",
