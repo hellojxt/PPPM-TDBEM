@@ -475,7 +475,7 @@ void GhostCellSolver::precompute_ghost_matrix(bool log_time)
         p_weight.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM);
         GArr3D<float> phi;
         phi.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM, GHOST_CELL_NEIGHBOR_NUM);
-        cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this);
+        cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this); // grid_size = 0.025
         LOG_TIME("Construct phi matrix")
         auto svd_result = cusolver_svd(phi);
         svd_result.solve_inverse();

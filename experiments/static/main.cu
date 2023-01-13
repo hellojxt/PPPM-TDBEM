@@ -172,17 +172,17 @@ int main(int argc, char *argv[])
     std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035};
     // std::vector<float> grid_size_list = {0.01};
     float3 min_pos = make_float3(0.0f, 0.0f, 0.0f);
-    auto obj_name = std::string("plane.obj");
+    auto obj_name = std::string("plane_thin.obj");
     auto filename = ASSET_DIR + obj_name;
     // auto mesh = Mesh::loadOBJ(filename, true);
 
     // auto check_point = make_float3(0.25f, 0.0f, 0.0f);
-    // xcx: 多个check_point阵列(先整27个点，为一个2*2*2立方体所有顶点和棱、面的中心点)
+    // xcx: 多个check_point阵列
     std::vector<float3> check_point_list;
     for (int i = -2; i <= 2; i++)
         for (int j = -2; j <= 2; j++)
             for (int k = -2; k <= 2; k++)
-                if(i*i + j*j + k*k >= 4)
+                if(i*i + j*j + k*k >= 4) // 保证采样点不能离物体太近
                     check_point_list.push_back(make_float3(0.2f * i, 0.2f * j, 0.2f * k));
     // get scale from argv[0]
     float scale;

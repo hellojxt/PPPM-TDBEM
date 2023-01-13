@@ -76,7 +76,7 @@ class GridCache
         }
 };
 
-#define PARTICLE_CACHE_SIZE 1024 * 5 // 需要改大！
+#define PARTICLE_CACHE_SIZE 1024 * 8 // 需要改大！
 #define INTERPOLATION_WEIGHT_SIZE 8
 class FaceCache
 {
