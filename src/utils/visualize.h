@@ -70,7 +70,7 @@ class RenderElement
         void update_mesh()
         {
             // render_window中的256*1080*1080的data没有被释放！！！
-            render_window.setData(data, max_abs_value, 0.5f, last_mesh_update + 1, current_data_idx + 1); 
+            render_window.setData(data, max_abs_value, 0.5f, last_mesh_update + 1, current_data_idx + 1);
 
             auto p = normal2plane(make_float3(plane));
             auto normal = plane2normal(p);
@@ -133,7 +133,7 @@ static inline void save_all_grid(ParticleGrid &grid, std::string filename, float
     for (int i = 1; i < grid.grid_dim; i++)
     {
         RenderElement e(grid, "save");
-        e.set_params(make_int3(i, 0, 0), 1, max_value);
+        e.set_params(make_int3(0, 0, i), 1, max_value);
         e.assign(0, grid.fdtd.grids[grid.fdtd.t]);
         e.update_mesh();
         e.write_image(0, filename + std::to_string(i) + ".png");

@@ -227,6 +227,9 @@ __global__ void add_mesh_kernel(GArr<float3> vertices,
         contact[i] = make_float3(0, 0, 0);
     }
     int contact_num = 0;
+    // printf("v0: %f %f %f, v1: %f %f %f, v2: %f %f %f, plane_pos: %f %f %f\n", v0.x, v0.y, v0.z, v1.x, v1.y, v1.z,
+    // v2.x,
+    //        v2.y, v2.z, plane_pos.x, plane_pos.y, plane_pos.z);
     if (linePlaneIntersection(contact[contact_num], v0, v1, plane_normal, plane_pos))
         contact_num++;
     if (linePlaneIntersection(contact[contact_num], v1, v2, plane_normal, plane_pos))
