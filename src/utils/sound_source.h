@@ -34,8 +34,8 @@ class MonoPole
         CGPU_FUNC cpx inline neumann(float3 pos, float3 normal)
         {
             float r = length(pos - center);
-            cpx ikr = cpx(0, 1) * r * wave_number;
-            return -exp(-ikr) / (4 * PI * r * r * r) * (1 + ikr) * dot(normal, pos - center);
+            cpx ikr = cpx(0, 1) * r * wave_number; // 表示当前振动到了什么地方
+            return -exp(-ikr) / (4 * PI * r * r * r) * (1 + ikr) * dot(normal, pos - center); // 表示当前的振动速度吗？
         }
 };
 }  // namespace pppm

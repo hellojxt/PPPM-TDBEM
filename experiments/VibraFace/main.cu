@@ -1,3 +1,6 @@
+// 相比static的输入是人工指定的振动, 本程序改为每个表面有自己的一个振幅，从文件读出来；
+// 取它周围包围盒的一个面, 在这个面上取所有点得到n*n图像
+
 #include <vector>
 #include "array_writer.h"
 #include "bem.h"
@@ -14,14 +17,13 @@
 #include "ghost_cell.h"
 #include <sys/stat.h> 
 
-
 #define ALL_TIME 0.02f
 #define OUTPUT_DIR (EXP_DIR + std::string("static/output/"))
 #define USE_UI
 #define UI_FRAME_NUM 256
 using namespace pppm;
 
-void PPPM_test(PPPMSolver &solver, Mesh &mesh, std::vector<int3> check_cell_list, SineSource &sine, MonoPole &mp, std::string dirname)
+void PPPM_test(PPPMSolver &solver, Mesh &mesh, std::vector<int3> check_cell_list, CArr<float> face_wave, SineSource &sine, std::string dirname)
 {
     TICK(PPPMPrecompute) // 预计算开始计时
     solver.set_mesh(mesh.vertices, mesh.triangles, true); // 初始化网格和预计算网格与三角面邻居关系等,分配内存与设置缓存等
@@ -33,7 +35,7 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, std::vector<int3> check_cell_list
     ofs0.close();
 
     CArr<float> neuuman_condition; // Neumann boundary(第二类边界条件)—待求变量边界外法线的方向导数被指定
-    neuuman_condition.resize(solver.pg.triangles.size());
+    neuuman_condition.resize(solver.pg.triangles.size()); // 这里每个面的振动都需要指定；
     auto triangles = solver.pg.triangles.cpu();
     int all_step = ALL_TIME / solver.dt();
 
@@ -54,7 +56,12 @@ void PPPM_test(PPPMSolver &solver, Mesh &mesh, std::vector<int3> check_cell_list
         for (int p_id = 0; p_id < neuuman_condition.size(); p_id++)
         {
             auto &p = triangles[p_id];
-            neuuman_condition[p_id] = (mp.neumann(p.center, p.normal) * sine(solver.dt() * i)).real(); // 指明边界法线的方向导数
+
+            // TODO: 这里的振动是人工指定的, 本程序改为每个表面有自己的一个振幅，从文件读出来；
+            // 可以写成这样吗？
+            neuuman_condition[p_id] = face_wave[p_id] * sine(solver.dt() * i).real();
+
+            // neuuman_condition[p_id] = (mp.neumann(p.center, p.normal) * sine(solver.dt() * i)).real(); // 指明边界法线的方向导数
         }
         solver.set_neumann_condition(neuuman_condition);
         solver.update_dirichlet(i == all_step - 1); // Dirichlet boundary这一步在做什么?
@@ -167,6 +174,24 @@ void Analytical_test(SineSource &sine, MonoPole &mp, std::vector<float3> check_p
     write_to_txt(dirname + "analytical_solution_multi.txt", analytical_solution);
 }
 
+CArr<float> get_face_wave(std::string filename, int faces)
+{
+    std::ifstream ifs(filename);
+    std::string line;
+    std::vector<std::string> lines;
+    while (std::getline(ifs, line))
+        lines.push_back(line);
+    ifs.close();
+
+    int num = lines.size();
+    CArr<float> face_wave(faces);
+    for (int i = 0; i < faces; i++)
+    {
+        std::stof(lines[i]);
+    }
+    return face_wave;
+}
+
 int main(int argc, char *argv[])
 {
     std::vector<float> grid_size_list = {0.01, 0.015, 0.02, 0.025, 0.03, 0.035};
@@ -211,10 +236,11 @@ int main(int argc, char *argv[])
         for (auto check_point : check_point_list)
             check_cell_list.push_back(make_int3((check_point + center) / grid_size));
         
+        // TODO: 本文件需要更改下面的振动定义，从文件读出来
         auto sine = SineSource(2 * PI * 1000); // 1000Hz正弦波源
         float wave_number = sine.omega / AIR_WAVE_SPEED; 
         auto mp = MonoPole(center, wave_number);
-        
+
         std::stringstream stream1;
         stream1 << std::fixed << std::setprecision(1) << scale << "/";
         std::stringstream stream2;
@@ -225,7 +251,11 @@ int main(int argc, char *argv[])
         
         // mesh.stretch_to(pppm.size().x / scale);
         mesh.move_to(pppm.center()); // 以上两行把mesh resize到适应网格大小并放到网格中心
-        PPPM_test(pppm, mesh, check_cell_list, sine, mp, dirname); // 进行PPPM运算
+
+        // 需要从文件读入每个面的振动波形
+        std::string face_wave_file = ASSET_DIR + "face_wave.txt";
+        CArr<float> face_wave = get_face_wave(face_wave_file, mesh.triangles.size()); 
+        PPPM_test(pppm, mesh, check_cell_list, face_wave, sine, dirname); // 进行PPPM运算
         
         pppm.clear(); 
 
