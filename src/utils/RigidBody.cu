@@ -32,13 +32,13 @@ float RigidBody::GetLastFrameTime()
     return frameTime.last();
 };
 
-void RigidBody::UpdateUntil(float time)
+bool RigidBody::UpdateUntil(float time)
 {
     while(current_time < time)
     {
         audio_step();
     }
-    return;
+    return mesh_is_updated;
 };
 
 GArr<float3> & RigidBody::GetVertices()
@@ -272,16 +272,6 @@ void RigidBody::animation_step()
               rotations[animationTimeStamp]);
     animationTimeStamp++;
 }
-
-struct bbox_minimum
-{
-        __device__ float3 operator()(const float3 &a, const float3 &b) const { return fminf(a, b); }
-};
-
-struct bbox_maximum
-{
-        __device__ float3 operator()(const float3 &a, const float3 &b) const { return fmaxf(a, b); }
-};
 
 BBox RigidBody::get_bbox()
 {

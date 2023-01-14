@@ -48,26 +48,41 @@ int main()
     // std::cout << "\n";
     // write_to_txt("result.txt", result);
     
-    result.reset();
-    solver.pg.fdtd.reset();
+    // result.reset();
+    // solver.pg.fdtd.reset();
+
     progressbar bar2(step_num, "Chunk version.");
     int chunkSize = 5000;
-    int backStepSize = 175;
+    int backStepSize = 300;
     for (int i = 0; i < step_num; i++)
     {        
         if(i % chunkSize == chunkSize - backStepSize)
         {
+            auto endStep = std::min(i + backStepSize, step_num + 1);
+            auto savedT = solver.pg.fdtd.t;
             // update rest of the last chunk.
-            for(int j = i; j < i + chunkSize && j < step_num; j++)
+            for(int j = i; j < endStep; j++)
             {
                 solver.pg.fdtd.step();
-                result[j] += solver.pg.fdtd.grids[i](to_cpu(res - 2, res - 2, res - 2));
+                UpdateFDTDSignal(solver.pg.fdtd, s, j, step_num);
+                result[j] = solver.pg.fdtd.grids[i](to_cpu(res - 2, res - 2, res - 2));
             }
             solver.pg.fdtd.reset();
+            solver.neumann.reset();
+            solver.dirichlet.reset();
+            solver.pg.fdtd.t = savedT;
+            for(int j = i; j < endStep; j++)
+            {
+                solver.pg.fdtd.step();
+                UpdateFDTDSignal(solver.pg.fdtd, s, j, step_num);
+                bar2.update();
+            }
+            i = endStep - 1;
+            continue;
         }
         solver.pg.fdtd.step();
         UpdateFDTDSignal(solver.pg.fdtd, s, i, step_num);
-        result[i] += solver.pg.fdtd.grids[i](to_cpu(res - 2, res - 2, res - 2));
+        result[i] = solver.pg.fdtd.grids[i](to_cpu(res - 2, res - 2, res - 2));
         bar2.update();
     }
     std::cout << "\n";

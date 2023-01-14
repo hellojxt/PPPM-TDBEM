@@ -22,6 +22,7 @@ ObjectCollection::ObjectCollection(const std::filesystem::path& dir,
     const std::vector<std::pair<std::string, ObjectInfo::SoundType>>& objectNames,
     const std::vector<std::any>& additionalParameters)
 {
+    rootDir = dir;
     size_t verticesSize = 0, surfacesSize = 0;
     for(int i = 0 ; i < objectNames.size(); i++)
     {
@@ -30,7 +31,6 @@ ObjectCollection::ObjectCollection(const std::filesystem::path& dir,
         {
             const auto parameter = std::any_cast<std::string>(additionalParameters[i]);
             auto ptr = std::make_unique<RigidBody>(dir / objectName.first, parameter);
-            ptr->set_sample_rate(44100);
             objects.push_back(std::move(ptr));
         }
         else if(objectName.second == ObjectInfo::SoundType::Manual)
@@ -46,6 +46,7 @@ ObjectCollection::ObjectCollection(const std::filesystem::path& dir,
             objects.push_back(std::move(ptr));
         }
         auto& currObject = objects.back();
+        currObject->name = objectName.first;
         auto currObjectVerticesSize = currObject->GetVertices().size(),
             currObjectSurfacesSize = currObject->GetSurfaces().size();
         objectInfos.pushBack(ObjectInfo{ objectName.second, verticesSize, surfacesSize});
@@ -53,6 +54,97 @@ ObjectCollection::ObjectCollection(const std::filesystem::path& dir,
     }
     tetVertices.resize(verticesSize), tetSurfaces.resize(surfacesSize);
     surfaceAccs.resize(surfacesSize);
+    UpdateMesh();
+    
+    return;
+}
+
+BBox ObjectCollection::GetBBox()
+{
+    BBox box;
+    box.min = make_float3(1e10, 1e10, 1e10);
+    box.max = make_float3(-1e10, -1e10, -1e10);
+
+    for(auto& object : objects)
+    {
+        BBox objBBox = object->get_bbox();
+        box.min = fminf(box.min, objBBox.min);
+        box.max = fmaxf(box.max, objBBox.max);
+    }
+    return box;
+}
+
+void ObjectCollection::UpdateTimeStep()
+{
+    auto minStep = FLT_MAX;
+    for(int i = 0; i < objects.size(); i++)
+    {
+        minStep = std::min(minStep, objects[i]->GetTimeStep());
+    }
+    assert(minStep != FLT_MAX);
+    timeStep = minStep;
+    return;
+}
+
+void ObjectCollection::FixMesh(float precision)
+{
+    size_t verticesSize = 0, surfacesSize = 0;
+    for(int i = 0; i < objects.size(); i++)
+    {
+        auto& object = objects[i];
+        auto& objectInfo = objectInfos[i];
+        object->fix_mesh(precision, rootDir / object->name);
+        
+        objectInfo.verticesOffset = verticesSize;
+        objectInfo.surfacesOffset = surfacesSize;
+
+        verticesSize += object->GetVertices().size();
+        surfacesSize += object->GetSurfaces().size();
+    }
+    tetVertices.resize(verticesSize), tetSurfaces.resize(surfacesSize);
+    surfaceAccs.resize(surfacesSize);
+    UpdateMesh();
+    return;
+}
+
+void ObjectCollection::LoadObjectMesh_(int objID)
+{
+    auto& object = objects[objID];
+    auto& objectInfo = objectInfos[objID];
+
+    auto rawTetVerticesPtr = tetVertices.data();
+    auto rawTetSurfacesPtr = tetSurfaces.data();
+
+    auto& objectVertices = object->GetVertices();
+    auto& objectSurfaces = object->GetSurfaces();
+
+    cudaMemcpy(rawTetVerticesPtr + objectInfo.verticesOffset, objectVertices.data(),
+                objectVertices.size() * sizeof(float3), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(rawTetSurfacesPtr + objectInfo.surfacesOffset, objectSurfaces.data(),
+                objectSurfaces.size() * sizeof(int3), cudaMemcpyDeviceToDevice);
+    cuExecute(objectSurfaces.size(), AttachSurfaceIndicesOffset,
+                rawTetSurfacesPtr + objectInfo.surfacesOffset, objectSurfaces.size(),
+                objectInfo.verticesOffset);
+    return;
+}
+
+void ObjectCollection::UpdateMesh()
+{
+    for (int j = 0; j < objects.size(); j++)
+    {
+        LoadObjectMesh_(j);
+    }
+    return;
+}
+
+void ObjectCollection::UpdateAcc()
+{
+    for(int i = 0; i < objects.size(); i++)
+    {
+        auto& object = objects[i];
+        auto& objectInfo = objectInfos[i];
+        object->SubmitAccelerations(surfaceAccs.data() + objectInfo.surfacesOffset);
+    }
     return;
 }
 
@@ -68,26 +160,14 @@ void ObjectCollection::export_mesh_sequence(const std::string &output_path)
     int frame_num = lastFrameTime / animation_export_timestep;
     progressbar bar(frame_num - 1, "exporting mesh sequence");
     
-    auto rawTetVerticesPtr = tetVertices.data();
-    auto rawTetSurfacesPtr = tetSurfaces.data();
-
     for (int i = 1; i < frame_num; i++)
     {
         for(int j = 0; j < objects.size(); j++)
         {
             auto& object = objects[j];
             object->UpdateUntil(i * animation_export_timestep);
-            auto& objectVertices = object->GetVertices();
-            auto& objectSurfaces = object->GetSurfaces();
 
-            auto& objectInfo = objectInfos[j];
-            cudaMemcpy(rawTetVerticesPtr + objectInfo.verticesOffset, objectVertices.data(),
-                       objectVertices.size() * sizeof(float3), cudaMemcpyDeviceToDevice);
-            cudaMemcpy(rawTetSurfacesPtr + objectInfo.surfacesOffset, objectSurfaces.data(),
-                       objectSurfaces.size() * sizeof(int3), cudaMemcpyDeviceToDevice);
-            cuExecute(objectSurfaces.size(), AttachSurfaceIndicesOffset,
-                      rawTetSurfacesPtr + objectInfo.surfacesOffset, objectSurfaces.size(),
-                      objectInfo.verticesOffset);
+            LoadObjectMesh_(j);
         }
         
         Mesh surfaceMesh(tetVertices, tetSurfaces);

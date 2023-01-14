@@ -64,14 +64,15 @@ class RigidBody : public Object
         }
 
         virtual float GetLastFrameTime() override;
-        virtual void UpdateUntil(float time) override;
+        virtual bool UpdateUntil(float time) override;
         virtual GArr<float3> &GetVertices() override;
         virtual GArr<int3> &GetSurfaces() override;
         virtual void SubmitAccelerations(float* begin) override;
+        virtual float GetTimeStep() override { return timestep; };
 
         void separate_mode(int mode);
         void load_data(const std::string &data_dir);
-        void fix_mesh(float precision, std::string tmp_dir);
+        virtual void fix_mesh(float precision, std::string tmp_dir);
         void update_surf_matrix();
         void export_mesh_with_modes(const std::string &output_path);
         void export_surface_mesh(const std::string &output_path);
@@ -80,7 +81,7 @@ class RigidBody : public Object
         void export_mesh_sequence(const std::string &output_path);
         void export_surface_accs(const std::string &filename);
         void move_to_first_impulse();
-        BBox get_bbox();
+        virtual BBox get_bbox();
         void animation_step();
         void audio_step();
         bool end() { return current_time <= frameTime.last(); }
