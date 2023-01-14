@@ -19,6 +19,7 @@ struct ObjectInfo
     } type;
     size_t verticesOffset;
     size_t surfacesOffset;
+    std::unique_ptr<ObjectState> state;
 };
 
 class ObjectCollection
@@ -37,7 +38,7 @@ public:
     void FixMesh(float);
     BBox GetBBox();
 
-    CArr<ObjectInfo> objectInfos;
+    std::vector<ObjectInfo> objectInfos;
     std::vector<std::unique_ptr<Object>> objects;
 
     GArr<float3> tetVertices;

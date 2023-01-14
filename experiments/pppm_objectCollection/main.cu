@@ -147,7 +147,7 @@ void AudioAndManualTest()
     collection.UpdateMesh();
 
     float dt = 1.0f / frame_rate;
-    float max_time = 2.5f;
+    float max_time = 10.0f;
     LOG("bbox: " << bbox)
     LOG("min pos: " << min_pos);
     LOG("max pos: " << min_pos + grid_size * res)
@@ -172,7 +172,20 @@ void AudioAndManualTest()
 
     float currTime = 0.0f;
     progressbar bar(frame_num);
-    while (bar.get_progress() <= frame_num)
+
+    int chunkSize = 10000;
+    int backStepSize = 500;
+
+    auto CheckNaN = [&](){
+        if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
+        {
+            LOG("NAN")
+            return false;
+        }
+        return true;
+    };
+
+    auto UpdateSound = [&]()
     {
         bool meshUpdated = false;
         for (auto &object : collection.objects)
@@ -192,16 +205,66 @@ void AudioAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
-        SaveGridIf([](int frame_num) { return frame_num % 10000 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
-                   1e-5);
+        // SaveGridIf([](int frame_num) { return frame_num % 10000 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
+        //            1e-5);
+        return;
+    };
 
-        result[mute_frame_num + bar.get_progress() + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
-        if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
+    bool success = false;
+    while (bar.get_progress() <= frame_num)
+    {
+        int i = bar.get_progress();
+        if(i % chunkSize == chunkSize - backStepSize)
         {
-            LOG("NAN")
-            break;
+            auto endStep = std::min(i + backStepSize, frame_num + 1);
+            auto savedT = solver.pg.fdtd.t;
+            auto savedCurrTime = currTime;
+            for(int k = 0; k < collection.objects.size(); k++)
+            {
+                collection.objects[k]->SaveState(*(collection.objectInfos[k].state));
+            }
+            // update rest of the last chunk.
+            for(int j = i; j < endStep; j++)
+            {
+                UpdateSound();
+                result[mute_frame_num + j + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
+                success = CheckNaN();
+                if(!success)
+                    break;
+            }
+            if(!success)
+                break;
+
+            solver.pg.fdtd.reset();
+            solver.neumann.reset();
+            solver.dirichlet.reset();
+            solver.pg.fdtd.t = savedT;
+            currTime = savedCurrTime;
+            for (int k = 0; k < collection.objects.size(); k++)
+            {
+                collection.objects[k]->LoadState(*(collection.objectInfos[k].state));
+            }
+            
+            for(int j = i; j < endStep; j++)
+            {
+                success = CheckNaN();
+                if(!success)
+                    break;
+                bar.update();
+            }
+            if(!success)
+                break;
+            
+            bar.update();
+            continue;    
         }
+        
+        UpdateSound();
+        result[mute_frame_num + i + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         bar.update();
+        std::cerr.flush();
+        if(!CheckNaN())
+            break;
     }
     std::cout << "Done" << std::endl;
     write_to_txt(OUT_DIR + "/result.txt", result);

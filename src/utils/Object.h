@@ -26,6 +26,16 @@ __global__ void Transform(GArr<float3> vertices, GArr<float3> standard_vertices,
 
 __global__ void Fill(float* arr, float num, size_t size);
 
+struct ObjectState {};
+
+struct AudioObjectState : public ObjectState
+{
+public:
+    CArr<float3> vertices;
+    int animationTimeStep;
+    int accTimeStep;
+};
+
 class Object
 {
 public:
@@ -39,6 +49,8 @@ public:
     virtual BBox get_bbox() = 0;
     virtual void fix_mesh(float precision, std::string tmp_dir) = 0;
     virtual ~Object(){};
+    virtual void SaveState(ObjectState& state) = 0;
+    virtual void LoadState(ObjectState& state) = 0;
     std::string name;
 protected:
     void LoadTetMesh_(const std::string &vertsPath, const std::string &tetPath,
@@ -57,6 +69,8 @@ public:
         surfaces.assign(mesh.triangles);
         return;
     }
+    virtual void SaveState(ObjectState& state) override {};
+    virtual void LoadState(ObjectState& state) override {};
     virtual float GetLastFrameTime() override { return FLT_MAX; }
     virtual bool UpdateUntil(float time) override { return false; } // no motion.
     virtual GArr<float3> &GetVertices() override { return vertices; };
@@ -109,6 +123,21 @@ public:
         LoadAccs_(dir + "/accs.txt");
         return;
     }
+    virtual void SaveState(ObjectState& state) {
+        // Don't operator on state directly to prevent slicing.
+        AudioObjectState& actualState = static_cast<AudioObjectState&>(state);
+        actualState.vertices.assign(vertices);
+        actualState.accTimeStep = accTimeStep;
+        actualState.animationTimeStep = animationTimeStep;
+        return;
+    };
+    virtual void LoadState(ObjectState& state) {
+        AudioObjectState& actualState = static_cast<AudioObjectState&>(state);
+        vertices.assign(actualState.vertices);
+        accTimeStep = actualState.accTimeStep;
+        animationTimeStep = actualState.animationTimeStep;
+        return;
+    };
     virtual float GetTimeStep() { return sampleTime; };
     void SetSampleRate(float sampleRate) { sampleTime = 1 / sampleRate; return; }
     virtual float GetLastFrameTime() override { return frameTime.last(); }
@@ -120,7 +149,11 @@ public:
     virtual GArr<float3> &GetVertices() override { return vertices; };
     virtual GArr<int3>& GetSurfaces() override { return surfaces; };
     virtual void SubmitAccelerations(float* begin) override {
-        assert(accTimeStep <= accelerations.size());
+        if(accTimeStep >= accelerations.size())
+        {
+            cudaMemset(begin, 0, surfaces.size() * sizeof(float));
+            return;
+        }
         cuExecute(surfaces.size() / 64, Fill, begin,
                   accelerations[accTimeStep], surfaces.size());
         return;

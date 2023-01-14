@@ -27,27 +27,31 @@ ObjectCollection::ObjectCollection(const std::filesystem::path &dir,
     for (int i = 0; i < objectNames.size(); i++)
     {
         auto &objectName = objectNames[i];
+        std::unique_ptr<ObjectState> objectState = nullptr;
         if (objectName.second == ObjectInfo::SoundType::Modal)
         {
             const auto parameter = std::any_cast<std::string>(additionalParameters[i]);
             auto ptr = std::make_unique<RigidBody>(dir / objectName.first, parameter);
             objects.push_back(std::move(ptr));
+            objectState = std::move(std::make_unique<RigidBodyState>());
         }
         else if (objectName.second == ObjectInfo::SoundType::Manual)
         {
             objects.push_back(std::make_unique<ManualObject>(dir / objectName.first));
+            objectState = std::move(std::make_unique<ObjectState>());
         }
         else if (objectName.second == ObjectInfo::SoundType::Audio)
         {
             auto ptr = std::make_unique<AudioObject>(dir / objectName.first);
             ptr->SetSampleRate(44100);
             objects.push_back(std::move(ptr));
+            objectState = std::move(std::make_unique<AudioObjectState>());
         }
         auto &currObject = objects.back();
         currObject->name = objectName.first;
         auto currObjectVerticesSize = currObject->GetVertices().size(),
              currObjectSurfacesSize = currObject->GetSurfaces().size();
-        objectInfos.pushBack(ObjectInfo{objectName.second, verticesSize, surfacesSize});
+        objectInfos.push_back(ObjectInfo{objectName.second, verticesSize, surfacesSize, std::move(objectState)});
         verticesSize += currObjectVerticesSize, surfacesSize += currObjectSurfacesSize;
     }
     tetVertices.resize(verticesSize), tetSurfaces.resize(surfacesSize);

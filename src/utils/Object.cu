@@ -161,7 +161,7 @@ void Object::LoadMotion_(const std::string &path, CArr<float3> &translations,
     if (!fin.good())
     {
         LOG_ERROR("Fail to load displacement file.\n");
-        std::exit(EXIT_FAILURE);
+        return;
     }
     std::string line;
     while (getline(fin, line))
