@@ -65,7 +65,7 @@ int main()
             {
                 solver.pg.fdtd.step();
                 UpdateFDTDSignal(solver.pg.fdtd, s, j, step_num);
-                result[j] = solver.pg.fdtd.grids[i](to_cpu(res - 2, res - 2, res - 2));
+                result[j] = solver.pg.fdtd.grids[j](to_cpu(res - 2, res - 2, res - 2));
             }
             solver.pg.fdtd.reset();
             solver.neumann.reset();

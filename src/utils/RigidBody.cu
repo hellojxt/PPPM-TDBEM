@@ -58,6 +58,35 @@ void RigidBody::SubmitAccelerations(float* begin)
     return;
 }
 
+void RigidBody::SaveState(ObjectState& state)
+{
+    RigidBodyState& actualState = static_cast<RigidBodyState&>(state);
+    actualState.current_time = current_time;
+    actualState.impulseTimeStamp = impulseTimeStamp;
+    actualState.animationTimeStamp = animationTimeStamp;
+
+    actualState.vertices.assign(tetVertices);
+
+    actualState.modalInfos.assign(modalInfos);
+    actualState.surfaceAccs.assign(surfaceAccs);
+    return;
+};
+
+void RigidBody::LoadState(ObjectState& state)
+{
+    RigidBodyState& actualState = static_cast<RigidBodyState&>(state);
+    current_time = actualState.current_time;
+    impulseTimeStamp = actualState.impulseTimeStamp;
+    animationTimeStamp = actualState.animationTimeStamp;
+
+    tetVertices.assign(actualState.vertices);
+    gpuVertices.assign(actualState.vertices);
+
+    modalInfos.assign(actualState.modalInfos);
+    surfaceAccs.assign(actualState.surfaceAccs);
+    return;
+};
+
 void RigidBody::load_data(const std::string &data_dir)
 {
     impulseTimeStamp = 0;

@@ -44,6 +44,18 @@ struct ModalInfo
         void SetCoeffs(float timestep, float eigenVal, MaterialParameters &material);
 };
 
+struct RigidBodyState : public ObjectState
+{
+    CArr<float3> vertices;
+
+    CArr<ModalInfo> modalInfos;
+    CArr<float> surfaceAccs;
+
+    int animationTimeStamp;
+    int impulseTimeStamp;
+    float current_time;
+};
+
 class RigidBody : public Object
 {
     public:
@@ -69,6 +81,8 @@ class RigidBody : public Object
         virtual GArr<int3> &GetSurfaces() override;
         virtual void SubmitAccelerations(float* begin) override;
         virtual float GetTimeStep() override { return timestep; };
+        virtual void SaveState(ObjectState& state) override;
+        virtual void LoadState(ObjectState& state) override;
 
         void separate_mode(int mode);
         void load_data(const std::string &data_dir);

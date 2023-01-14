@@ -19,14 +19,13 @@
 using namespace pppm;
 
 template <typename T>
-void SaveGridIf(T func, bool saveAll, const std::string &dir, int frameNum,
-                ParticleGrid &grid, float max_value = 1.0f)
+void SaveGridIf(T func, bool saveAll, const std::string &dir, int frameNum, ParticleGrid &grid, float max_value = 1.0f)
 {
-    if(func(frameNum))
+    if (func(frameNum))
     {
-        if(saveAll)
+        if (saveAll)
         {
-            save_all_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value);
+            save_all_grid(grid, dir + "/" + std::to_string(frameNum) + "/", max_value);
         }
         else
         {
@@ -41,14 +40,10 @@ void ModalAndManualTest()
     std::string OUT_DIR = data_dir + "total/output/pppm4";
     CHECK_DIR(OUT_DIR);
 
-    ObjectCollection collection(DATASET_DIR, 
-        std::vector<std::pair<std::string, ObjectInfo::SoundType>>{ 
-            {"bowl", ObjectInfo::SoundType::Modal},
-            {"plane", ObjectInfo::SoundType::Manual}
-        }, std::vector<std::any>{
-            std::string{ "polystyrene" }, 
-            {}
-    });
+    ObjectCollection collection(DATASET_DIR,
+                                std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
+                                    {"bowl", ObjectInfo::SoundType::Modal}, {"plane", ObjectInfo::SoundType::Manual}},
+                                std::vector<std::any>{std::string{"polystyrene"}, {}});
 
     BBox bbox = collection.GetBBox();
     float3 grid_center = bbox.center();
@@ -58,7 +53,7 @@ void ModalAndManualTest()
     float3 min_pos = grid_center - grid_length / 2;
     int frame_rate = 1.01f / (grid_size / std::sqrt(3) / AIR_WAVE_SPEED);
 
-    RigidBody* bowl = static_cast<RigidBody*>(collection.objects[0].get());
+    RigidBody *bowl = static_cast<RigidBody *>(collection.objects[0].get());
     bowl->set_sample_rate(frame_rate);
 
     collection.UpdateTimeStep();
@@ -92,7 +87,7 @@ void ModalAndManualTest()
     while (bar.get_progress() <= frame_num)
     {
         bool meshUpdated = false;
-        for(auto& object : collection.objects)
+        for (auto &object : collection.objects)
         {
             meshUpdated = meshUpdated || object->UpdateUntil(currTime + timeStep);
         }
@@ -127,18 +122,17 @@ void ModalAndManualTest()
 void AudioAndManualTest()
 {
     std::string data_dir = DATASET_DIR "test";
-    std::string OUT_DIR = DATASET_DIR "phone/output/pppm";
+    std::string OUT_DIR = DATASET_DIR "test/output/pppm";
     CHECK_DIR(OUT_DIR);
 
-    ObjectCollection collection(data_dir, 
-        std::vector<std::pair<std::string, ObjectInfo::SoundType>>{ 
-            {"phone", ObjectInfo::SoundType::Audio},
-            // {"cup", ObjectInfo::SoundType::Manual}
-        }, std::vector<std::any>{
-            {},
-            // std::string{ "polystyrene" }, 
-            // {}
-    });
+    ObjectCollection collection(data_dir,
+                                std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
+                                    {"phone", ObjectInfo::SoundType::Audio}, {"cup", ObjectInfo::SoundType::Manual}},
+                                std::vector<std::any>{
+                                    {},
+                                    // std::string{ "polystyrene" },
+                                    // {}
+                                });
 
     BBox bbox = collection.GetBBox();
     float3 grid_center = bbox.center();
@@ -153,15 +147,17 @@ void AudioAndManualTest()
     collection.UpdateMesh();
 
     float dt = 1.0f / frame_rate;
-    float max_time = 2.5f;
+    float max_time = 10.0f;
+    LOG("bbox: " << bbox)
     LOG("min pos: " << min_pos);
+    LOG("max pos: " << min_pos + grid_size * res)
     LOG("grid size: " << grid_size)
     LOG("dt: " << dt)
     LOG("frame rate: " << frame_rate)
 
     PPPMSolver solver(res, grid_size, dt, min_pos);
 
-    int frame_num = max_time/ dt;
+    int frame_num = max_time / dt;
     auto IMG_DIR = OUT_DIR + "/img/";
     CHECK_DIR(IMG_DIR)
 
@@ -176,10 +172,23 @@ void AudioAndManualTest()
 
     float currTime = 0.0f;
     progressbar bar(frame_num);
-    while (bar.get_progress() <= frame_num)
+
+    int chunkSize = 10000;
+    int backStepSize = 500;
+
+    auto CheckNaN = [&](){
+        if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
+        {
+            LOG("NAN")
+            return false;
+        }
+        return true;
+    };
+
+    auto UpdateSound = [&]()
     {
         bool meshUpdated = false;
-        for(auto& object : collection.objects)
+        for (auto &object : collection.objects)
         {
             meshUpdated = meshUpdated || object->UpdateUntil(currTime + dt);
         }
@@ -196,27 +205,71 @@ void AudioAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
-        
-        // save every 1000 frames.
-        // SaveGridIf([](int frame_num){ return frame_num % 1000 == 0;},
-        //                 false, IMG_DIR, frame_num, solver.pg);
-        // save when in some range.
-        // SaveGridIf([beginFrame, endFrame](int frame_num) { 
-        //                 return frame_num >= beginFrame && frame_num < endFrame; 
-        //             }, true, IMG_DIR, frame_num, solver.pg);
+        // SaveGridIf([](int frame_num) { return frame_num % 10000 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
+        //            1e-5);
+        return;
+    };
 
-        result[mute_frame_num + bar.get_progress() + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
-        if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
+    bool success = false;
+    while (bar.get_progress() <= frame_num)
+    {
+        int i = bar.get_progress();
+        if(i % chunkSize == chunkSize - backStepSize)
         {
-            LOG("NAN")
-            break;
+            auto endStep = std::min(i + backStepSize, frame_num + 1);
+            auto savedT = solver.pg.fdtd.t;
+            auto savedCurrTime = currTime;
+            for(int k = 0; k < collection.objects.size(); k++)
+            {
+                collection.objects[k]->SaveState(*(collection.objectInfos[k].state));
+            }
+            // update rest of the last chunk.
+            for(int j = i; j < endStep; j++)
+            {
+                UpdateSound();
+                result[mute_frame_num + j + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
+                success = CheckNaN();
+                if(!success)
+                    break;
+            }
+            if(!success)
+                break;
+
+            solver.pg.fdtd.reset();
+            solver.neumann.reset();
+            solver.dirichlet.reset();
+            solver.pg.fdtd.t = savedT;
+            currTime = savedCurrTime;
+            for (int k = 0; k < collection.objects.size(); k++)
+            {
+                collection.objects[k]->LoadState(*(collection.objectInfos[k].state));
+            }
+            
+            for(int j = i; j < endStep; j++)
+            {
+                success = CheckNaN();
+                if(!success)
+                    break;
+                bar.update();
+            }
+            if(!success)
+                break;
+            
+            bar.update();
+            continue;    
         }
+        
+        UpdateSound();
+        result[mute_frame_num + i + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         bar.update();
+        std::cerr.flush();
+        if(!CheckNaN())
+            break;
     }
     std::cout << "Done" << std::endl;
     write_to_txt(OUT_DIR + "/result.txt", result);
     solver.clear();
-    return;   
+    return;
 }
 
 int main()

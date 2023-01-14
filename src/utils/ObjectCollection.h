@@ -19,6 +19,7 @@ struct ObjectInfo
     } type;
     size_t verticesOffset;
     size_t surfacesOffset;
+    std::unique_ptr<ObjectState> state;
 };
 
 class ObjectCollection
@@ -28,6 +29,7 @@ public:
                      const std::vector<std::pair<std::string, ObjectInfo::SoundType>> &objects,
                      const std::vector<std::any>& additionalParameters);
 
+    void export_mesh(const std::string &output_path);
     void export_mesh_sequence(const std::string &output_path);
     void export_modes(const std::string &output_path);
     void UpdateMesh();
@@ -36,7 +38,7 @@ public:
     void FixMesh(float);
     BBox GetBBox();
 
-    CArr<ObjectInfo> objectInfos;
+    std::vector<ObjectInfo> objectInfos;
     std::vector<std::unique_ptr<Object>> objects;
 
     GArr<float3> tetVertices;
