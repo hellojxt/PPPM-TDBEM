@@ -7,7 +7,7 @@
 namespace pppm
 {
 // 因为fix_mesh导致面元数量巨幅提升，这么大的buffer不够用了！
-#define BUFFER_MUL 3
+#define BUFFER_MUL 2
 #define BUFFER_SIZE_FACE_NUM_PER_CELL 128*BUFFER_MUL
 #define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 256*BUFFER_MUL
 #define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 512*BUFFER_MUL

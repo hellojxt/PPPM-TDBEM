@@ -10,3 +10,5 @@ dataset/**/*.txt
 experiments/**/*.txt
 dataset/test
 dataset/test2
+assets/fixed/
+
