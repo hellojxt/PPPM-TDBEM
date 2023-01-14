@@ -178,12 +178,17 @@ int main(int argc, char *argv[])
 
     // auto check_point = make_float3(0.25f, 0.0f, 0.0f);
     // xcx: 多个check_point阵列
+
+    // 多个bounding box，每个bounding box取3*3*3-1=26个点，目前有26*6=156个点
     std::vector<float3> check_point_list;
-    for (int i = -2; i <= 2; i++)
-        for (int j = -2; j <= 2; j++)
-            for (int k = -2; k <= 2; k++)
-                if(i*i + j*j + k*k >= 4) // 保证采样点不能离物体太近
-                    check_point_list.push_back(make_float3(0.2f * i, 0.2f * j, 0.2f * k));
+    std::vector<float> bb_size_list = {0.15, 0.2, 0.25, 0.3, 0.35, 0.4};
+    for(auto bb_size : bb_size_list)
+        for (int i = -1; i <= 1; i++)
+            for (int j = -1; j <= 1; j++)
+                for (int k = -1; k <= 1; k++)
+                    if(i*i + j*j + k*k >= 1) // 保证采样点不能离物体太近
+                        check_point_list.push_back(make_float3(i * bb_size, j * bb_size, k * bb_size));
+
     // get scale from argv[0]
     float scale;
     if (argc > 1)

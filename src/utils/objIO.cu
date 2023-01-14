@@ -244,17 +244,16 @@ void Mesh::fix_mesh(float precision, std::string tmp_dir, std::string mesh_name)
     std::string out_mesh_dirname = out_path + "/" + out_mesh_name;
     if (access(out_mesh_dirname.c_str(), 0) == -1)
     {
-        
         int isCreate = mkdir(out_path.c_str(), 0777);
-        export_surface_mesh(out_path, mesh_name);
+    }
 
+        export_surface_mesh(out_path, mesh_name);
         std::string cmd = "docker run -it --rm -v " + out_path + ":/models " + "-v " + python_src_dir + ":/scripts " +
                         "pymesh/pymesh /scripts/" + python_src_name + " --detail " + std::to_string(precision) +
                         " /models/" + in_mesh_name + " /models/" + out_mesh_name;
         // std::cout << cmd << std::endl;
         system(cmd.c_str());
-    }
-
+    
     Mesh fixedMesh(out_path + "/" + out_mesh_name);
     GArr<float3> fixedVertices = fixedMesh.vertices.gpu();
     GArr<int3> fixedSurfaces = fixedMesh.triangles.gpu();

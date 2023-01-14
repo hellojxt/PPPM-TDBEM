@@ -55,7 +55,8 @@ dirs = sorted(dirs, key=lambda x: x.split('/')[-1])
 subdirs = []
 for dir in dirs:
     # if dir[-4:] != ".png":
-    subdirs.append(sorted(glob(dir + '/0.*'), key=lambda x: x.split('/')[-1]))
+    if '6.0' in dir:
+        subdirs.append(sorted(glob(dir + '/0.*'), key=lambda x: x.split('/')[-1]))
 keys = [dir.split('/')[-1] for dir in subdirs[0]]
 
 # 去除非以网格大小命名的文件夹的数据
@@ -76,14 +77,18 @@ ghost_2nd_times = [[] for i in range(len(keys))]
 
 # multi情形clip移到SNR计算中
 clip_idx = 256
-point_num = 98
+point_num = 156
+bb_point_num = 26
+bb_num = 6
 
 # 用来给多个点每个点输出一个结果
-sample_points = 6
-sample_lists = [0, 1, 2, 6, 7, 12] # 根据对称性，对球体来说只有六种不同的采样点
-pppm_data_multi = [([[] for i in range(len(keys))]) for i in range(sample_points)]
-ghost_1st_data_multi = [([[] for i in range(len(keys))]) for i in range(sample_points)]
-ghost_2nd_data_multi = [([[] for i in range(len(keys))]) for i in range(sample_points)]
+# sample_points = 6
+# sample_lists = [0, 1, 2, 6, 7, 12] # 根据对称性，对球体来说只有六种不同的采样点
+
+# 这里计算每一个包围盒的所有点的平均SNR
+pppm_data_multi = [([[] for i in range(len(keys))]) for i in range(bb_num)]
+ghost_1st_data_multi = [([[] for i in range(len(keys))]) for i in range(bb_num)]
+ghost_2nd_data_multi = [([[] for i in range(len(keys))]) for i in range(bb_num)]
 
 for dir_parent in subdirs:
     for i, dir in enumerate(dir_parent):
@@ -112,21 +117,23 @@ for dir_parent in subdirs:
         # ghost_1st_data[i].append(SNR(analytical, ghost_cell_1st))
         # ghost_2nd_data[i].append(SNR(analytical, ghost_cell_2nd))
 
-        # 依次分别计算多点输入
-        for cnt_point in range(sample_points):
-            pppm_data_multi[cnt_point][i].append( \
-                one_multi_SNR(analytical, pppm, clip_idx, sample_lists[cnt_point], len(pppm) // point_num))
-            ghost_1st_data_multi[cnt_point][i].append( \
-                one_multi_SNR(analytical, ghost_cell_1st, clip_idx, sample_lists[cnt_point], len(pppm) // point_num))
-            ghost_2nd_data_multi[cnt_point][i].append( \
-                one_multi_SNR(analytical, ghost_cell_2nd, clip_idx, sample_lists[cnt_point], len(pppm) // point_num))
+        # 依次分别计算多点输入j
+        step_bb = len(analytical) // point_num * bb_point_num
+        for j in range(bb_num):
+            pppm_data_multi[j][i].append( \
+                multi_SNR(analytical[j * step_bb:(j+1) * step_bb], pppm[j * step_bb:(j+1) * step_bb], bb_point_num, clip_idx, 'logsnr_avg'))
+            ghost_1st_data_multi[j][i].append( \
+                multi_SNR(analytical[j * step_bb:(j+1) * step_bb], ghost_cell_1st[j * step_bb:(j+1) * step_bb], bb_point_num, clip_idx, 'logsnr_avg'))
+            ghost_2nd_data_multi[j][i].append( \
+                multi_SNR(analytical[j * step_bb:(j+1) * step_bb], ghost_cell_2nd[j * step_bb:(j+1) * step_bb], bb_point_num, clip_idx, 'logsnr_avg'))
+
 
         # 保存cnt_point=0的wav结果
-        save_wav_path = dir + "/"
-        save_wav(analytical[clip_idx: len(analytical) // point_num], save_wav_path + "analytical.wav")
-        save_wav(pppm[clip_idx: len(pppm) // point_num], save_wav_path + "pppm.wav")
-        save_wav(ghost_cell_1st[clip_idx: len(ghost_cell_1st) // point_num], save_wav_path + "ghost_cell_1st.wav")
-        save_wav(ghost_cell_2nd[clip_idx: len(ghost_cell_2nd) // point_num], save_wav_path + "ghost_cell_2nd.wav")
+        # save_wav_path = dir + "/"
+        # save_wav(analytical[clip_idx: len(analytical) // point_num], save_wav_path + "analytical.wav")
+        # save_wav(pppm[clip_idx: len(pppm) // point_num], save_wav_path + "pppm.wav")
+        # save_wav(ghost_cell_1st[clip_idx: len(ghost_cell_1st) // point_num], save_wav_path + "ghost_cell_1st.wav")
+        # save_wav(ghost_cell_2nd[clip_idx: len(ghost_cell_2nd) // point_num], save_wav_path + "ghost_cell_2nd.wav")
 
 
 # pppm_data = 10 * np.log10(np.array(pppm_data)).mean(axis=1)
@@ -142,11 +149,11 @@ ghost_1st_times = np.array(ghost_1st_times).mean(axis=1)
 ghost_2nd_times = np.array(ghost_2nd_times).mean(axis=1)
 
 # 逐点保存采样
-for i in range(sample_points):
+for i in range(bb_num):
     plot_data([pppm_data_multi[i], ghost_1st_data_multi[i], ghost_2nd_data_multi[i]], \
         ['PPPM', 'Ghost Cell 1st', 'Ghost Cell 2nd'], labels=keys, title="average SNR")
     path = 'experiments/static/output/' + model_name + ".obj/6.0/"
-    plt.savefig(path + "SNR_point_ " + str(i) + ".png") 
+    plt.savefig(path + "SNR_bbsize_ " + str(0.05 * (3 + i))[:4] + ".png") 
 
 plot_data([pppm_data, ghost_1st_data, ghost_2nd_data], ['PPPM', 'Ghost Cell 1st', 'Ghost Cell 2nd'], labels=keys, title="average SNR")
 path = 'experiments/static/output/' + model_name + ".obj/6.0/"

@@ -175,7 +175,7 @@ __global__ void update_dirichlet_kernel(PPPMSolver solver)
         factor_sum += solver.face_factor(tri_idx, i);
     }
     solver.dirichlet[tri_idx][solver.time_idx()] =
-        (solver.face_far_field[tri_idx] * 0.83 + near_field_sum) / (0.5 * tri.area - factor_sum);
+        (solver.face_far_field[tri_idx] * 1 + near_field_sum) / (0.5 * tri.area - factor_sum);
 }
 
 void PPPMSolver::update_dirichlet(bool log_time)
