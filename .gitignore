@@ -12,4 +12,5 @@ experiments/**/*.wav
 dataset/test
 dataset/test2
 assets/fixed/
+**/img
 
