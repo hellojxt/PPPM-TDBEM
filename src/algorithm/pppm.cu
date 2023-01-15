@@ -41,8 +41,10 @@ __global__ void solve_fdtd_far_kernel(PPPMSolver solver)
 void PPPMSolver::solve_fdtd_far(bool log_time)
 {
     START_TIME(log_time)
-    grid_far_field[time_idx()].assign(pg.fdtd.grids[time_idx()]); // 将上一时间步fdtd计算出来的当前时间步波值赋值给far_field
-    cuExecuteBlock(pg.neighbor_3_square_nonempty.size(), 64, solve_fdtd_far_kernel, *this); // 对所有3*3*3范围内非空的网格,计算其远场传播
+    grid_far_field[time_idx()].assign(
+        pg.fdtd.grids[time_idx()]);  // 将上一时间步fdtd计算出来的当前时间步波值赋值给far_field
+    cuExecuteBlock(pg.neighbor_3_square_nonempty.size(), 64, solve_fdtd_far_kernel,
+                   *this);  // 对所有3*3*3范围内非空的网格,计算其远场传播
     LOG_TIME("solve_fdtd_far")
 }
 
@@ -175,7 +177,7 @@ __global__ void update_dirichlet_kernel(PPPMSolver solver)
         factor_sum += solver.face_factor(tri_idx, i);
     }
     solver.dirichlet[tri_idx][solver.time_idx()] =
-        (solver.face_far_field[tri_idx] * 1 + near_field_sum) / (0.5 * tri.area - factor_sum);
+        (solver.face_far_field[tri_idx] * 0.83 + near_field_sum) / (0.5 * tri.area - factor_sum);
 }
 
 void PPPMSolver::update_dirichlet(bool log_time)

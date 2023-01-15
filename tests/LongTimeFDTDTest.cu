@@ -1,6 +1,8 @@
+#include <string>
 #include "case_generator.h"
 #include "fdtd.h"
 #include "gui.h"
+#include "macro.h"
 #include "objIO.h"
 #include "sound_source.h"
 #include "visualize.h"
@@ -16,7 +18,7 @@ __global__ void set_center_signal(FDTD fdtd, SineSource s)
     fdtd.grids[fdtd.t](center) = s((fdtd.t) * fdtd.dt).real();
 }
 
-void UpdateFDTDSignal(FDTD& fdtd, SineSource& sineSource, int step, int totalStep)
+void UpdateFDTDSignal(FDTD &fdtd, SineSource &sineSource, int step, int totalStep)
 {
     if (step < totalStep)
         cuExecuteBlock(1, 1, set_center_signal, fdtd, sineSource);
@@ -39,7 +41,7 @@ void Test1()
 
     // progressbar bar(step_num, "No chunk version.");
     // for (int i = 0; i < step_num; i++)
-    // {        
+    // {
     //     solver.pg.fdtd.step();
     //     UpdateFDTDSignal(solver.pg.fdtd, s, i, step_num);
     //     result[i] = solver.pg.fdtd.grids[i](to_cpu(res - 2, res - 2, res - 2));
@@ -47,7 +49,7 @@ void Test1()
     // }
     // std::cout << "\n";
     // write_to_txt("result.txt", result);
-    
+
     // result.reset();
     // solver.pg.fdtd.reset();
 
@@ -55,13 +57,13 @@ void Test1()
     int chunkSize = 5000;
     int backStepSize = 300;
     for (int i = 0; i < step_num; i++)
-    {        
-        if(i % chunkSize == chunkSize - backStepSize)
+    {
+        if (i % chunkSize == chunkSize - backStepSize)
         {
             auto endStep = std::min(i + backStepSize, step_num + 1);
             auto savedT = solver.pg.fdtd.t;
             // update rest of the last chunk.
-            for(int j = i; j < endStep; j++)
+            for (int j = i; j < endStep; j++)
             {
                 solver.pg.fdtd.step();
                 UpdateFDTDSignal(solver.pg.fdtd, s, j, step_num);
@@ -71,7 +73,7 @@ void Test1()
             solver.neumann.reset();
             solver.dirichlet.reset();
             solver.pg.fdtd.t = savedT;
-            for(int j = i; j < endStep; j++)
+            for (int j = i; j < endStep; j++)
             {
                 solver.pg.fdtd.step();
                 UpdateFDTDSignal(solver.pg.fdtd, s, j, step_num);
@@ -106,33 +108,54 @@ void Test1()
 //     }
 // }
 
-void UpdateSolver(PPPMSolver &solver, CArr<Triangle> &triangles,
-                  SineSource &sine, MonoPole &mp, int step, int totalStep)
+void UpdateSolver(PPPMSolver &solver,
+                  CArr<Triangle> &triangles,
+                  SineSource &sine,
+                  MonoPole &mp,
+                  int step,
+                  int totalStep)
 {
     CArr<float> neumann_condition;
     neumann_condition.resize(triangles.size());
-    for(int i = 0; i < triangles.size(); i++)
+    for (int i = 0; i < triangles.size(); i++)
     {
         auto &triangle = triangles[i];
-        neumann_condition[i] = (mp.neumann(triangle.center, triangle.normal) *
-                                sine(solver.dt() * step)).real();
+        neumann_condition[i] = (mp.neumann(triangle.center, triangle.normal) * sine(solver.dt() * step)).real();
     }
-    solver.set_neumann_condition(neumann_condition);
-    solver.update_dirichlet();
-    solver.solve_fdtd_near(); 
-
+    LOG(neumann_condition[0])
+    solver.update_grid_and_face(neumann_condition);
     return;
+}
+
+template <typename T>
+void SaveGridIf(T func, bool saveAll, const std::string &dir, int frameNum, ParticleGrid &grid, float max_value = 1.0f)
+{
+    CHECK_DIR(dir)
+    if (func(frameNum))
+    {
+        if (saveAll)
+        {
+            save_all_grid(grid, dir + "/" + std::to_string(frameNum) + "/", max_value);
+        }
+        else
+        {
+            save_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value);
+        }
+    }
 }
 
 void Test2(bool needAnswer = false)
 {
     int step_num = 5000;
-    int res = 64;
-    Mesh mesh = Mesh::loadOBJ("/home/jiaming/Self/PPPM-github/PPPM-TDBEM/assets/sphere3.obj");
+    int res = 40;
+    Mesh mesh = Mesh::loadOBJ(ASSET_DIR + std::string("sphere4.obj"));
+    mesh.stretch_to(0.1f);
     BBox bbox = mesh.bbox();
-
-    float3 min_pos = bbox.center() - bbox.length();
-    float grid_size = bbox.length() * 2 / res;
+    auto OUT_DIR = EXP_DIR + std::string("/test/Longtime/");
+    CHECK_DIR(OUT_DIR);
+    float grid_length = bbox.length() * 4;
+    float3 min_pos = bbox.center() - grid_length / 2;
+    float grid_size = grid_length / res;
     float dt = grid_size / AIR_WAVE_SPEED / std::sqrt(3) / 1.01;
     PPPMSolver solver(res, grid_size, dt, min_pos);
 
@@ -144,68 +167,64 @@ void Test2(bool needAnswer = false)
     // acceleration.resize(mesh.triangles.size());
 
     auto sine = SineSource(2 * PI * 1000);
-    float wave_number = sine.omega / AIR_WAVE_SPEED; 
+    float wave_number = sine.omega / AIR_WAVE_SPEED;
     auto mp = MonoPole(bbox.center(), wave_number);
 
-    auto checkCoord = to_cpu(res - 2, res - 2, res - 2);
-    auto checkPoint = 1.0f * (res - 2) / res * bbox.length() / 2 + bbox.center();
-
-    // should be same if sphere has center (0, 0, 0).
-    LOG(checkPoint);
-    LOG(1.0f * (res - 2) / res * bbox.max);
+    auto checkCoord = to_cpu(res - 5, res - 5, res - 5);
+    auto checkPoint = solver.pg.getCenter(res - 5, res - 5, res - 5);
 
     solver.set_mesh(mesh.vertices, mesh.triangles);
     CArr<Triangle> triangles = solver.pg.triangles.cpu();
-    
+
     progressbar bar2(step_num, "Chunk version.");
     int chunkSize = 1000;
     int backStepSize = 100;
-    
-    for (int i = 0; i < step_num; i++)
-    {   
-        if(i % chunkSize == chunkSize - backStepSize)
-        {
-            auto endStep = std::min(i + backStepSize, step_num + 1);
-            auto savedT = solver.pg.fdtd.t;
-            // update rest of the last chunk.
-            for(int j = i; j < endStep; j++)
-            {
-                UpdateSolver(solver, triangles, sine, mp, j, step_num);
 
-                result[j] = solver.pg.fdtd.grids[j](checkCoord);
-            }
-            solver.pg.fdtd.reset();
-            solver.neumann.reset();
-            solver.dirichlet.reset();
-            solver.pg.fdtd.t = savedT;
-            for(int j = i; j < endStep; j++)
-            {
-                UpdateSolver(solver, triangles, sine, mp, j, step_num);
-                bar2.update();
-            }
-            i = endStep - 1;
-            continue;
-        }
+    for (int i = 0; i < step_num; i++)
+    {
+        // if (i % chunkSize == chunkSize - backStepSize)
+        // {
+        //     auto endStep = std::min(i + backStepSize, step_num + 1);
+        //     auto savedT = solver.pg.fdtd.t;
+        //     // update rest of the last chunk.
+        //     for (int j = i; j < endStep; j++)
+        //     {
+        //         UpdateSolver(solver, triangles, sine, mp, j, step_num);
+        //         result[j] = solver.pg.fdtd.grids[j](checkCoord);
+        //     }
+        //     solver.pg.fdtd.reset();
+        //     solver.neumann.reset();
+        //     solver.dirichlet.reset();
+        //     solver.pg.fdtd.t = savedT;
+        //     for (int j = i; j < endStep; j++)
+        //     {
+        //         UpdateSolver(solver, triangles, sine, mp, j, step_num);
+        //         bar2.update();
+        //     }
+        //     i = endStep - 1;
+        //     continue;
+        // }
+        SaveGridIf([](int frame_num) { return frame_num < 100; }, false, OUT_DIR + "/img", i, solver.pg, 0.01f);
         UpdateSolver(solver, triangles, sine, mp, i, step_num);
         result[i] = solver.pg.fdtd.grids[i](checkCoord);
         bar2.update();
     }
     std::cout << "\n";
-    write_to_txt("result5.txt", result);
-    
-    if(needAnswer)
+    write_to_txt(OUT_DIR + "pppm.txt", result);
+
+    if (needAnswer)
     {
         CArr<float> analytical_solution(step_num);
         for (int i = 0; i < step_num; i++)
             analytical_solution[i] = (mp.dirichlet(checkPoint) * sine(dt * i)).real();
 
-        write_to_txt("result6.txt", analytical_solution);
+        write_to_txt(OUT_DIR + "gt.txt", analytical_solution);
     }
     return;
 }
 
 int main()
 {
-    Test2();
+    Test2(true);
     return 0;
 }
