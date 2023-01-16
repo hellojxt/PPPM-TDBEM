@@ -234,14 +234,14 @@ void Mesh::fix_mesh(float precision, std::string tmp_dir, std::string mesh_name)
     CHECK_DIR(tmp_dir);
     std::string python_src_dir = ROOT_DIR + std::string("python_scripts/");
     std::string python_src_name = "fix_mesh.py";
-    std::string in_mesh_name = tmp_dir + "/" + mesh_name;
-    std::string out_mesh_name = tmp_dir + "/fixed_" + mesh_name;
-    writeOBJ(in_mesh_name);
+    std::string in_mesh_name = mesh_name;
+    std::string out_mesh_name = "fixed_" + mesh_name;
+    writeOBJ(tmp_dir + "/" + in_mesh_name);
     std::string cmd = "docker run -it --rm -v " + tmp_dir + ":/models " + "-v " + python_src_dir + ":/scripts " +
                       "pymesh/pymesh /scripts/" + python_src_name + " --detail " + std::to_string(precision) +
                       " /models/" + in_mesh_name + " /models/" + out_mesh_name;
     system(cmd.c_str());
-    Mesh fixedMesh(out_mesh_name);
+    Mesh fixedMesh(tmp_dir + "/" + out_mesh_name);
     vertices.assign(fixedMesh.vertices);
     triangles.assign(fixedMesh.triangles);
 }
