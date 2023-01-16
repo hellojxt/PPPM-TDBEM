@@ -37,7 +37,7 @@ void SaveGridIf(T func, bool saveAll, const std::string &dir, int frameNum, Part
 void ModalAndManualTest()
 {
     std::string data_dir = DATASET_DIR;
-    std::string OUT_DIR = data_dir + "total/output/pppm4";
+    std::string OUT_DIR = "/home/jiaming/Self/PPPM-github/render-result/bowl-plane";
     CHECK_DIR(OUT_DIR);
 
     ObjectCollection collection(DATASET_DIR,
@@ -83,15 +83,25 @@ void ModalAndManualTest()
 
     auto currTime = bowl->current_time;
     auto timeStep = collection.timeStep;
+
     progressbar bar(frame_num);
-    while (bar.get_progress() <= frame_num)
+    auto CheckNaN = [&](){
+        if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
+        {
+            LOG("NAN")
+            return false;
+        }
+        return true;
+    };
+
+    auto UpdateSound = [&]()
     {
         bool meshUpdated = false;
         for (auto &object : collection.objects)
         {
-            meshUpdated = meshUpdated || object->UpdateUntil(currTime + timeStep);
+            meshUpdated = meshUpdated || object->UpdateUntil(currTime + dt);
         }
-        currTime += timeStep;
+        currTime += dt;
         collection.UpdateMesh();
         collection.UpdateAcc();
 
@@ -104,14 +114,70 @@ void ModalAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
-        result[mute_frame_num + bar.get_progress() + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
-        if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
+        // SaveGridIf([](int frame_num) { return frame_num % 10000 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
+        //            1e-5);
+        return;
+    };
+
+    int chunkSize = 10000;
+    int backStepSize = 500;
+    bool success = false;
+    while (bar.get_progress() <= frame_num)
+    {
+        int i = bar.get_progress();
+        if(i % chunkSize == chunkSize - backStepSize)
         {
-            LOG("NAN")
-            break;
+            auto endStep = std::min(i + backStepSize, frame_num + 1);
+            auto savedT = solver.pg.fdtd.t;
+            auto savedCurrTime = currTime;
+            for(int k = 0; k < collection.objects.size(); k++)
+            {
+                collection.objects[k]->SaveState(*(collection.objectInfos[k].state));
+            }
+            // update rest of the last chunk.
+            for(int j = i; j < endStep; j++)
+            {
+                UpdateSound();
+                result[mute_frame_num + j + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
+                success = CheckNaN();
+                if(!success)
+                    break;
+            }
+            if(!success)
+                break;
+
+            solver.pg.fdtd.reset();
+            solver.neumann.reset();
+            solver.dirichlet.reset();
+            solver.pg.fdtd.t = savedT;
+            currTime = savedCurrTime;
+            for (int k = 0; k < collection.objects.size(); k++)
+            {
+                collection.objects[k]->LoadState(*(collection.objectInfos[k].state));
+            }
+            
+            for(int j = i; j < endStep; j++)
+            {
+                UpdateSound();
+                success = CheckNaN();
+                if(!success)
+                    break;
+                bar.update();
+            }
+            if(!success)
+                break;
+            
+            bar.update();
+            continue;    
         }
+        
+        UpdateSound();
+        result[mute_frame_num + i + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         bar.update();
+        if(!CheckNaN())
+            break;
     }
+
     std::cout << "Done" << std::endl;
     write_to_txt(OUT_DIR + "/result.txt", result);
     bowl->clear();
@@ -122,17 +188,31 @@ void ModalAndManualTest()
 void AudioAndManualTest()
 {
     std::string data_dir = DATASET_DIR "test";
-    std::string OUT_DIR = DATASET_DIR "test/output/pppm";
+    std::string OUT_DIR = "/home/jiaming/Self/PPPM-github/render-result/glass-water";
     CHECK_DIR(OUT_DIR);
 
-    ObjectCollection collection(data_dir,
+    // ObjectCollection collection(data_dir,
+    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
+    //                                 {"phone", ObjectInfo::SoundType::Audio}, {"cup", ObjectInfo::SoundType::Manual}},
+    //                             std::vector<std::any>{
+    //                                 {},
+    //                                 // std::string{ "polystyrene" },
+    //                                 // {}
+    //                             });
+
+    // ObjectCollection collection(data_dir,
+    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
+    //                                 {"trumpet_horn_speaker", ObjectInfo::SoundType::Audio},
+    //                                 {"plunger", ObjectInfo::SoundType::Audio}, // for plunger has motion.
+    //                                 {"trumpet_horn", ObjectInfo::SoundType::Manual}},
+    //                             {});
+
+    ObjectCollection collection("/home/jiaming/Downloads/倒水demo",
                                 std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-                                    {"phone", ObjectInfo::SoundType::Audio}, {"cup", ObjectInfo::SoundType::Manual}},
-                                std::vector<std::any>{
-                                    {},
-                                    // std::string{ "polystyrene" },
-                                    // {}
-                                });
+                                    {"water", ObjectInfo::SoundType::Audio},
+                                    {"glass", ObjectInfo::SoundType::Manual}},
+                                {});
+
 
     BBox bbox = collection.GetBBox();
     float3 grid_center = bbox.center();
@@ -167,8 +247,6 @@ void AudioAndManualTest()
     CArr<float> result(mute_frame_num + frame_num + 2);
     result.reset();
     result[0] = frame_rate;
-
-    const int beginFrame = 0, endFrame = 1000;
 
     float currTime = 0.0f;
     progressbar bar(frame_num);
@@ -205,8 +283,8 @@ void AudioAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
-        // SaveGridIf([](int frame_num) { return frame_num % 10000 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
-        //            1e-5);
+        SaveGridIf([](int frame_num) { return frame_num % 10010 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
+                   1e-5);
         return;
     };
 
@@ -247,6 +325,7 @@ void AudioAndManualTest()
             
             for(int j = i; j < endStep; j++)
             {
+                UpdateSound();
                 success = CheckNaN();
                 if(!success)
                     break;
@@ -262,7 +341,6 @@ void AudioAndManualTest()
         UpdateSound();
         result[mute_frame_num + i + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         bar.update();
-        std::cerr.flush();
         if(!CheckNaN())
             break;
     }
@@ -275,5 +353,6 @@ void AudioAndManualTest()
 int main()
 {
     AudioAndManualTest();
+    // ModalAndManualTest();
     return 0;
 }

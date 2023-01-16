@@ -160,6 +160,10 @@ void ObjectCollection::export_mesh(const std::string &output_path)
 void ObjectCollection::export_mesh_sequence(const std::string &output_path)
 {
     CHECK_DIR(output_path);
+    CHECK_DIR(output_path + "/total");
+    for(int i = 0; i < objects.size(); i++)
+        CHECK_DIR(output_path + "/" + std::to_string(i));
+    
     float animation_export_timestep = 1.0f / 24.0f;
     float lastFrameTime = FLT_MAX;
     for (auto &object : objects)
@@ -176,9 +180,15 @@ void ObjectCollection::export_mesh_sequence(const std::string &output_path)
             auto &object = objects[j];
             object->UpdateUntil(i * animation_export_timestep);
 
+            Mesh surfaceMesh(object->GetVertices().cpu(),
+                             object->GetSurfaces().cpu());
+            surfaceMesh.remove_isolated_vertices();
+            surfaceMesh.writeOBJ(output_path + "/" + std::to_string(j) +
+                                 "/surface_" + std::to_string(i) + ".obj");
+
             LoadObjectMesh_(j);
         }
-        export_mesh(output_path + "/surface_" + std::to_string(i) + ".obj");
+        export_mesh(output_path + "/total/surface_" + std::to_string(i) + ".obj");
         bar.update();
     }
     std::cout << std::endl;

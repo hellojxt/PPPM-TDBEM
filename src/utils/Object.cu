@@ -19,13 +19,62 @@ __global__ void Transform(GArr<float3> vertices, GArr<float3> standard_vertices,
     return;
 }
 
-__global__ void Fill(float* arr, float num, size_t size)
+__global__ void FillIf(float* arr, int* judge, float num, size_t size)
 {
     int id = (threadIdx.x + blockIdx.x * blockDim.x) * 64;
     for(int i = 0; i < 64 && id + i < size; i++)
     {
-        arr[id + i] = num;
+        if(judge[id + i])
+            arr[id + i] = num;
+        else
+            arr[id + i] = 0;
     }
+    return;
+}
+
+__global__ void FindNearestVertex(
+    GArr<float3> origin_vertices,
+    GArr<int3> origin_surfaces,
+    GArr<float3> vertices,
+    GArr<int3> surfaces,
+    GArr<int> judge,
+    GArr<int> selectedVertices)
+{
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= surfaces.size())
+        return;
+    int3 surface = surfaces[id];
+    float3 verts[3] = {vertices[surface.x], vertices[surface.y], vertices[surface.z]};
+    int min_dist_id[3] = {-1, -1, -1};
+    float min_dist[3] = {MAX_FLOAT, MAX_FLOAT, MAX_FLOAT};
+#pragma unroll
+    for (int f_id = 0; f_id < origin_surfaces.size(); f_id++)
+    {
+        int3 face = origin_surfaces[f_id];
+        float3 o_verts[3] = {origin_vertices[face.x], origin_vertices[face.y], origin_vertices[face.z]};
+        for (int i = 0; i < 3; i++)
+        {
+            float3 nearest_p = get_nearest_triangle_point(verts[i], o_verts[0], o_verts[1], o_verts[2]);
+            float dist = length(nearest_p - verts[i]);
+            if (dist < min_dist[i])
+            {
+                min_dist[i] = dist;
+                min_dist_id[i] = f_id;
+            }
+        }
+    }
+#pragma unroll
+    for(int vertexID = 0; vertexID < selectedVertices.size(); vertexID++)
+    {
+        if (selectedVertices[vertexID] == min_dist_id[0] ||
+            selectedVertices[vertexID] == min_dist_id[1] ||
+            selectedVertices[vertexID] == min_dist_id[2])
+        {
+            judge[id] = 1;
+            return;
+        }
+    }
+    judge[id] = 0;
     return;
 }
 
@@ -160,7 +209,7 @@ void Object::LoadMotion_(const std::string &path, CArr<float3> &translations,
     float4 currRotation;
     if (!fin.good())
     {
-        LOG_ERROR("Fail to load displacement file.\n");
+        LOG_ERROR("Fail to load displacement file at " << path << "\n");
         return;
     }
     std::string line;
@@ -181,6 +230,11 @@ void Object::LoadMotion_(const std::string &path, CArr<float3> &translations,
 void AudioObject::LoadAccs_(const std::string& path)
 {
     std::ifstream fin(path);
+    if(!fin.good())
+    {
+        LOG_ERROR("Fail to load acceleration file at " << path << "\n");
+        return;
+    }
     float currAcc = 0;
     while(true)
     {
@@ -192,6 +246,30 @@ void AudioObject::LoadAccs_(const std::string& path)
         }
         accelerations.pushBack(currAcc);
     }
+    return;
+}
+
+void AudioObject::LoadCover_(const std::string& path)
+{
+    std::ifstream fin(path);
+    if(!fin.good())
+    {
+        LOG_ERROR("Fail to load selected vertices file at " << path << "\n");
+        return;
+    }
+    CArr<int> cpuCoverVertices;
+    int currVertex = 0;
+    while(true)
+    {
+        fin >> currVertex;
+        if(!fin.good())
+        {
+            assert(fin.eof());
+            break;
+        }
+        cpuCoverVertices.pushBack(currVertex);
+    }
+    selectedVertices.assign(cpuCoverVertices);
     return;
 }
 

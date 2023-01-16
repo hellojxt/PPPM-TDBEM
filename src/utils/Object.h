@@ -24,7 +24,15 @@ __device__ inline float3 rotate(const float4 q, const float3 v);
 __global__ void Transform(GArr<float3> vertices, GArr<float3> standard_vertices,
                           float3 translation, float4 rotation);
 
-__global__ void Fill(float* arr, float num, size_t size);
+__global__ void FillIf(float* arr, int* judge, float num, size_t size);
+
+__global__ void FindNearestVertex(
+    GArr<float3> origin_vertices,
+    GArr<int3> origin_surfaces,
+    GArr<float3> vertices,
+    GArr<int3> surfaces,
+    GArr<int> judge,
+    GArr<int> selectedVertices);
 
 struct ObjectState {};
 
@@ -121,6 +129,7 @@ public:
         surfaces.assign(mesh.triangles);
         LoadMotion_(dir + "/motion.txt", translations, rotations, frameTime);
         LoadAccs_(dir + "/accs.txt");
+        LoadCover_(dir + "/selected_vertices.txt");
         return;
     }
     virtual void SaveState(ObjectState& state) {
@@ -140,7 +149,7 @@ public:
     };
     virtual float GetTimeStep() { return sampleTime; };
     void SetSampleRate(float sampleRate) { sampleTime = 1 / sampleRate; return; }
-    virtual float GetLastFrameTime() override { return frameTime.last(); }
+    virtual float GetLastFrameTime() override { return frameTime.isEmpty() ? FLT_MAX : frameTime.last(); }
     virtual bool UpdateUntil(float time) override { 
         bool animationUpdate = AnimationUpdateUntil_(time);
         AccelerationUpdateUntil_(time);
@@ -154,7 +163,7 @@ public:
             cudaMemset(begin, 0, surfaces.size() * sizeof(float));
             return;
         }
-        cuExecute(surfaces.size() / 64, Fill, begin,
+        cuExecute(surfaces.size() / 64, FillIf, begin, selectedSurfacesJudgement.data(),
                   accelerations[accTimeStep], surfaces.size());
         return;
     }
@@ -171,10 +180,35 @@ public:
                         " /models/" + in_mesh_name + " /models/" + out_mesh_name;
         // std::cout << cmd << std::endl;
         system(cmd.c_str());
+
         Mesh fixedMesh(tmp_dir + "/" + out_mesh_name);
+
+        if(accelerations.isEmpty())
+        {
+            vertices.assign(fixedMesh.vertices);
+            surfaces.assign(fixedMesh.triangles);
+            standardVertices.assign(vertices);
+            selectedSurfacesJudgement.resize(surfaces.size());
+            thrust::fill(thrust::device, selectedSurfacesJudgement.data(),
+                         selectedSurfacesJudgement.data() + selectedSurfacesJudgement.size(), 1);
+            return;
+        }
+
+        auto gpuFixedVertices = fixedMesh.vertices.gpu();
+        auto gpuFixedSurfaces = fixedMesh.triangles.gpu();
+
+        selectedSurfacesJudgement.resize(gpuFixedSurfaces.size());
+        // find the covered surfaces.
+        cuExecute(gpuFixedVertices.size(), FindNearestVertex, vertices, surfaces,
+                  gpuFixedVertices, gpuFixedSurfaces, selectedSurfacesJudgement,
+                  selectedVertices);
+
         vertices.assign(fixedMesh.vertices);
         surfaces.assign(fixedMesh.triangles);
         standardVertices.assign(vertices);
+
+        gpuFixedVertices.clear();
+        gpuFixedSurfaces.clear();
     };
 
     virtual BBox get_bbox()
@@ -204,9 +238,13 @@ public:
         vertices.clear();
         standardVertices.clear();
         surfaces.clear();
+        selectedVertices.clear();
+        selectedSurfacesJudgement.clear();
     }
 
 private:
+    GArr<int> selectedVertices;
+    GArr<int> selectedSurfacesJudgement;
     GArr<float3> vertices;
     GArr<float3> standardVertices;
     GArr<int3> surfaces;
@@ -220,7 +258,7 @@ private:
 
     bool AnimationUpdateUntil_(float time)
     {
-        if(animationTimeStep >= frameTime.size() - 1)
+        if(animationTimeStep + 1 >= frameTime.size())
             return false;
         
         animationTimeStep++;
@@ -251,6 +289,7 @@ private:
     };
 
     void LoadAccs_(const std::string& path);
+    void LoadCover_(const std::string &path);
 };
 
 }
