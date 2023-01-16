@@ -132,8 +132,8 @@ __global__ void update_grid_list_kernel(ParticleGrid pg)
 
 void ParticleGrid::construct_grid()
 {
-    cuExecute(faces.size(), update_triangles_kernel, *this); // 初始化网格中物体的三角面
-    cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), update_grid_list_kernel, *this); // 初始化每个网格包含物体三角面的列表
+    cuExecute(faces.size(), update_triangles_kernel, *this);
+    cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), update_grid_list_kernel, *this);
 }
 
 __global__ void init_neigbor_list_size_kernel(ParticleGrid pg)
@@ -182,7 +182,16 @@ __global__ void fill_neighbor_list_3_kernel(ParticleGrid pg)
         auto &face_list = pg.grid_face_list(neighbor_coord);
         for (int face_idx = 0; face_idx < face_list.size(); face_idx++)
         {
-            neighbor_list[neighbor_num_prefix_sum[idx] + face_idx] = face_list[face_idx];
+            int tri_idx = face_list[face_idx];
+            if (pg.triangles[tri_idx].grid_coord.x != neighbor_coord.x ||
+                pg.triangles[tri_idx].grid_coord.y != neighbor_coord.y ||
+                pg.triangles[tri_idx].grid_coord.z != neighbor_coord.z)
+                printf(
+                    "Error in fill_neighbor_list_3_kernel, tri_idx = %d, tri_coord = (%d, %d, %d), grid_coord = (%d, "
+                    "%d, %d)\n",
+                    tri_idx, pg.triangles[tri_idx].grid_coord.x, pg.triangles[tri_idx].grid_coord.y,
+                    pg.triangles[tri_idx].grid_coord.z, neighbor_coord.x, neighbor_coord.y, neighbor_coord.z);
+            neighbor_list[neighbor_num_prefix_sum[idx] + face_idx] = tri_idx;
         }
     }
     neighbor_list.num = neighbor_num_sum;
@@ -225,13 +234,13 @@ void ParticleGrid::construct_neighbor_lists()
 {
     neighbor_3_square_nonempty.reset();
     base_coord_nonempty.reset();
-    cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), init_neigbor_list_size_kernel, *this); // 初始化每个网格和周围网格的邻居关系 
-    neighbor_3_square_nonempty.remove_zeros(); // 426 为什么这里会占内存？
+    cuExecute3D(dim3(grid_dim, grid_dim, grid_dim), init_neigbor_list_size_kernel, *this);
+    neighbor_3_square_nonempty.remove_zeros();
     base_coord_nonempty.remove_zeros();
     neighbor_3_square_list.reset();
     neighbor_4_square_list.reset();
-    cuExecuteBlock(neighbor_3_square_nonempty.size(), 32, fill_neighbor_list_3_kernel, *this); // 初始化3*3*3网格邻居关系
-    cuExecuteBlock(base_coord_nonempty.size(), 64, fill_neighbor_list_4_kernel, *this); // 初始化4*4*4网格邻居关系
+    cuExecuteBlock(neighbor_3_square_nonempty.size(), 32, fill_neighbor_list_3_kernel, *this);
+    cuExecuteBlock(base_coord_nonempty.size(), 64, fill_neighbor_list_4_kernel, *this);
 }
 
 }  // namespace pppm

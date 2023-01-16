@@ -65,6 +65,8 @@ class progressbar
                    << std::string(2 - std::to_string(seconds).size(), '0') << seconds;
             // write message
             output << ' ' << message;
+            if (progress == n_cycles)
+                output << std::endl;
             last_perc = perc;
             output << std::flush;
             return;
