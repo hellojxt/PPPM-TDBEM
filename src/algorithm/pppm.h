@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <fstream>
 #include "array3D.h"
+#include "particle_grid.h"
 #include "pppm_cache.h"
 
 namespace pppm
@@ -11,7 +12,7 @@ class PPPMSolver
 {
     public:
         TDBEM bem;        // boundary element method solver
-        ParticleGrid pg;  // The left corner of the fdtd grid is at (0,0,0)  
+        ParticleGrid pg;  // The left corner of the fdtd grid is at (0,0,0)
         // pg储存了每个顶点、边、三角面、每个网格包含的面，每个网格用来插值的面，非空网格，3x3x3范围邻居面及其对应非空网格，4x4x4范围邻居面
         GArr<History> dirichlet;      // Dirichlet boundary condition
         GArr<History> neumann;        // Neumann boundary condition
@@ -35,9 +36,9 @@ class PPPMSolver
          *   @param dl_: grid cell size
          *   @param dt_: time step for the FDTD solver
          */
-        PPPMSolver(int res_, float dl_, float dt_, float3 min_pos = make_float3(0, 0, 0))
+        PPPMSolver(int res_, float dl_, float dt_, float3 min_pos = make_float3(0, 0, 0), int pml_width = 0)
         {
-            pg.init(min_pos, dl_, res_, dt_);
+            pg.init(min_pos, dl_, res_, dt_, pml_width);
             bem.init(dt_, dl_);
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
@@ -69,15 +70,15 @@ class PPPMSolver
         void set_mesh(T1 &verts_, T2 &tris_, bool log_time = false)
         {
             START_TIME(log_time)
-            pg.set_mesh(verts_, tris_); // 初始化网格(包括物体节点面元与每个网格与物体面的包含关系)
+            pg.set_mesh(verts_, tris_);  // 初始化网格(包括物体节点面元与每个网格与物体面的包含关系)
             LOG_TIME("particle grid: set_mesh")
-            pg.construct_neighbor_lists(); // 初始化网格邻居关系
+            pg.construct_neighbor_lists();  // 初始化网格邻居关系
             LOG_TIME("particle grid: construct_neighbor_lists")
             grid_cache.init(tris_.size());
             face_cache.init(tris_.size());
-            grid_cache.update_cache(pg, bem, log_time); 
+            grid_cache.update_cache(pg, bem, log_time);
             face_cache.update_cache(pg, bem, log_time);
-            dirichlet.resize(tris_.size()); // 初始化dirichlet和neumann边界条件
+            dirichlet.resize(tris_.size());  // 初始化dirichlet和neumann边界条件
             dirichlet.reset();
             neumann.resize(tris_.size());
             neumann.reset();
@@ -136,6 +137,16 @@ class PPPMSolver
             update_dirichlet(log_time);
             solve_fdtd_near(log_time);
         }
+
+        template <typename T>
+        void update_step(T neuuman_condition, bool log_time = false)
+        {
+            update_grid_and_face(neuuman_condition, log_time);
+        }
+
+        GArr3D<float> get_grid() { return pg.fdtd.grids[pg.fdtd.t]; }
+
+        GArr<Triangle> get_triangles() { return pg.triangles; }
 
         void solve_fdtd_far_simple(bool log_time = false);
 

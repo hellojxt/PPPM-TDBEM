@@ -117,23 +117,30 @@ static inline void renderArray(RenderElement &e)
     gui.start();
 }
 
-static inline void save_grid(ParticleGrid &grid, std::string filename, float max_value = 1.0f)
+static inline void save_grid(ParticleGrid &grid,
+                             std::string filename,
+                             float max_value = 1.0f,
+                             float3 slice = make_float3(0, 0.5f, 0))
 {
     RenderElement e(grid, "save");
-    e.set_params(make_int3(grid.grid_dim / 2, 0, 0), 1, max_value);
+    int d = grid.grid_dim;
+    e.set_params(make_int3(d * slice.x, d * slice.y, d * slice.z), 1, max_value);
     e.assign(0, grid.fdtd.grids[grid.fdtd.t]);
     e.update_mesh();
     e.write_image(0, filename);
     e.clear();
 }
 
-static inline void save_all_grid(ParticleGrid &grid, std::string filename, float max_value = 1.0f)
+static inline void save_all_grid(ParticleGrid &grid,
+                                 std::string filename,
+                                 float max_value = 1.0f,
+                                 float3 slice = make_float3(0, 1.0f, 0))
 {
     CHECK_DIR(filename)
     for (int i = 1; i < grid.grid_dim; i++)
     {
         RenderElement e(grid, "save");
-        e.set_params(make_int3(0, 0, i), 1, max_value);
+        e.set_params(make_int3(i * slice.x, i * slice.y, i * slice.z), 1, max_value);
         e.assign(0, grid.fdtd.grids[grid.fdtd.t]);
         e.update_mesh();
         e.write_image(0, filename + std::to_string(i) + ".png");

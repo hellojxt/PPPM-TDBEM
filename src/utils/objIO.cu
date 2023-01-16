@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include "helper_math.h"
 #include "objIO.h"
-#include <sys/stat.h> 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <cstddef>
 
@@ -234,46 +234,16 @@ void Mesh::fix_mesh(float precision, std::string tmp_dir, std::string mesh_name)
     CHECK_DIR(tmp_dir);
     std::string python_src_dir = ROOT_DIR + std::string("python_scripts/");
     std::string python_src_name = "fix_mesh.py";
-    std::string in_mesh_name = mesh_name;
-    std::string out_mesh_name = "fixed_" + std::to_string(precision) + mesh_name;
-
-    std::string out_path = tmp_dir + "/" + in_mesh_name;
-    out_path = out_path.substr(0, out_path.length() - 4);
-    
-    // 如果对应文件名的fixed mesh不存在，就调用python计算一个，否则直接读取
-    std::string out_mesh_dirname = out_path + "/" + out_mesh_name;
-    if (access(out_mesh_dirname.c_str(), 0) == -1)
-    {
-        int isCreate = mkdir(out_path.c_str(), 0777);
-    }
-
-        export_surface_mesh(out_path, mesh_name);
-        std::string cmd = "docker run -it --rm -v " + out_path + ":/models " + "-v " + python_src_dir + ":/scripts " +
-                        "pymesh/pymesh /scripts/" + python_src_name + " --detail " + std::to_string(precision) +
-                        " /models/" + in_mesh_name + " /models/" + out_mesh_name;
-        // std::cout << cmd << std::endl;
-        system(cmd.c_str());
-    
-    Mesh fixedMesh(out_path + "/" + out_mesh_name);
-    GArr<float3> fixedVertices = fixedMesh.vertices.gpu();
-    GArr<int3> fixedSurfaces = fixedMesh.triangles.gpu();
-    // modelMatrixSurf.resize(fixedSurfaces.size(), modalMatrix.size.y);
-    // cuExecute(fixedSurfaces.size(), update_surf_matrix_for_fixed_mesh, modalMatrix, modelMatrixSurf, tetVertices,
-    //           tetSurfaces, fixedVertices, fixedSurfaces);
-    vertices.assign(fixedVertices);
-    fixedVertices.clear();
-    triangles.assign(fixedSurfaces);
-    fixedSurfaces.clear();
-    // standardTetVertices.assign(tetVertices);
-    // surfaceAccs.resize(tetSurfaces.size());
-}
-
-void Mesh::export_surface_mesh(const std::string &output_path, std::string mesh_name)
-{
-    CHECK_DIR(output_path);
-    Mesh surfaceMesh(vertices, triangles); // need to change?
-    printf("export surface mesh to %s\n", output_path.c_str());
-    surfaceMesh.writeOBJ(output_path + "/" + mesh_name);
+    std::string in_mesh_name = tmp_dir + "/" + mesh_name;
+    std::string out_mesh_name = tmp_dir + "/fixed_" + mesh_name;
+    writeOBJ(in_mesh_name);
+    std::string cmd = "docker run -it --rm -v " + tmp_dir + ":/models " + "-v " + python_src_dir + ":/scripts " +
+                      "pymesh/pymesh /scripts/" + python_src_name + " --detail " + std::to_string(precision) +
+                      " /models/" + in_mesh_name + " /models/" + out_mesh_name;
+    system(cmd.c_str());
+    Mesh fixedMesh(out_mesh_name);
+    vertices.assign(fixedMesh.vertices);
+    triangles.assign(fixedMesh.triangles);
 }
 
 }  // namespace pppm

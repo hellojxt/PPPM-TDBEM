@@ -69,9 +69,9 @@ class CellInfo
 class GhostCellSolver
 {
     public:
-        GhostCellSolver(float3 min_pos_, float grid_size_, int grid_dim_, float dt)
+        GhostCellSolver(float3 min_pos_, float grid_size_, int grid_dim_, float dt, int pml_width = 0)
         {
-            grid.init(min_pos_, grid_size_, grid_dim_, dt);
+            grid.init(min_pos_, grid_size_, grid_dim_, dt, pml_width);
             cell_data.resize(grid_dim_, grid_dim_, grid_dim_);
             fresh_cell_list.reserve(grid_dim_ * grid_dim_ * grid_dim_);
             set_condition_number_threshold(25.0f);
@@ -115,7 +115,8 @@ class GhostCellSolver
 
         void fill_in_fresh_cell(bool log_time = false);
 
-        void set_boundary_condition(CArr<float> neuuman_condition)
+        template <typename T>
+        void set_boundary_condition(T neuuman_condition)
         {
             neuuman_data_old.assign(neuuman_data);
             neuuman_data.assign(neuuman_condition);
@@ -129,7 +130,8 @@ class GhostCellSolver
 
         void solve_ghost_cell(bool log_time = false);  // update right hand side of ghost cell solver and solve it
 
-        void update(CArr<float> neuuman_condition, bool log = false)
+        template <typename T>
+        void update(T neuuman_condition, bool log = false)
         {
             START_TIME(log)
             // LOG("value before: " << grid.fdtd.grids[grid.fdtd.t](to_cpu(37, 33, 27)))
@@ -141,6 +143,16 @@ class GhostCellSolver
             set_solid_cell_zero();
             LOG_TIME("solve ghost cell")
         }
+
+        template <typename T>
+        void update_step(T neuuman_condition, bool log_time = false)
+        {
+            update(neuuman_condition, log_time);
+        }
+
+        GArr3D<float> get_grid() { return grid.fdtd.grids[grid.fdtd.t]; }
+
+        GArr<Triangle> get_triangles() { return grid.triangles; }
 
         void set_solid_cell_zero();
 

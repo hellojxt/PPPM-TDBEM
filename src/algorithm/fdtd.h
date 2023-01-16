@@ -9,25 +9,30 @@ namespace pppm
 typedef float value;
 typedef CircularArray<GArr3D<value>, GRID_TIME_SIZE> GridArr;
 
+struct PMLCell
+{
+        float v1[3];
+        float v2[3];
+};
+
 /**
  * @brief The FDTD class
  * This class implements the finite difference time domain method.
  * It is used to simulate the propagation of sound waves in a 3D space.
  */
+// template for PML or ABC
 class FDTD
 {
     public:
         GridArr grids;  // 3D grids with 3 history time steps
+        CircularArray<GArr3D<PMLCell>, GRID_TIME_SIZE> pml_grids;
         float c;        // speed of sound
         int t;          // current time (index) initialized to -1
         int res;        // resolution of the grid
-        int res_bound;  // resolution of the boundary
+        int res_bound;  // resolution of the pml boundary
         float dl;       // grid spacing
         float dt;       // time step
-        int3 reflect_center_coord;
-        int3 reflect_normal;
-        bool reflect_grooves;
-        bool use_reflect_boundary;
+        float damp;
 
         /**
          *  This function is used to initialize the FDTD grid.
@@ -37,34 +42,30 @@ class FDTD
          *  @param dl the grid spacing
          *  @param dt the time step
          */
-        void init(int res_, float dl_, float dt_)
+        void init(int res_, float dl_, float dt_, int res_bound_ = 0)
         {
             res = res_;
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
                 grids[i].resize(res, res, res);
                 grids[i].reset();
+                pml_grids[i].resize(res, res, res);
+                pml_grids[i].reset();
             }
             t = -1;
             dl = dl_;
             dt = dt_;
             c = AIR_WAVE_SPEED;
-            use_reflect_boundary = false;
+            res_bound = res_bound_;
+            damp = 2.0f / dl;
         }
 
         void step_inner_grid();
 
         void step_boundary_grid();
 
-        void step_reflect_boundary(int3 center_coord, int3 normal, bool has_grooves = false);
+        void step_pml_grid();
 
-        void set_reflect_boundary(int3 center_coord, int3 normal, bool has_grooves = false)
-        {
-            reflect_center_coord = center_coord;
-            reflect_normal = normal;
-            reflect_grooves = has_grooves;
-            use_reflect_boundary = true;
-        }
         /**
          * @brief step forward in time,
          * t++ first, then compute the FDTD kernel
@@ -72,10 +73,15 @@ class FDTD
         void step(bool log_time = false)
         {
             START_TIME(log_time)
-            step_inner_grid();     // fdtd计算内部网格
-            step_boundary_grid();  // fdtd计算似乎是整个网格的边界!(6*res*res)
-            if (use_reflect_boundary)
-                step_reflect_boundary(reflect_center_coord, reflect_normal);
+            if (res_bound > 0)
+            {
+                step_pml_grid();
+            }
+            else
+            {
+                step_inner_grid();
+                step_boundary_grid();
+            }
             t++;
             LOG_TIME("FDTD")
         }
@@ -85,6 +91,7 @@ class FDTD
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
                 grids[i].clear();
+                pml_grids[i].clear();
             }
         }
 
@@ -93,6 +100,7 @@ class FDTD
             for (int i = 0; i < GRID_TIME_SIZE; i++)
             {
                 grids[i].reset();
+                pml_grids[i].reset();
             }
             t = -1;
         }

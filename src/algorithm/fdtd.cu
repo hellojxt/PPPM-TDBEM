@@ -1,5 +1,6 @@
 #include "fdtd.h"
 #include "helper_math.h"
+#include "macro.h"
 namespace pppm
 {
 
@@ -84,7 +85,7 @@ GPU_FUNC inline void Solve4x4Linear(float a[4][4], float b[4], float result[4])
 #define Y_IDX(x) (((x) + 1) % 3)
 #define Z_IDX(x) (((x) + 2) % 3)
 
-__device__ void ab_condition_solve(FDTD &fdtd, int i, int j, int k) // 似乎是计算边界条件的?
+__device__ void ab_condition_solve(FDTD &fdtd, int i, int j, int k)  // 似乎是计算边界条件的?
 {
     int t = fdtd.t;
     float dt = fdtd.dt, h = fdtd.dl, c = fdtd.c;
@@ -92,7 +93,7 @@ __device__ void ab_condition_solve(FDTD &fdtd, int i, int j, int k) // 似乎是
     int3 d_coord[3] = {make_int3(1, 0, 0), make_int3(0, 1, 0), make_int3(0, 0, 1)};
     int3 coord = make_int3(i, j, k);
 
-    float a[4][4], b[4]; // 这是啥?
+    float a[4][4], b[4];  // 这是啥?
     // for wave equation (4th equation with index 3)
     float coef = c * c * dt * dt / (h * h);
     a[3][3] = 1;
@@ -158,29 +159,81 @@ void FDTD::step_boundary_grid()
     cuExecute2D(dim2(6 * res, res), fdtd_boundary_kernel, *this);
 }
 
-__global__ void fdtd_reflect_kernel(FDTD fdtd, int3 center_coord, int3 normal, bool has_grooves)
+CGPU_FUNC float get_damp(int3 coord, FDTD &fdtd)
+{
+    if (coord.x < fdtd.res_bound || coord.x >= fdtd.res - fdtd.res_bound || coord.y < fdtd.res_bound ||
+        coord.y >= fdtd.res - fdtd.res_bound || coord.z < fdtd.res_bound || coord.z >= fdtd.res - fdtd.res_bound)
+        return fdtd.damp;
+    else
+        return 0;
+}
+
+CGPU_FUNC int get_sign(int x, FDTD &fdtd)
+{
+    if (x > fdtd.res / 2)
+        return 1;
+    else
+        return -1;
+}
+
+__global__ void pml_step_kernel(FDTD fdtd)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    if (x >= fdtd.res - 1 || x == 0 || y >= fdtd.res - 1 || y == 0)
+    int z = blockIdx.z * blockDim.z + threadIdx.z;
+    if (x >= fdtd.res - 1 || x == 0 || y >= fdtd.res - 1 || y == 0 || z >= fdtd.res - 1 || z == 0)
         return;
-    int3 direction[3] = {make_int3(1, 0, 0), make_int3(0, 1, 0), make_int3(0, 0, 1)};
-    int direct_index;
+    int3 coord = make_int3(x, y, z);
+    int t = fdtd.t;
+    auto &grids = fdtd.grids;
+    auto &pml_grids = fdtd.pml_grids;
+    float c = fdtd.c;
+    float h = fdtd.dl;
+    float dt = fdtd.dt;
+    int3 e[3] = {make_int3(1, 0, 0), make_int3(0, 1, 0), make_int3(0, 0, 1)};
+    int coord_sign[3] = {get_sign(coord.x, fdtd), get_sign(coord.y, fdtd), get_sign(coord.z, fdtd)};
+    float c_damp = get_damp(coord, fdtd);
+    // grid_value.x = U, grid_value.y = phi, grid_value.z = Phi
+    // solve U
+    float rhs = 0;
 #pragma unroll
     for (int i = 0; i < 3; i++)
-        if (dot(normal, direction[i]) != 0)
-            direct_index = i;
-    int3 coord = dot(center_coord, normal) * normal + x * direction[(direct_index + 1) % 3] +
-                 y * direction[(direct_index + 2) % 3];
-    // add groove with stride 4
-    if (has_grooves && (x % 4 == 0 || y % 4 == 0))
-        coord -= normal;
-    fdtd.grids[fdtd.t + 1](coord) = fdtd.grids[fdtd.t + 1](coord + normal);
+    {
+        rhs += 1 / (h * h) * (grids[t](coord + e[i]) - 2 * grids[t](coord) + grids[t](coord - e[i]));
+        rhs += 1 / h *
+               (c_damp * pml_grids[t](coord + coord_sign[i] * e[i]).v2[i] -
+                get_damp(coord - coord_sign[i] * e[i], fdtd) * pml_grids[t](coord - coord_sign[i] * e[i]).v1[i]);
+    }
+    grids[t + 1](coord) = grids[t](coord) * 2 - grids[t - 1](coord) + c * c * dt * dt * rhs;
+    if (c_damp == 0)
+        return;
+        // solve phi
+#pragma unroll
+    for (int i = 0; i < 3; i++)
+    {
+        float rhs = 0;
+        rhs += -1.0f / 2.0f *
+               (get_damp(coord - coord_sign[i] * e[i], fdtd) * pml_grids[t](coord - coord_sign[i] * e[i]).v1[i] +
+                c_damp * pml_grids[t](coord).v1[i]);
+        rhs += -1.0f / (h * 2.0f) * (grids[t](coord + coord_sign[i] * e[i]) - grids[t](coord - coord_sign[i] * e[i]));
+        pml_grids[t + 1](coord).v1[i] = pml_grids[t](coord).v1[i] + c * dt * rhs;
+    }
+    // solve Phi
+#pragma unroll
+    for (int i = 0; i < 3; i++)
+    {
+        float rhs = 0;
+        rhs += -1.0f / 2.0f *
+               (get_damp(coord - coord_sign[i] * e[i], fdtd) * pml_grids[t](coord).v2[i] +
+                c_damp * pml_grids[t](coord + coord_sign[i] * e[i]).v2[i]);
+        rhs += -1.0f / (h * 2.0f) * (grids[t](coord + coord_sign[i] * e[i]) - grids[t](coord - coord_sign[i] * e[i]));
+        pml_grids[t + 1](coord).v2[i] = pml_grids[t](coord).v2[i] + c * dt * rhs;
+    }
 }
 
-void FDTD::step_reflect_boundary(int3 center_coord, int3 normal, bool has_grooves)
+void FDTD::step_pml_grid()
 {
-    cuExecute2D(dim2(res, res), fdtd_reflect_kernel, *this, center_coord, normal, has_grooves);
+    cuExecute3D(dim3(res, res, res), pml_step_kernel, *this);
 }
 
 }  // namespace pppm

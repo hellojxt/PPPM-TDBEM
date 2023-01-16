@@ -72,6 +72,11 @@ namespace pppm
 
 #define TOCK_VALUE(x) std::chrono::duration<float>(std::chrono::steady_clock::now() - bench_##x).count()
 
+#define APPEND_TIME(T, FUNC, TAG)                        \
+    auto bench_##TAG = std::chrono::steady_clock::now(); \
+    FUNC;                                                \
+    T += std::chrono::duration<float>(std::chrono::steady_clock::now() - bench_##TAG).count();
+
 #define PI 3.14159265359
 #define F2I(x) (int)(x + 0.5f)
 #define AIR_WAVE_SPEED 340.3f
@@ -82,7 +87,7 @@ namespace pppm
 #define RAND_F (float)rand() / (float)RAND_MAX
 #define RAND_I(min, max) (min + rand() % (max - min + 1))
 #define RAND_SIGN (rand() % 2 == 0 ? 1 : -1)
-#define BDF2(x) 0.5 * ((x) * (x)-4 * (x) + 3) // 这是啥？
+#define BDF2(x) 0.5 * ((x) * (x)-4 * (x) + 3)  // 这是啥？
 #define MAX_FLOAT 3.402823466e+38F
 #define CHECK_DIR(dir)                          \
     if (!std::filesystem::exists(dir))          \

@@ -13,6 +13,9 @@ target_link_libraries(UITest PRIVATE uilib alglib utillib)
 add_executable(FDTDTest FDTDTest.cu)
 target_link_libraries(FDTDTest PRIVATE uilib alglib utillib)
 
+add_executable(FDTDPMLTest FDTDPMLTest.cu)
+target_link_libraries(FDTDPMLTest PRIVATE uilib alglib utillib)
+
 add_executable(LongTimeFDTDTest LongTimeFDTDTest.cu)
 target_link_libraries(LongTimeFDTDTest PRIVATE uilib alglib utillib)
 
