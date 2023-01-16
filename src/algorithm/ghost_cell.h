@@ -206,6 +206,7 @@ class GhostCellSolver
         float condition_number_threshold;  // threshold of condition number
         GArr<int> fresh_error;             // for debug
         bool mesh_set = false;
+        bool no_ghost_cell = false;
 };
 
 }  // namespace pppm

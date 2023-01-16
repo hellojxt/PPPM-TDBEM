@@ -7,8 +7,8 @@
 namespace pppm
 {
 #define BUFFER_SIZE_FACE_NUM_PER_CELL 32
-#define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 128
-#define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 256
+#define BUFFER_SIZE_NEIGHBOR_NUM_3_3_3 256
+#define BUFFER_SIZE_NEIGHBOR_NUM_4_4_4 512
 
 // attention: need to be used as reference for performance
 template <typename T, int N>
@@ -27,8 +27,27 @@ class GridElementList
             list[index] = i;
             return index;
         }
-        CGPU_FUNC T &operator[](int i) const { return list[i]; }
-        CGPU_FUNC T &operator[](int i) { return list[i]; }
+        CGPU_FUNC T &operator[](int i) const
+        {
+#ifdef MEMORY_CHECK
+            assert(i < num);
+#endif
+            return list[i];
+        }
+        CGPU_FUNC T &operator[](int i)
+        {
+#ifdef MEMORY_CHECK
+            assert(i < num);
+#endif
+            return list[i];
+        }
+        CGPU_FUNC void set_size(int i)
+        {
+#ifdef MEMORY_CHECK
+            assert(i <= N);
+#endif
+            num = i;
+        }
         CGPU_FUNC int size() const { return num; }
         CGPU_FUNC void clear() { num = 0; }
 };

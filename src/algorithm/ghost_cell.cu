@@ -240,7 +240,14 @@ void GhostCellSolver::precompute_cell_data(bool log_time)
     ghost_cells.resize(ghost_cell_num);
     cuExecute3D(dim3(grid.grid_dim, grid.grid_dim, grid.grid_dim), construct_ghost_cell_list, *this);
     if (ghost_cell_num <= 0)
+    {
         LOG_ERROR("No ghost cell found!");
+        no_ghost_cell = true;
+    }
+    else
+    {
+        no_ghost_cell = false;
+    }
     LOG_TIME("Precompute Cell Data")
 };
 
@@ -466,6 +473,8 @@ __global__ void construct_equation_kernel(GhostCellSolver solver)
 void GhostCellSolver::precompute_ghost_matrix(bool log_time)
 {
     START_TIME(log_time)
+    if (no_ghost_cell)
+        return;
     b.resize(ghost_cell_num);
     if (condition_number_threshold > 0.0f)
     {
@@ -475,7 +484,7 @@ void GhostCellSolver::precompute_ghost_matrix(bool log_time)
         p_weight.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM);
         GArr3D<float> phi;
         phi.resize(ghost_cell_num, GHOST_CELL_NEIGHBOR_NUM, GHOST_CELL_NEIGHBOR_NUM);
-        cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this); // grid_size = 0.025
+        cuExecute(ghost_cell_num, construct_phi_matrix_kernel, phi, *this);  // grid_size = 0.025
         LOG_TIME("Construct phi matrix")
         auto svd_result = cusolver_svd(phi);
         svd_result.solve_inverse();
@@ -517,6 +526,8 @@ __global__ void update_ghost_cell_kernel(GArr<float> x, GhostCellSolver solver)
 void GhostCellSolver::solve_ghost_cell(bool log_time)
 {
     START_TIME(log_time)
+    if (no_ghost_cell)
+        return;
     b.reset();
     auto construct_rhs_kernel = construct_equation_kernel<false, true>;
     cuExecute(ghost_cell_num, construct_rhs_kernel, *this);

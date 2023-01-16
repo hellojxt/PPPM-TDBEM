@@ -113,7 +113,7 @@ __global__ void update_grid_list_kernel(ParticleGrid pg)
             face_list_size++;
         }
     }
-    face_list.num = face_list_size;
+    face_list.set_size(face_list_size);
     for (int idx = 0; idx < base_coord_face_list.size(); idx++)
     {
         int face_idx = base_coord_face_list[idx];
@@ -127,7 +127,7 @@ __global__ void update_grid_list_kernel(ParticleGrid pg)
             base_coord_face_list_size++;
         }
     }
-    base_coord_face_list.num = base_coord_face_list_size;
+    base_coord_face_list.set_size(base_coord_face_list_size);
 }
 
 void ParticleGrid::construct_grid()
@@ -176,6 +176,7 @@ __global__ void fill_neighbor_list_3_kernel(ParticleGrid pg)
         neighbor_num_prefix_sum[idx] = neighbor_num_sum;
         neighbor_num_sum += pg.grid_face_list(neighbor_coord).size();
     }
+    neighbor_list.set_size(neighbor_num_sum);
     for (int idx = threadIdx.x; idx < 27; idx += blockDim.x)
     {
         int3 neighbor_coord = coord + make_int3(idx % 3 - 1, idx / 3 % 3 - 1, idx / 9 - 1);
@@ -183,18 +184,14 @@ __global__ void fill_neighbor_list_3_kernel(ParticleGrid pg)
         for (int face_idx = 0; face_idx < face_list.size(); face_idx++)
         {
             int tri_idx = face_list[face_idx];
-            if (pg.triangles[tri_idx].grid_coord.x != neighbor_coord.x ||
-                pg.triangles[tri_idx].grid_coord.y != neighbor_coord.y ||
-                pg.triangles[tri_idx].grid_coord.z != neighbor_coord.z)
-                printf(
-                    "Error in fill_neighbor_list_3_kernel, tri_idx = %d, tri_coord = (%d, %d, %d), grid_coord = (%d, "
-                    "%d, %d)\n",
-                    tri_idx, pg.triangles[tri_idx].grid_coord.x, pg.triangles[tri_idx].grid_coord.y,
-                    pg.triangles[tri_idx].grid_coord.z, neighbor_coord.x, neighbor_coord.y, neighbor_coord.z);
+#ifdef MEMORY_CHECK
+            assert(pg.triangles[tri_idx].grid_coord.x == neighbor_coord.x);
+            assert(pg.triangles[tri_idx].grid_coord.y == neighbor_coord.y);
+            assert(pg.triangles[tri_idx].grid_coord.z == neighbor_coord.z);
+#endif
             neighbor_list[neighbor_num_prefix_sum[idx] + face_idx] = tri_idx;
         }
     }
-    neighbor_list.num = neighbor_num_sum;
 }
 
 // 4x4x4 neighbor list (-1, -1, -1) -> (2, 2, 2)
@@ -213,6 +210,7 @@ __global__ void fill_neighbor_list_4_kernel(ParticleGrid pg)
         neighbor_num_prefix_sum[idx] = neighbor_num_sum;
         neighbor_num_sum += pg.grid_face_list(neighbor_coord).size();
     }
+    neighbor_list.set_size(neighbor_num_sum);
     for (int idx = threadIdx.x; idx < 64; idx += blockDim.x)
     {
         int3 neighbor_coord = coord + make_int3(idx % 4 - 1, idx / 4 % 4 - 1, idx / 16 - 1);
@@ -222,7 +220,6 @@ __global__ void fill_neighbor_list_4_kernel(ParticleGrid pg)
             neighbor_list[neighbor_num_prefix_sum[idx] + face_idx] = face_list[face_idx];
         }
     }
-    neighbor_list.num = neighbor_num_sum;
 }
 
 struct empty_neighbor_num

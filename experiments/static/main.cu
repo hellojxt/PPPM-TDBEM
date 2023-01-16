@@ -21,22 +21,26 @@ using namespace pppm;
 
 #define ALL_TIME 0.015
 #define SKIP_TIME 0.01
-#define CHECK_BBOX_NUM 2
-#define CHECK_BBOX_SIZE \
-    {                   \
-        0.25, 0.35,     \
+#define CHECK_BBOX_NUM 4
+#define CHECK_BBOX_SIZE         \
+    {                           \
+        0.20, 0.25, 0.30, 0.35, \
     }
 
-void SaveGrid(const std::string &dir, ParticleGrid &grid, float max_value = 1.0f, bool saveAll = false)
+void SaveGrid(const std::string &dir,
+              ParticleGrid &grid,
+              float max_value = 1.0f,
+              bool saveAll = false,
+              std::string name = "img")
 {
     CHECK_DIR(dir)
     if (saveAll)
     {
-        save_all_grid(grid, dir + "/img/", max_value);
+        save_all_grid(grid, dir + "/" + name + "/", max_value);
     }
     else
     {
-        save_grid(grid, dir + "/img.png", max_value, make_float3(0.5, 0, 0));
+        save_grid(grid, dir + "/" + name + ".png", max_value, make_float3(0.5, 0, 0));
     }
 }
 
@@ -103,6 +107,8 @@ void points_test(T &solver, Mesh &mesh, SineSource &sine, MonoPole &mp, std::str
         bar.update();
         cuExecute(surface_accs.size(), update_surf_acc, sine, mp, surface_accs, triangles, solver.dt() * i);
         APPEND_TIME(cost_time, solver.update_step(surface_accs), UPDATE_STEP)
+        // SaveGrid(dirname + "/grids/", solver.pg, 1.0f, false, "grid" + std::to_string(i));
+        // return;
         if (i > SKIP_FRAME)
             for (int j = 0; j < CHECK_BBOX_NUM; j++)
             {
@@ -190,18 +196,19 @@ void GroudTruth::update_step(GArr<float> surface_accs)
 
 int main(int argc, char *argv[])
 {
-    std::vector<float> grid_size_list = {0.005, 0.01, 0.015, 0.02, 0.025, 0.03};
+    std::vector<float> grid_size_list = {0.008, 0.010, 0.012, 0.014, 0.016, 0.018, 0.02, 0.022, 0.024, 0.026};
+    // std::vector<float> grid_size_list = {0.01};
     auto dir_name = ROOT_DIR + std::string("dataset/static/");
     if (argc > 1)
         dir_name += std::string(argv[1]) + "/";
     else
-        dir_name += "plane/";
+        dir_name += "letterT/";
 
     auto OUT_DIR = dir_name + "output/";
     CHECK_DIR(OUT_DIR);
     GArr<Triangle> triangles;
 
-    float scale = 5.0;
+    float scale = 6.0;
     float box_size = 0.7;
     for (auto grid_size : grid_size_list)
     {

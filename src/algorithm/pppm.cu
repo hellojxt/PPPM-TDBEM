@@ -1,3 +1,4 @@
+#include <cmath>
 #include "pppm.h"
 #include "pppm_direct.h"
 #include "array_writer.h"
@@ -25,6 +26,7 @@ __global__ void solve_fdtd_far_kernel(PPPMSolver solver)
         auto &tri = solver.pg.triangles[tri_idx];
         int3 tri_coord = tri.grid_coord;
         auto w = cache.fdtd_near_weight(tri_idx, tri_coord, grid_coord);
+        int weight_dix = cache.weight_idx(grid_coord, tri_coord);
         auto &neumann = solver.neumann[tri_idx];
         auto &dirichlet = solver.dirichlet[tri_idx];
         atomicAdd_block(&fdtd_near_field, w.convolution(neumann, dirichlet, t));
@@ -131,6 +133,11 @@ __global__ void solve_face_far_kernel(PPPMSolver solver)
                 int weight_idx = dx * 4 + dy * 2 + dz;
                 int3 coord = tri.grid_base_coord + make_int3(dx, dy, dz);
                 far_sum += w(tri_idx, weight_idx) * solver.grid_far_field[t](coord);
+                // if (isnan(far_sum))
+                //     printf("tri_idx = %d, weight_idx = %d, coord = %d %d %d, w = %e, grid_far_field = %e\n", tri_idx,
+                //            weight_idx, coord.x, coord.y, coord.z, w(tri_idx, weight_idx),
+                //            solver.grid_far_field[t](coord));
+                // return;
             }
     solver.face_far_field[tri_idx] = far_sum;
     solver.dirichlet[tri_idx][t] = 0;
@@ -178,6 +185,11 @@ __global__ void update_dirichlet_kernel(PPPMSolver solver)
     }
     solver.dirichlet[tri_idx][solver.time_idx()] =
         (solver.face_far_field[tri_idx] * 0.83 + near_field_sum) / (0.5 * tri.area - factor_sum);
+    // if (isnan(solver.dirichlet[tri_idx][solver.time_idx()]))
+    // {
+    //     printf("face_far_field: %f, near_field_sum: %f, factor_sum: %f\n", solver.face_far_field[tri_idx],
+    //            near_field_sum, factor_sum);
+    // }
 }
 
 void PPPMSolver::update_dirichlet(bool log_time)
