@@ -147,6 +147,7 @@ class PPPMSolver
         GArr3D<float> get_grid() { return pg.fdtd.grids[pg.fdtd.t]; }
 
         GArr<Triangle> get_triangles() { return pg.triangles; }
+        ParticleGrid &get_particle_grid() { return pg; }
 
         void solve_fdtd_far_simple(bool log_time = false);
 
