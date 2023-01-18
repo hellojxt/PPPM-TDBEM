@@ -154,6 +154,8 @@ class GhostCellSolver
 
         GArr<Triangle> get_triangles() { return grid.triangles; }
 
+        ParticleGrid &get_particle_grid() { return grid; }
+
         void set_solid_cell_zero();
 
         CGPU_FUNC float inline dt() { return grid.fdtd.dt; }

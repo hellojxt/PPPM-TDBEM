@@ -96,7 +96,7 @@ __global__ void solve_fdtd_near_kernel(PPPMSolver solver)
     __syncthreads();
     if (threadIdx.x == 0)
     {
-        solver.pg.fdtd.grids[t](grid_coord) = solver.grid_far_field[t](grid_coord) + accurate_near_field;
+        solver.pg.fdtd.grids[t](grid_coord) = solver.grid_far_field[t](grid_coord) + accurate_near_field * 0.98;
         // if (abs(solver.pg.fdtd.grids[t](grid_coord)) > 5)
         // {
         //     printf("t = %d, grid %d %d %d: grid_far_field = %e, accurate_near_field = %e, fdtd = %e\n",

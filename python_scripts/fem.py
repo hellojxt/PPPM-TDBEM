@@ -114,9 +114,9 @@ class SoundObj():
         self.cell_size = (bbox_max - bbox_min).max() / 30
         print("target cell_size: ", self.cell_size)
 
-    def tetrahedralize(self):
+    def tetrahedralize(self, engine="cgal"):
         self.tet_mesh = pymesh.tetrahedralize(
-            self.origin_mesh, self.cell_size, engine="cgal")
+            self.origin_mesh, self.cell_size, engine=engine)
         print("tetrahedralized mesh data")
         print("vertices: ", self.tet_mesh.vertices.shape)
         print("faces: ", self.tet_mesh.faces.shape)

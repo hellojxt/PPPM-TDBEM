@@ -9,8 +9,5 @@ dataset/**/*.txt
 **/*.wav
 experiments/**/*.txt
 experiments/**/*.wav
-dataset/test
-dataset/test2
 assets/fixed/
 **/img
-**/acoustic
