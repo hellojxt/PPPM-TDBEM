@@ -216,6 +216,13 @@ public:
         BBox box;
         box.min = make_float3(1e10, 1e10, 1e10);
         box.max = make_float3(-1e10, -1e10, -1e10);
+        if(translations.size() == 0)
+        {
+            Mesh mesh(vertices.cpu(), surfaces.cpu());
+            box = mesh.bbox();
+            return box;
+        }
+
         GArr<float3> verts;
         verts.assign(vertices);
         progressbar bar(translations.size(), "Calculating BBox");
