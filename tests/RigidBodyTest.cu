@@ -14,62 +14,34 @@
 #include "ghost_cell.h"
 #include "RigidBody.h"
 #include "ObjectCollection.h"
+#include "simple_json_reader.h"
 
 using namespace pppm;
 
 int main()
 {
-    std::string OUT_DIR = "/home/jiaming/Self/PPPM-github/render-result/glass-water";
-    // RigidBody rigidbody(DATASET_DIR + obj_name, "polystyrene");
-    // rigidbody.set_sample_rate(44100);
-    // rigidbody.fix_mesh(1e-2, OUT_DIR);
-    // rigidbody.export_mesh_with_modes(OUT_DIR + "/correctAnswer");
-    // rigidbody.export_signal(OUT_DIR, 2.5);
-    // rigidbody.export_mesh_sequence(OUT_DIR + "/mesh_sequence");
+    std::string configDir = "/home/jiaming/Self/PPPM-github/PPPM-TDBEM/assets/scene.cfg";
+    SimpleJsonReader reader(configDir);
+    auto &inputDir = reader.dirMap["inputDir"],
+         &outputDir = reader.dirMap["outputDir"];
+    CHECK_DIR(outputDir);
 
-    // ObjectCollection collection(DATASET_DIR,
-    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-    //                                 {"bowl", ObjectInfo::SoundType::Modal}, {"plane", ObjectInfo::SoundType::Manual}},
-    //                             std::vector<std::any>{std::string{"polystyrene"}, {}});
-    // static_cast<RigidBody*>(collection.objects[0].get())->set_sample_rate(44100);
+    std::vector<std::pair<std::string, ObjectInfo::SoundType>> nativeSceneInfo;
+    for(auto& info : reader.sceneInfoMap)
+    {
+        ObjectInfo::SoundType nativeType;
+        auto& type = info["type"];
+        if(type == "Audio")
+            nativeType = ObjectInfo::SoundType::Audio;
+        else if(type == "Manual")
+            nativeType = ObjectInfo::SoundType::Manual;
+        else
+            assert(false);
+        nativeSceneInfo.emplace_back(std::move(info["name"]), nativeType);
+    }
 
-    // ObjectCollection collection("/home/jiaming/Downloads/cup_phone/test",
-    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-    //                                 {"phone", ObjectInfo::SoundType::Audio}, 
-    //                                 {"cup", ObjectInfo::SoundType::Manual}
-    //                             },
-    //                             std::vector<std::any>{
-    //                                 {},
-    //                                 // std::string{ "polystyrene" },
-    //                                 {}
-    //                             });
-
-    // ObjectCollection collection("/home/jiaming/Downloads/trumpet/test3",
-    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-    //                                 {"trumpet_horn_speaker", ObjectInfo::SoundType::Audio},
-    //                                 {"plunger", ObjectInfo::SoundType::Audio}, // for plunger has motion.
-    //                                 {"trumpet_horn", ObjectInfo::SoundType::Manual}},
-    //                             {});
-
-    // ObjectCollection collection("/home/jiaming/Downloads/talk_fan/test",
-    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-    //                                 {"head", ObjectInfo::SoundType::Audio},
-    //                                 {"blade1", ObjectInfo::SoundType::Audio},
-    //                                 {"blade2", ObjectInfo::SoundType::Audio},
-    //                                 {"blade3", ObjectInfo::SoundType::Audio},
-    //                                 {"fan_other_part", ObjectInfo::SoundType::Manual}},
-    //                             {});
-
-    ObjectCollection collection("/home/jiaming/Downloads/倒水demo",
-                                std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-                                    {"water", ObjectInfo::SoundType::Audio},
-                                    {"glass", ObjectInfo::SoundType::Manual}},
-                                {});
-
-    // collection.export_modes(OUT_DIR);
-    // collection.objects[0]->UpdateUntil(8.5);
-    // collection.UpdateMesh();
-    // collection.export_mesh(OUT_DIR + "/mesh_sequence2/surface2.obj");
-    collection.export_mesh_sequence(OUT_DIR + "/mesh_sequence");
+    // the last parameter is useless for collection with only audio and manual.
+    ObjectCollection collection(inputDir, nativeSceneInfo, {});
+    collection.export_mesh_sequence(outputDir + "/mesh_sequence");
     return 0;
 }

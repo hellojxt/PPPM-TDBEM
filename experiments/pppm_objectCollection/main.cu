@@ -15,6 +15,7 @@
 #include "progressbar.h"
 #include "ObjectCollection.h"
 #include "RigidBody.h"
+#include "simple_json_reader.h"
 
 using namespace pppm;
 
@@ -187,37 +188,33 @@ void ModalAndManualTest()
 
 void AudioAndManualTest()
 {
-    std::string data_dir = DATASET_DIR "test";
-    std::string OUT_DIR = "/home/jiaming/Self/PPPM-github/render-result/glass-water";
-    CHECK_DIR(OUT_DIR);
+    std::string configDir = "/home/jiaming/Self/PPPM-github/PPPM-TDBEM/assets/scene.cfg";
+    SimpleJsonReader reader(configDir);
+    auto &inputDir = reader.dirMap["inputDir"],
+         &outputDir = reader.dirMap["outputDir"];
+    CHECK_DIR(outputDir);
 
-    // ObjectCollection collection(data_dir,
-    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-    //                                 {"phone", ObjectInfo::SoundType::Audio}, {"cup", ObjectInfo::SoundType::Manual}},
-    //                             std::vector<std::any>{
-    //                                 {},
-    //                                 // std::string{ "polystyrene" },
-    //                                 // {}
-    //                             });
+    std::vector<std::pair<std::string, ObjectInfo::SoundType>> nativeSceneInfo;
+    for(auto& info : reader.sceneInfoMap)
+    {
+        ObjectInfo::SoundType nativeType;
+        auto& type = info["type"];
+        if(type == "Audio")
+            nativeType = ObjectInfo::SoundType::Audio;
+        else if(type == "Manual")
+            nativeType = ObjectInfo::SoundType::Manual;
+        else
+            assert(false);
+        nativeSceneInfo.emplace_back(std::move(info["name"]), nativeType);
+    }
 
-    // ObjectCollection collection(data_dir,
-    //                             std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-    //                                 {"trumpet_horn_speaker", ObjectInfo::SoundType::Audio},
-    //                                 {"plunger", ObjectInfo::SoundType::Audio}, // for plunger has motion.
-    //                                 {"trumpet_horn", ObjectInfo::SoundType::Manual}},
-    //                             {});
-
-    ObjectCollection collection("/home/jiaming/Downloads/倒水demo",
-                                std::vector<std::pair<std::string, ObjectInfo::SoundType>>{
-                                    {"water", ObjectInfo::SoundType::Audio},
-                                    {"glass", ObjectInfo::SoundType::Manual}},
-                                {});
-
+    // the last parameter is useless for collection with only audio and manual.
+    ObjectCollection collection(inputDir, nativeSceneInfo, {});
 
     BBox bbox = collection.GetBBox();
     float3 grid_center = bbox.center();
-    float grid_length = bbox.length() * 2;
-    int res = 40;
+    float grid_length = bbox.length() * reader.numMap["gridLengthFactor"];
+    int res = reader.numMap["res"];
     float grid_size = grid_length / res;
     float3 min_pos = grid_center - grid_length / 2;
     int frame_rate = 1.01f / (grid_size / std::sqrt(3) / AIR_WAVE_SPEED);
@@ -227,7 +224,11 @@ void AudioAndManualTest()
     collection.UpdateMesh();
 
     float dt = 1.0f / frame_rate;
-    float max_time = 10.0f;
+    float max_time = reader.numMap["maxTime"];
+    LOG("res: " << res);
+    LOG("max time: " << max_time);
+    LOG("grid length factor: "<< (grid_length / bbox.length()));
+
     LOG("bbox: " << bbox)
     LOG("min pos: " << min_pos);
     LOG("max pos: " << min_pos + grid_size * res)
@@ -238,10 +239,13 @@ void AudioAndManualTest()
     PPPMSolver solver(res, grid_size, dt, min_pos);
 
     int frame_num = max_time / dt;
-    auto IMG_DIR = OUT_DIR + "/img/";
+    auto IMG_DIR = outputDir + "/img/";
     CHECK_DIR(IMG_DIR)
 
-    int3 check_coord = make_int3(res / 8 * 7);
+    int3 check_coord = make_int3(reader.numMap["checkCoordX"] * res,
+        reader.numMap["checkCoordY"] * res, reader.numMap["checkCoordZ"] * res);
+
+    LOG("check_coord: " << check_coord.x << " " << check_coord.y << " " << check_coord.z);
 
     const int mute_frame_num = 0;
     CArr<float> result(mute_frame_num + frame_num + 2);
@@ -249,10 +253,10 @@ void AudioAndManualTest()
     result[0] = frame_rate;
 
     float currTime = 0.0f;
-    progressbar bar(frame_num);
+    progressbar bar(frame_num - currTime / dt);
 
-    int chunkSize = 10000;
-    int backStepSize = 500;
+    int chunkSize = 5000;
+    int backStepSize = 250;
 
     auto CheckNaN = [&](){
         if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
@@ -283,8 +287,8 @@ void AudioAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
-        SaveGridIf([](int frame_num) { return frame_num % 10010 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
-                   1e-5);
+        // SaveGridIf([](int frame_num) { return frame_num % 1010 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
+        //            1e-5);
         return;
     };
 
@@ -345,7 +349,7 @@ void AudioAndManualTest()
             break;
     }
     std::cout << "Done" << std::endl;
-    write_to_txt(OUT_DIR + "/result.txt", result);
+    write_to_txt(outputDir + "/result.txt", result);
     solver.clear();
     return;
 }
