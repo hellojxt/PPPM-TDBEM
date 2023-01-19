@@ -188,27 +188,31 @@ public:
             vertices.assign(fixedMesh.vertices);
             surfaces.assign(fixedMesh.triangles);
             standardVertices.assign(vertices);
-            selectedSurfacesJudgement.resize(surfaces.size());
-            thrust::fill(thrust::device, selectedSurfacesJudgement.data(),
-                         selectedSurfacesJudgement.data() + selectedSurfacesJudgement.size(), 1);
             return;
         }
+        // all surfaces have.
+        if(selectedVertices.isEmpty())
+        {
+            selectedSurfacesJudgement.resize(fixedMesh.triangles.size());
+            thrust::fill(thrust::device, selectedSurfacesJudgement.data(),
+                         selectedSurfacesJudgement.data() + selectedSurfacesJudgement.size(), 1);
+        }
+        else
+        {
+            auto gpuFixedVertices = fixedMesh.vertices.gpu();
+            auto gpuFixedSurfaces = fixedMesh.triangles.gpu();
 
-        auto gpuFixedVertices = fixedMesh.vertices.gpu();
-        auto gpuFixedSurfaces = fixedMesh.triangles.gpu();
-
-        selectedSurfacesJudgement.resize(gpuFixedSurfaces.size());
-        // find the covered surfaces.
-        cuExecute(gpuFixedVertices.size(), FindNearestVertex, vertices, surfaces,
-                  gpuFixedVertices, gpuFixedSurfaces, selectedSurfacesJudgement,
-                  selectedVertices);
-
+            selectedSurfacesJudgement.resize(gpuFixedSurfaces.size());
+            // find the covered surfaces.
+            cuExecute(gpuFixedVertices.size(), FindNearestVertex, vertices, surfaces,
+                      gpuFixedVertices, gpuFixedSurfaces, selectedSurfacesJudgement,
+                      selectedVertices);
+            gpuFixedVertices.clear();
+            gpuFixedSurfaces.clear();
+        }
         vertices.assign(fixedMesh.vertices);
         surfaces.assign(fixedMesh.triangles);
         standardVertices.assign(vertices);
-
-        gpuFixedVertices.clear();
-        gpuFixedSurfaces.clear();
     };
 
     virtual BBox get_bbox()
