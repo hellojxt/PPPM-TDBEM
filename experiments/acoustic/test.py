@@ -61,6 +61,7 @@ def process_acoustic_data(dir_name):
     plt.imshow(concated, cmap='jet', alpha=0.7, interpolation='bilinear')
     plt.savefig(img_dir + "/" + names[-3] + "_" + names[-2] +
                 "ffat.png", dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.close()
     return SNR(ffat, pppm_ffat), SNR(ffat, ghost_ffat1), SNR(ffat, ghost_ffat2)
 
 
@@ -109,13 +110,15 @@ plt.ylabel("Time (s)")
 plt.xlabel("Resolution")
 plt.savefig(img_dir + "/acoustic_time.png", dpi=300,
             bbox_inches='tight', pad_inches=0)
+plt.close()
 
 plt.figure(figsize=(15, 8))
 plt.plot(res_list, SNR_data["pppm"], label="PPPM")
-plt.plot(res_list, SNR_data["ghost1"], label="Ghost1")
-plt.plot(res_list, SNR_data["ghost2"], label="Ghost2")
+plt.plot(res_list, SNR_data["ghost1"], label="Ghost Cell 1st")
+plt.plot(res_list, SNR_data["ghost2"], label="Ghost Cell 2nd")
 plt.legend()
 plt.ylabel("SNR")
 plt.xlabel("Resolution")
 plt.savefig(img_dir + "/acoustic_SNR.png", dpi=300,
             bbox_inches='tight', pad_inches=0)
+plt.close()
