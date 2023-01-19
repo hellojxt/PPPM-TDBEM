@@ -7,7 +7,7 @@ sns.set_theme(style="darkgrid")
 
 
 def SNR(ground_truth, prediction):
-    return 10*np.log(np.mean(ground_truth ** 2) / np.mean((ground_truth - prediction) ** 2))
+    return 10 * np.log(np.mean(ground_truth ** 2) / np.mean((ground_truth - prediction) ** 2))
 
 
 def normalize(data):
@@ -33,7 +33,7 @@ for sub_dir in sub_dirs:
     grid_size_list = [float(x.split("/")[-1]) for x in sub_dirs]
     method_list = ['pppm', 'ghostcell1', 'ghostcell2', 'groundtruth']
     label_dict = {'pppm': 'PPPM', 'ghostcell1': 'Ghost Cell 1st',
-                  'ghostcell2': 'Ghost Cell 2st', 'groundtruth': 'Ground Truth'}
+                  'ghostcell2': 'Ghost Cell 2nd', 'groundtruth': 'Ground Truth'}
     SNR_data = {'pppm': [], 'ghostcell1': [],
                 'ghostcell2': [], 'groundtruth': []}
     time_data = {'pppm': [], 'ghostcell1': [],
@@ -55,6 +55,8 @@ for sub_dir in sub_dirs:
             if method == 'groundtruth':
                 continue
             SNR_data[method].append(SNR(gt, method_data[method]))
+            print(basename, grid_size, method,
+                  (method_data[method]**2).sum()**0.5 / (gt**2).sum()**0.5)
     plt.figure(figsize=(15, 8))
     for method in method_list:
         if method == 'groundtruth':
