@@ -30,7 +30,7 @@ void SaveGridIf(T func, bool saveAll, const std::string &dir, int frameNum, Part
         }
         else
         {
-            save_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value);
+            save_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value, make_float3(0.5f, 0, 0));
         }
     }
 }
@@ -86,7 +86,7 @@ void ModalAndManualTest()
     auto timeStep = collection.timeStep;
 
     progressbar bar(frame_num);
-    auto CheckNaN = [&](){
+    auto CheckNaN = [&]() {
         if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
         {
             LOG("NAN")
@@ -95,8 +95,7 @@ void ModalAndManualTest()
         return true;
     };
 
-    auto UpdateSound = [&]()
-    {
+    auto UpdateSound = [&]() {
         bool meshUpdated = false;
         for (auto &object : collection.objects)
         {
@@ -115,7 +114,8 @@ void ModalAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
-        // SaveGridIf([](int frame_num) { return frame_num % 10000 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
+        // SaveGridIf([](int frame_num) { return frame_num % 10000 == 0; }, true, IMG_DIR, bar.get_progress(),
+        // solver.pg,
         //            1e-5);
         return;
     };
@@ -126,25 +126,25 @@ void ModalAndManualTest()
     while (bar.get_progress() <= frame_num)
     {
         int i = bar.get_progress();
-        if(i % chunkSize == chunkSize - backStepSize)
+        if (i % chunkSize == chunkSize - backStepSize)
         {
             auto endStep = std::min(i + backStepSize, frame_num + 1);
             auto savedT = solver.pg.fdtd.t;
             auto savedCurrTime = currTime;
-            for(int k = 0; k < collection.objects.size(); k++)
+            for (int k = 0; k < collection.objects.size(); k++)
             {
                 collection.objects[k]->SaveState(*(collection.objectInfos[k].state));
             }
             // update rest of the last chunk.
-            for(int j = i; j < endStep; j++)
+            for (int j = i; j < endStep; j++)
             {
                 UpdateSound();
                 result[mute_frame_num + j + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
                 success = CheckNaN();
-                if(!success)
+                if (!success)
                     break;
             }
-            if(!success)
+            if (!success)
                 break;
 
             solver.pg.fdtd.reset();
@@ -156,26 +156,26 @@ void ModalAndManualTest()
             {
                 collection.objects[k]->LoadState(*(collection.objectInfos[k].state));
             }
-            
-            for(int j = i; j < endStep; j++)
+
+            for (int j = i; j < endStep; j++)
             {
                 UpdateSound();
                 success = CheckNaN();
-                if(!success)
+                if (!success)
                     break;
                 bar.update();
             }
-            if(!success)
+            if (!success)
                 break;
-            
+
             bar.update();
-            continue;    
+            continue;
         }
-        
+
         UpdateSound();
         result[mute_frame_num + i + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         bar.update();
-        if(!CheckNaN())
+        if (!CheckNaN())
             break;
     }
 
@@ -186,22 +186,20 @@ void ModalAndManualTest()
     return;
 }
 
-void AudioAndManualTest()
+void AudioAndManualTest(std::string configDir)
 {
-    std::string configDir = "/home/jiaming/Self/PPPM-github/PPPM-TDBEM/assets/scene.cfg";
     SimpleJsonReader reader(configDir);
-    auto &inputDir = reader.dirMap["inputDir"],
-         &outputDir = reader.dirMap["outputDir"];
+    auto &inputDir = reader.dirMap["inputDir"], &outputDir = reader.dirMap["outputDir"];
     CHECK_DIR(outputDir);
 
     std::vector<std::pair<std::string, ObjectInfo::SoundType>> nativeSceneInfo;
-    for(auto& info : reader.sceneInfoMap)
+    for (auto &info : reader.sceneInfoMap)
     {
         ObjectInfo::SoundType nativeType;
-        auto& type = info["type"];
-        if(type == "Audio")
+        auto &type = info["type"];
+        if (type == "Audio")
             nativeType = ObjectInfo::SoundType::Audio;
-        else if(type == "Manual")
+        else if (type == "Manual")
             nativeType = ObjectInfo::SoundType::Manual;
         else
             assert(false);
@@ -227,7 +225,7 @@ void AudioAndManualTest()
     float max_time = reader.numMap["maxTime"];
     LOG("res: " << res);
     LOG("max time: " << max_time);
-    LOG("grid length factor: "<< (grid_length / bbox.length()));
+    LOG("grid length factor: " << (grid_length / bbox.length()));
 
     LOG("bbox: " << bbox)
     LOG("min pos: " << min_pos);
@@ -242,8 +240,8 @@ void AudioAndManualTest()
     auto IMG_DIR = outputDir + "/img/";
     CHECK_DIR(IMG_DIR)
 
-    int3 check_coord = make_int3(reader.numMap["checkCoordX"] * res,
-        reader.numMap["checkCoordY"] * res, reader.numMap["checkCoordZ"] * res);
+    int3 check_coord = make_int3(reader.numMap["checkCoordX"] * res, reader.numMap["checkCoordY"] * res,
+                                 reader.numMap["checkCoordZ"] * res);
 
     LOG("check_coord: " << check_coord.x << " " << check_coord.y << " " << check_coord.z);
 
@@ -255,10 +253,10 @@ void AudioAndManualTest()
     float currTime = 0.0f;
     progressbar bar(frame_num - currTime / dt);
 
-    int chunkSize = 5000;
-    int backStepSize = 250;
+    int chunkSize = 500;
+    int backStepSize = 50;
 
-    auto CheckNaN = [&](){
+    auto CheckNaN = [&]() {
         if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
         {
             LOG("NAN")
@@ -267,8 +265,7 @@ void AudioAndManualTest()
         return true;
     };
 
-    auto UpdateSound = [&]()
-    {
+    auto UpdateSound = [&]() {
         bool meshUpdated = false;
         for (auto &object : collection.objects)
         {
@@ -287,8 +284,8 @@ void AudioAndManualTest()
             solver.update_mesh(collection.tetVertices);
         }
         solver.update_grid_and_face(collection.surfaceAccs);
-        // SaveGridIf([](int frame_num) { return frame_num % 1010 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
-        //            1e-5);
+        // SaveGridIf([](int frame_num) { return frame_num % 10 == 0; }, false, IMG_DIR, bar.get_progress(), solver.pg,
+        //            1e-2);
         return;
     };
 
@@ -296,25 +293,25 @@ void AudioAndManualTest()
     while (bar.get_progress() <= frame_num)
     {
         int i = bar.get_progress();
-        if(i % chunkSize == chunkSize - backStepSize)
+        if (i % chunkSize == chunkSize - backStepSize)
         {
             auto endStep = std::min(i + backStepSize, frame_num + 1);
             auto savedT = solver.pg.fdtd.t;
             auto savedCurrTime = currTime;
-            for(int k = 0; k < collection.objects.size(); k++)
+            for (int k = 0; k < collection.objects.size(); k++)
             {
                 collection.objects[k]->SaveState(*(collection.objectInfos[k].state));
             }
             // update rest of the last chunk.
-            for(int j = i; j < endStep; j++)
+            for (int j = i; j < endStep; j++)
             {
                 UpdateSound();
                 result[mute_frame_num + j + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
                 success = CheckNaN();
-                if(!success)
+                if (!success)
                     break;
             }
-            if(!success)
+            if (!success)
                 break;
 
             solver.pg.fdtd.reset();
@@ -326,26 +323,26 @@ void AudioAndManualTest()
             {
                 collection.objects[k]->LoadState(*(collection.objectInfos[k].state));
             }
-            
-            for(int j = i; j < endStep; j++)
+
+            for (int j = i; j < endStep; j++)
             {
                 UpdateSound();
                 success = CheckNaN();
-                if(!success)
+                if (!success)
                     break;
                 bar.update();
             }
-            if(!success)
+            if (!success)
                 break;
-            
+
             bar.update();
-            continue;    
+            continue;
         }
-        
+
         UpdateSound();
         result[mute_frame_num + i + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
         bar.update();
-        if(!CheckNaN())
+        if (!CheckNaN())
             break;
     }
     std::cout << "Done" << std::endl;
@@ -354,9 +351,9 @@ void AudioAndManualTest()
     return;
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    AudioAndManualTest();
+    AudioAndManualTest(argv[1]);
     // ModalAndManualTest();
     return 0;
 }

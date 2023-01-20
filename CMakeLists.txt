@@ -12,7 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include_directories(/usr/local/cuda/include)
 
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
-add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
+# add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DNDEBUG>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)

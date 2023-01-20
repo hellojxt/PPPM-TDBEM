@@ -31,9 +31,10 @@ for sub_dir in sub_dirs:
     sub_dirs = glob(output_dir + "0.*")
     sub_dirs = sorted(sub_dirs, key=lambda x: float(x.split("/")[-1]))
     grid_size_list = [float(x.split("/")[-1]) for x in sub_dirs]
+    resolution_list = [int(0.7 / x) for x in grid_size_list]
     method_list = ['pppm', 'ghostcell1', 'ghostcell2', 'groundtruth']
-    label_dict = {'pppm': 'PPPM', 'ghostcell1': 'Ghost Cell 1st',
-                  'ghostcell2': 'Ghost Cell 2nd', 'groundtruth': 'Ground Truth'}
+    label_dict = {'pppm': 'Ours', 'ghostcell1': 'Ghost Cell 1st',
+                  'ghostcell2': 'Ghost Cell Method', 'groundtruth': 'Ground Truth'}
     SNR_data = {'pppm': [], 'ghostcell1': [],
                 'ghostcell2': [], 'groundtruth': []}
     time_data = {'pppm': [], 'ghostcell1': [],
@@ -57,32 +58,26 @@ for sub_dir in sub_dirs:
             SNR_data[method].append(SNR(gt, method_data[method]))
             print(basename, grid_size, method,
                   (method_data[method]**2).sum()**0.5 / (gt**2).sum()**0.5)
-    plt.figure(figsize=(15, 8))
+    plt.figure(figsize=(8, 4))
     for method in method_list:
-        if method == 'groundtruth':
+        if method == 'groundtruth' or method == 'ghostcell1':
             continue
-        plt.plot(grid_size_list, SNR_data[method],
+        plt.plot(resolution_list, SNR_data[method],
                  label=label_dict[method], marker='o')
     plt.legend()
-    SMALL_SIZE = 8
-    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-    plt.rc('ytick', labelsize=SMALL_SIZE)
-    plt.xlabel("Grid Size")
+    plt.xlabel("Resolution")
     plt.ylabel("SNR (dB)")
     plt.savefig(img_dir + "SNR.png", dpi=300,
                 bbox_inches='tight', pad_inches=0)
 
-    plt.figure(figsize=(15, 8))
+    plt.figure(figsize=(8, 4))
     for method in method_list:
-        if method == 'groundtruth':
+        if method == 'groundtruth' or method == 'ghostcell1':
             continue
-        plt.plot(grid_size_list, time_data[method],
+        plt.plot(resolution_list, time_data[method],
                  label=label_dict[method], marker='o')
     plt.legend()
-    SMALL_SIZE = 8
-    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-    plt.rc('ytick', labelsize=SMALL_SIZE)
-    plt.xlabel("Grid Size")
+    plt.xlabel("Resolution")
     plt.ylabel("Time (s)")
     plt.savefig(img_dir + "time.png", dpi=300,
                 bbox_inches='tight', pad_inches=0)

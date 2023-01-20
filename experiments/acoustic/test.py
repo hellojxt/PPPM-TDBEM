@@ -51,7 +51,7 @@ def process_acoustic_data(dir_name):
     ghost_ffat1 = norm_ffat(np.loadtxt(dir_name + "ghost1_ffat.txt"), dim)
     ghost_ffat2 = norm_ffat(np.loadtxt(dir_name + "ghost2_ffat.txt"), dim)
     concated = np.concatenate(
-        (ffat, pppm_ffat, ghost_ffat1, ghost_ffat2), axis=1)
+        (ffat, pppm_ffat, ghost_ffat2), axis=1)
     fig = plt.figure(figsize=(10, 5))
     # hide axes
     fig.patch.set_visible(False)
@@ -101,10 +101,11 @@ for i in tqdm(res_list):
     time_data["ghost1"].append(ghost1_time / len(mode_idx_list))
     time_data["ghost2"].append(ghost2_time / len(mode_idx_list))
 
-plt.figure(figsize=(15, 8))
-plt.plot(res_list, time_data["pppm"], label="PPPM")
-plt.plot(res_list, time_data["ghost1"], label="Ghost1")
-plt.plot(res_list, time_data["ghost2"], label="Ghost2")
+plt.figure(figsize=(8, 4))
+plt.plot(res_list, time_data["pppm"], label="Ours", marker='o')
+# plt.plot(res_list, time_data["ghost1"], label="Ghost Cell 1st", marker='o')
+plt.plot(res_list, time_data["ghost2"],
+         label="Ghost Cell Method", marker='o')
 plt.legend()
 plt.ylabel("Time (s)")
 plt.xlabel("Resolution")
@@ -112,10 +113,11 @@ plt.savefig(img_dir + "/acoustic_time.png", dpi=300,
             bbox_inches='tight', pad_inches=0)
 plt.close()
 
-plt.figure(figsize=(15, 8))
-plt.plot(res_list, SNR_data["pppm"], label="PPPM")
-plt.plot(res_list, SNR_data["ghost1"], label="Ghost Cell 1st")
-plt.plot(res_list, SNR_data["ghost2"], label="Ghost Cell 2nd")
+plt.figure(figsize=(8, 4))
+plt.plot(res_list, SNR_data["pppm"], label="Ours", marker='o')
+# plt.plot(res_list, SNR_data["ghost1"], label="Ghost Cell 1st", marker='o')
+plt.plot(res_list, SNR_data["ghost2"],
+         label="Ghost Cell Method", marker='o')
 plt.legend()
 plt.ylabel("SNR")
 plt.xlabel("Resolution")
