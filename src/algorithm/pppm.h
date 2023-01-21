@@ -11,13 +11,12 @@ namespace pppm
 class PPPMSolver
 {
     public:
-        TDBEM bem;        // boundary element method solver
-        ParticleGrid pg;  // The left corner of the fdtd grid is at (0,0,0)
-        // pg储存了每个顶点、边、三角面、每个网格包含的面，每个网格用来插值的面，非空网格，3x3x3范围邻居面及其对应非空网格，4x4x4范围邻居面
+        TDBEM bem;                    // boundary element method solver
+        ParticleGrid pg;              // The left corner of the fdtd grid is at (0,0,0)
         GArr<History> dirichlet;      // Dirichlet boundary condition
         GArr<History> neumann;        // Neumann boundary condition
         GArr<float> current_neumann;  // Neumann boundary condition for current
-        GridArr grid_far_field;       // far field potential of grid cells 远场是用作什么的？
+        GridArr grid_far_field;       // far field potential of grid cells
 
         // following are used for updating the dirichlet boundary values
         GArr<float> face_far_field;     // far field potential of faces
@@ -29,6 +28,7 @@ class PPPMSolver
         FaceCache face_cache;  // cache for near field computation weights
 
         bool mesh_set = false;
+        float reflect_coeff;
 
         /**
          *   Constructor of PPPMSolver
@@ -36,7 +36,12 @@ class PPPMSolver
          *   @param dl_: grid cell size
          *   @param dt_: time step for the FDTD solver
          */
-        PPPMSolver(int res_, float dl_, float dt_, float3 min_pos = make_float3(0, 0, 0), int pml_width = 0)
+        PPPMSolver(int res_,
+                   float dl_,
+                   float dt_,
+                   float3 min_pos = make_float3(0, 0, 0),
+                   int pml_width = 0,
+                   float reflect_coeff_ = 0.83)
         {
             pg.init(min_pos, dl_, res_, dt_, pml_width);
             bem.init(dt_, dl_);
@@ -45,6 +50,7 @@ class PPPMSolver
                 grid_far_field[i].resize(res_, res_, res_);
                 grid_far_field[i].reset();
             }
+            reflect_coeff = reflect_coeff_;
         }
 
         CGPU_FUNC float inline dt() { return pg.fdtd.dt; }
@@ -137,6 +143,7 @@ class PPPMSolver
             update_dirichlet(log_time);
             solve_fdtd_near(log_time);
         }
+        void set_mute();
 
         template <typename T>
         void update_step(T neuuman_condition, bool log_time = false)

@@ -11,4 +11,4 @@ experiments/**/*.txt
 experiments/**/*.wav
 assets/fixed/
 **/img
-demo
+demo/*

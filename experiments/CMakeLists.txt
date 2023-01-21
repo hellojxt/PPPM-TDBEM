@@ -1,14 +1,11 @@
 add_executable(static static/main.cu)
 target_link_libraries(static PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
-add_executable(ghost_rigidbody ghost_rigidbody/main.cu)
-target_link_libraries(ghost_rigidbody PRIVATE Catch2::Catch2WithMain uilib utillib alglib)
+add_executable(teaser teaser/main.cu)
+target_link_libraries(teaser PRIVATE Catch2::Catch2WithMain uilib alglib utillib)
 
-add_executable(pppm_rigidbody pppm_rigidbody/main.cu)
-target_link_libraries(pppm_rigidbody PRIVATE Catch2::Catch2WithMain uilib utillib alglib)
-
-add_executable(pppm_objectCollection pppm_objectCollection/main.cu)
-target_link_libraries(pppm_objectCollection PRIVATE Catch2::Catch2WithMain uilib utillib alglib)
+add_executable(demo demo/main.cu)
+target_link_libraries(demo PRIVATE Catch2::Catch2WithMain uilib utillib alglib)
 
 add_executable(acoustic acoustic/main.cu)
 target_link_libraries(acoustic PRIVATE Catch2::Catch2WithMain uilib alglib utillib)

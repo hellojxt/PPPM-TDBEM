@@ -184,7 +184,7 @@ __global__ void update_dirichlet_kernel(PPPMSolver solver)
         factor_sum += solver.face_factor(tri_idx, i);
     }
     solver.dirichlet[tri_idx][solver.time_idx()] =
-        (solver.face_far_field[tri_idx] * 0.83 + near_field_sum) / (0.5 * tri.area - factor_sum);
+        (solver.face_far_field[tri_idx] * solver.reflect_coeff + near_field_sum) / (0.5 * tri.area - factor_sum);
     // if (isnan(solver.dirichlet[tri_idx][solver.time_idx()]))
     // {
     //     printf("face_far_field: %f, near_field_sum: %f, factor_sum: %f\n", solver.face_far_field[tri_idx],
@@ -253,6 +253,20 @@ void PPPMSolver::export_dirichlet(std::string file_name)
     GArr<float> current_dirichlet(dirichlet.size());
     cuExecute(dirichlet.size(), get_current_dirichlet_kernel, *this, current_dirichlet);
     write_to_txt(file_name, current_dirichlet.cpu());
+}
+
+__global__ void set_mute_kernel(PPPMSolver solver)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i < solver.dirichlet.size())
+    {
+        solver.dirichlet[i][solver.time_idx()] = 0;
+    }
+}
+
+void PPPMSolver::set_mute()
+{
+    cuExecute(dirichlet.size(), set_mute_kernel, *this);
 }
 
 }  // namespace pppm

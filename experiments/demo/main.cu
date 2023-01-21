@@ -30,7 +30,7 @@ void SaveGridIf(T func, bool saveAll, const std::string &dir, int frameNum, Part
         }
         else
         {
-            save_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value, make_float3(0.5f, 0, 0));
+            save_grid(grid, dir + "/" + std::to_string(frameNum) + ".png", max_value);
         }
     }
 }
@@ -212,6 +212,7 @@ void AudioAndManualTest(std::string configDir)
     BBox bbox = collection.GetBBox();
     float3 grid_center = bbox.center();
     float grid_length = bbox.length() * reader.numMap["gridLengthFactor"];
+    float reflect_coeff = reader.numMap["reflectCoeff"];
     int res = reader.numMap["res"];
     float grid_size = grid_length / res;
     float3 min_pos = grid_center - grid_length / 2;
@@ -234,9 +235,9 @@ void AudioAndManualTest(std::string configDir)
     LOG("dt: " << dt)
     LOG("frame rate: " << frame_rate)
 
-    PPPMSolver solver(res, grid_size, dt, min_pos);
+    PPPMSolver solver(res, grid_size, dt, min_pos, 0, reflect_coeff);
 
-    int frame_num = max_time / dt;
+    int frame_num = (max_time - reader.numMap["startTime"]) / dt;
     auto IMG_DIR = outputDir + "/img/";
     CHECK_DIR(IMG_DIR)
 
@@ -250,11 +251,11 @@ void AudioAndManualTest(std::string configDir)
     result.reset();
     result[0] = frame_rate;
 
-    float currTime = 0.0f;
-    progressbar bar(frame_num - currTime / dt);
+    float currTime = reader.numMap["startTime"];
+    progressbar bar(frame_num);
 
-    int chunkSize = 500;
-    int backStepSize = 50;
+    int chunkSize = reader.numMap["chunkSize"];
+    int backStepSize = reader.numMap["backStepSize"];
 
     auto CheckNaN = [&]() {
         if (isnan(result[mute_frame_num + bar.get_progress() + 1]))
@@ -265,7 +266,7 @@ void AudioAndManualTest(std::string configDir)
         return true;
     };
 
-    auto UpdateSound = [&]() {
+    auto UpdateSound = [&](bool mute = false) {
         bool meshUpdated = false;
         for (auto &object : collection.objects)
         {
@@ -274,7 +275,6 @@ void AudioAndManualTest(std::string configDir)
         currTime += dt;
         collection.UpdateMesh();
         collection.UpdateAcc();
-
         if (!solver.mesh_set)
         {
             solver.set_mesh(collection.tetVertices, collection.tetSurfaces);
@@ -283,9 +283,16 @@ void AudioAndManualTest(std::string configDir)
         {
             solver.update_mesh(collection.tetVertices);
         }
-        solver.update_grid_and_face(collection.surfaceAccs);
-        // SaveGridIf([](int frame_num) { return frame_num % 10 == 0; }, false, IMG_DIR, bar.get_progress(), solver.pg,
-        //            1e-2);
+        if (mute)
+        {
+            collection.surfaceAccs.reset();
+            solver.update_grid_and_face(collection.surfaceAccs);
+        }
+        else
+            solver.update_grid_and_face(collection.surfaceAccs);
+        // SaveGridIf([](int frame_num) { return frame_num % 22222 == 0; }, true, IMG_DIR, bar.get_progress(),
+        // solver.pg,
+        //            1e-3);
         return;
     };
 
@@ -305,7 +312,9 @@ void AudioAndManualTest(std::string configDir)
             // update rest of the last chunk.
             for (int j = i; j < endStep; j++)
             {
-                UpdateSound();
+                UpdateSound(true);
+                if (reader.numMap["debug"] == 1 && j % 50 == 0)
+                    save_grid(solver.pg, IMG_DIR + "/" + std::to_string(j) + ".png", 1e-4, make_float3(0, 0, 0.5f));
                 result[mute_frame_num + j + 1] = solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
                 success = CheckNaN();
                 if (!success)
@@ -327,6 +336,7 @@ void AudioAndManualTest(std::string configDir)
             for (int j = i; j < endStep; j++)
             {
                 UpdateSound();
+                result[mute_frame_num + j + 1] += solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord));
                 success = CheckNaN();
                 if (!success)
                     break;
@@ -334,8 +344,7 @@ void AudioAndManualTest(std::string configDir)
             }
             if (!success)
                 break;
-
-            bar.update();
+            // break;
             continue;
         }
 
