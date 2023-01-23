@@ -26,6 +26,7 @@ ObjectCollection::ObjectCollection(const std::filesystem::path &dir,
     size_t verticesSize = 0, surfacesSize = 0;
     for (int i = 0; i < objectNames.size(); i++)
     {
+        LOG("Loading object " << objectNames[i].first << "...")
         auto &objectName = objectNames[i];
         std::unique_ptr<ObjectState> objectState = nullptr;
         if (objectName.second == ObjectInfo::SoundType::Modal)
@@ -161,9 +162,9 @@ void ObjectCollection::export_mesh_sequence(const std::string &output_path)
 {
     CHECK_DIR(output_path);
     CHECK_DIR(output_path + "/total");
-    for(int i = 0; i < objects.size(); i++)
+    for (int i = 0; i < objects.size(); i++)
         CHECK_DIR(output_path + "/" + std::to_string(i));
-    
+
     float animation_export_timestep = 1.0f / 24.0f;
     float lastFrameTime = FLT_MAX;
     for (auto &object : objects)
@@ -180,11 +181,9 @@ void ObjectCollection::export_mesh_sequence(const std::string &output_path)
             auto &object = objects[j];
             object->UpdateUntil(i * animation_export_timestep);
 
-            Mesh surfaceMesh(object->GetVertices().cpu(),
-                             object->GetSurfaces().cpu());
+            Mesh surfaceMesh(object->GetVertices().cpu(), object->GetSurfaces().cpu());
             surfaceMesh.remove_isolated_vertices();
-            surfaceMesh.writeOBJ(output_path + "/" + std::to_string(j) +
-                                 "/surface_" + std::to_string(i) + ".obj");
+            surfaceMesh.writeOBJ(output_path + "/" + std::to_string(j) + "/surface_" + std::to_string(i) + ".obj");
 
             LoadObjectMesh_(j);
         }

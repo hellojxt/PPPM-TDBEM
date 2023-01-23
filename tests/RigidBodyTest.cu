@@ -20,28 +20,13 @@ using namespace pppm;
 
 int main()
 {
-    std::string configDir = "/home/jiaming/Self/PPPM-github/PPPM-TDBEM/assets/scene.cfg";
-    SimpleJsonReader reader(configDir);
-    auto &inputDir = reader.dirMap["inputDir"],
-         &outputDir = reader.dirMap["outputDir"];
-    CHECK_DIR(outputDir);
-
-    std::vector<std::pair<std::string, ObjectInfo::SoundType>> nativeSceneInfo;
-    for(auto& info : reader.sceneInfoMap)
-    {
-        ObjectInfo::SoundType nativeType;
-        auto& type = info["type"];
-        if(type == "Audio")
-            nativeType = ObjectInfo::SoundType::Audio;
-        else if(type == "Manual")
-            nativeType = ObjectInfo::SoundType::Manual;
-        else
-            assert(false);
-        nativeSceneInfo.emplace_back(std::move(info["name"]), nativeType);
-    }
-
-    // the last parameter is useless for collection with only audio and manual.
-    ObjectCollection collection(inputDir, nativeSceneInfo, {});
-    collection.export_mesh_sequence(outputDir + "/mesh_sequence");
+    std::string obj_name = "bowl";
+    std::string OUT_DIR = DATASET_DIR + std::string("/acoustic/") + obj_name + std::string("/output/");
+    RigidBody rigidbody(DATASET_DIR + std::string("/acoustic/") + obj_name, "plastic");
+    rigidbody.set_sample_rate(44100);
+    // rigidbody.fix_mesh(1e-2, OUT_DIR);
+    // rigidbody.export_mesh_with_modes(OUT_DIR);
+    // rigidbody.export_signal(OUT_DIR, 2.5);
+    rigidbody.export_mesh_sequence(OUT_DIR + "/mesh_sequence");
     return 0;
 }

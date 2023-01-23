@@ -42,11 +42,11 @@ class MaterialParameters
                 restitution_coeff = 0.4;
                 friction_coeff = 0.2;
             }
-            else if (material_name == "polystyrene")
+            else if (material_name == "plastic")
             {
-                youngModulus = 3.5e9;
-                poissonRatio = 0.34;
-                density = 1050.0;
+                youngModulus = 1.4E9;
+                poissonRatio = 0.35;
+                density = 1070.0;
                 alpha = 30.0;
                 beta = 1e-6;
                 gamma = 4e-4;

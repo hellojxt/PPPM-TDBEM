@@ -22,11 +22,24 @@
             ]
         },
         {
-            "name": "CUDA C++: Experiments Launch",
-            "type": "cuda-gdb",
+            "name": "CUDA C++: demo",
+            "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/${relativeFileDirname}",
-            "cwd": "${workspaceFolder}/build",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "/home/jxt/PPPM-TDBEM/demo/bowl_plane/scene.cfg"
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/local/cuda/bin/cuda-gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         },
         {
             "name": "CUDA C++: Experiments Launch xcx",

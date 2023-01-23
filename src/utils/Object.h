@@ -220,8 +220,10 @@ class AudioObject : public Object
                 auto gpuFixedSurfaces = fixedMesh.triangles.gpu();
 
                 selectedSurfacesJudgement.resize(gpuFixedSurfaces.size());
+                selectedSurfacesJudgement.reset();
                 // find the covered surfaces.
-                cuExecute(gpuFixedVertices.size(), FindNearestVertex, vertices, surfaces, gpuFixedVertices,
+                LOG("selectedVertices.size() = " << selectedVertices.size());
+                cuExecute(selectedVertices.size(), FindNearestVertex, vertices, surfaces, gpuFixedVertices,
                           gpuFixedSurfaces, selectedSurfacesJudgement, selectedVertices);
                 gpuFixedVertices.clear();
                 gpuFixedSurfaces.clear();

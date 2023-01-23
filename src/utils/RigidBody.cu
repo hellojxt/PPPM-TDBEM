@@ -34,33 +34,32 @@ float RigidBody::GetLastFrameTime()
 
 bool RigidBody::UpdateUntil(float time)
 {
-    while(current_time < time)
+    while (current_time < time)
     {
         audio_step();
     }
     return mesh_is_updated;
 };
 
-GArr<float3> & RigidBody::GetVertices()
+GArr<float3> &RigidBody::GetVertices()
 {
     return tetVertices;
 };
 
-GArr<int3> & RigidBody::GetSurfaces()
+GArr<int3> &RigidBody::GetSurfaces()
 {
     return tetSurfaces;
 };
 
-void RigidBody::SubmitAccelerations(float* begin)
+void RigidBody::SubmitAccelerations(float *begin)
 {
-    cudaMemcpy(begin, surfaceAccs.data(), surfaceAccs.size() * sizeof(float),
-               cudaMemcpyDeviceToDevice);
+    cudaMemcpy(begin, surfaceAccs.data(), surfaceAccs.size() * sizeof(float), cudaMemcpyDeviceToDevice);
     return;
 }
 
-void RigidBody::SaveState(ObjectState& state)
+void RigidBody::SaveState(ObjectState &state)
 {
-    RigidBodyState& actualState = static_cast<RigidBodyState&>(state);
+    RigidBodyState &actualState = static_cast<RigidBodyState &>(state);
     actualState.current_time = current_time;
     actualState.impulseTimeStamp = impulseTimeStamp;
     actualState.animationTimeStamp = animationTimeStamp;
@@ -72,9 +71,9 @@ void RigidBody::SaveState(ObjectState& state)
     return;
 };
 
-void RigidBody::LoadState(ObjectState& state)
+void RigidBody::LoadState(ObjectState &state)
 {
-    RigidBodyState& actualState = static_cast<RigidBodyState&>(state);
+    RigidBodyState &actualState = static_cast<RigidBodyState &>(state);
     current_time = actualState.current_time;
     impulseTimeStamp = actualState.impulseTimeStamp;
     animationTimeStamp = actualState.animationTimeStamp;
@@ -184,6 +183,7 @@ void RigidBody::LoadEigen_(const std::string &eigenvalPath, const std::string &e
                 eigenVecs(i, j) = val;
         }
     }
+    LOG("Eigenvalue size:" << eigenVals.size());
     return;
 };
 

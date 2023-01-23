@@ -1,20 +1,20 @@
 #pragma once
 #ifndef RIGID_BODY_H
-#define RIGID_BODY_H
+#    define RIGID_BODY_H
 
-#include <string>
-#include "objIO.h"
-#include "array2D.h"
-#include "macro.h"
-#include <filesystem>
-#include "material.h"
-#include <deque>
-#include "Object.h"
+#    include <string>
+#    include "objIO.h"
+#    include "array2D.h"
+#    include "macro.h"
+#    include <filesystem>
+#    include "material.h"
+#    include <deque>
+#    include "Object.h"
 
 namespace pppm
 {
 
-#define CONTACT_TIME_SCALE 0.0005f
+#    define CONTACT_TIME_SCALE 0.0005f
 
 struct Impulse
 {
@@ -46,26 +46,26 @@ struct ModalInfo
 
 struct RigidBodyState : public ObjectState
 {
-    CArr<float3> vertices;
+        CArr<float3> vertices;
 
-    CArr<ModalInfo> modalInfos;
-    CArr<float> surfaceAccs;
+        CArr<ModalInfo> modalInfos;
+        CArr<float> surfaceAccs;
 
-    int animationTimeStamp;
-    int impulseTimeStamp;
-    float current_time;
+        int animationTimeStamp;
+        int impulseTimeStamp;
+        float current_time;
 };
 
 class RigidBody : public Object
 {
     public:
-        RigidBody(const std::string &data_dir, const std::string material_name, float max_frequncy_ = 20000.0f)
+        RigidBody(const std::string &data_dir, const std::string material_name, float max_frequncy_ = 15000.0f)
         {
             max_frequncy = max_frequncy_;
             material.set_parameters(material_name);
             load_data(data_dir);
         }
-        RigidBody(){}
+        RigidBody() {}
 
         void set_sample_rate(float sample_rate_)
         {
@@ -79,10 +79,10 @@ class RigidBody : public Object
         virtual bool UpdateUntil(float time) override;
         virtual GArr<float3> &GetVertices() override;
         virtual GArr<int3> &GetSurfaces() override;
-        virtual void SubmitAccelerations(float* begin) override;
+        virtual void SubmitAccelerations(float *begin) override;
         virtual float GetTimeStep() override { return timestep; };
-        virtual void SaveState(ObjectState& state) override;
-        virtual void LoadState(ObjectState& state) override;
+        virtual void SaveState(ObjectState &state) override;
+        virtual void LoadState(ObjectState &state) override;
 
         void separate_mode(int mode);
         void load_data(const std::string &data_dir);

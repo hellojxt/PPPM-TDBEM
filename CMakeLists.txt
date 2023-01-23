@@ -10,7 +10,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # For nsight compute
 
 include_directories(/usr/local/cuda/include)
-
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DMEMORY_CHECK>)
 # add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-DNDEBUG>)
