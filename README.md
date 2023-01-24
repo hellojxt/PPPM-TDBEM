@@ -1,8 +1,14 @@
 # PPPM-TDBEM
 
-推荐CUDA版本 >= 11.5
+## Requirements
 
-libpng catch2-3 CMake 
+- Ubuntu 20.04
+- CUDA version >= 11.5
+- CMake version >= 3.23
+- Catch2 (for unit test)
+- docker (for fix mesh using pymesh)
+- libglfw3-dev libglew-dev (for visualization)
 
+## Experiments
 
-- FFT 在最终版本添加 (测试阶段考虑编译速度用DFT)
+under `experiments` folder
