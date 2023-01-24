@@ -19,14 +19,24 @@
 
 using namespace pppm;
 
-#define ALL_STEP 500
+#define ALL_STEP 3500
 
-__global__ void update_surf_acc(SineSource sine, GArr<float> surface_accs, float t)
+__global__ void update_surf_acc(SineSource sine, GArr<float> surface_accs, GArr<Triangle> triangles, float t)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx >= surface_accs.size())
         return;
-    surface_accs[idx] = sine(t).real();
+    auto tri = triangles[idx];
+    if (tri.normal.y > 0)
+    {
+        // sine.omega = 2 * PI * 4000 * abs(tri.normal.x);
+        surface_accs[idx] = sine(t).real();
+    }
+    else
+    {
+        // sine.omega = 2 * PI * 4000 * abs(tri.normal.x);
+        surface_accs[idx] = -sine(t).real();
+    }
 }
 
 template <typename T>
@@ -36,26 +46,30 @@ void simulation(T &solver, Mesh &mesh, SineSource &sine, std::string dirname)
     surface_accs.resize(mesh.triangles.size());
     CHECK_DIR(dirname);
     LOG(dirname);
-    solver.set_mesh(mesh.vertices, mesh.triangles);
+    float time_cost = 0;
+    APPEND_TIME(time_cost, solver.set_mesh(mesh.vertices, mesh.triangles), set_mesh)
     progressbar bar(ALL_STEP);
+    auto triangles = solver.get_triangles();
     for (int i = 0; i < ALL_STEP; i++)
     {
         bar.update();
-        cuExecute(surface_accs.size(), update_surf_acc, sine, surface_accs, solver.dt() * i);
-        solver.update_step(surface_accs);
-        save_grid(solver.get_particle_grid(), dirname + "/" + std::to_string(i) + "png", 1.0f, make_float3(0.5, 0, 0));
+        cuExecute(surface_accs.size(), update_surf_acc, sine, surface_accs, triangles, solver.dt() * i);
+        APPEND_TIME(time_cost, solver.update_step(surface_accs), update)
+        // save_grid(solver.get_particle_grid(), dirname + "/" + std::to_string(i) + ".png", 0.01f,
+        //           make_float3(0, 0, 0.5));
     }
+    LOG("time cost: " << time_cost);
 }
 
 int main(int argc, char *argv[])
 {
-    auto dir_name = ROOT_DIR + std::string("dataset/teasor/");
+    auto dir_name = ROOT_DIR + std::string("dataset/teaser/");
     auto OUT_DIR = dir_name + "output/";
     CHECK_DIR(OUT_DIR);
 
-    float scale = 2.0;
+    float scale = 2;
     float box_size = 0.7;
-    float grid_size = 0.01;
+    float grid_size = 0.017;
 
     auto mesh = Mesh::loadOBJ(dir_name + "mesh.obj");
     mesh.stretch_to(box_size / scale);
@@ -65,7 +79,7 @@ int main(int argc, char *argv[])
     int res = box_size / grid_size;
     LOG("res: " << res << ", dt: " << dt << ", grid_size: " << grid_size << ", box_size: " << box_size)
 
-    auto sine = SineSource(2 * PI * 1000);
+    auto sine = SineSource(2 * PI * 4000);
 
     // PPPM
     PPPMSolver pppm(res, grid_size, dt, min_pos);
@@ -73,10 +87,10 @@ int main(int argc, char *argv[])
     pppm.clear();
 
     // First order Ghost cell
-    GhostCellSolver solver1(min_pos, grid_size, res, dt);
-    solver1.set_condition_number_threshold(0.0f);
-    simulation(solver1, mesh, sine, OUT_DIR + "/ghostcell1/");
-    solver1.clear();
+    // GhostCellSolver solver1(min_pos, grid_size, res, dt);
+    // solver1.set_condition_number_threshold(0.0f);
+    // simulation(solver1, mesh, sine, OUT_DIR + "/ghostcell1/");
+    // solver1.clear();
 
     // Second order Ghost cell
     GhostCellSolver solver2(min_pos, grid_size, res, dt);

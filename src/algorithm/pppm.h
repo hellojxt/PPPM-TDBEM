@@ -143,7 +143,7 @@ class PPPMSolver
             update_dirichlet(log_time);
             solve_fdtd_near(log_time);
         }
-        void set_mute();
+        void set_water_mute(float z);
 
         template <typename T>
         void update_step(T neuuman_condition, bool log_time = false)

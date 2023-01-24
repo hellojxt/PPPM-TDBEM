@@ -233,12 +233,18 @@ face2FaceIntegrand(const float3 *vertices, int3 src, int3 trg, cpx k, PotentialT
     float src_jacobian = jacobian(src_v);
     float3 trg_v[3] = {{vertices[trg.x]}, {vertices[trg.y]}, {vertices[trg.z]}};
     float trg_jacobian = jacobian(trg_v);
-    // float3 src_center = (src_v[0] + src_v[1] + src_v[2]) / 3;
-    // float3 trg_center = (trg_v[0] + trg_v[1] + trg_v[2]) / 3;
-    // float distance = length(src_center - trg_center);
-    // if (distance < threshold)
-    //     trg = src;
     int neighbor_num = triangle_common_vertex_num(src, trg);
+    float3 src_center = (src_v[0] + src_v[1] + src_v[2]) / 3;
+    float3 trg_center = (trg_v[0] + trg_v[1] + trg_v[2]) / 3;
+    float distance = length(src_center - trg_center);
+    if (distance < threshold && neighbor_num == 0)
+    {
+        cpx result = cpx(0, 0);
+        result += singular_integrand(src_v, src_v, src_jacobian, src_jacobian, k, neighbor_num, type);
+        result += singular_integrand(trg_v, trg_v, trg_jacobian, trg_jacobian, k, neighbor_num, type);
+        return result / 2;
+    }
+
     if (neighbor_num == 0)
         return regular_integrand(src_v, trg_v, src_jacobian, trg_jacobian, k, type);
     else
@@ -258,15 +264,6 @@ face2PointIntegrand(const float3 *vertices, int3 src, TargetCoordArray &trg, cpx
     float3 src_v[3] = {{vertices[src.x]}, {vertices[src.y]}, {vertices[src.z]}};
     float src_jacobian = jacobian(src_v);
     return potential_integrand(trg, src_v, src_jacobian, k, type);
-    // float3 src_v[3] = {{vertices[src.x]}, {vertices[src.y]}, {vertices[src.z]}};
-    // float src_jacobian = jacobian(src_v);
-    // cpx result = cpx(0, 0);
-    // float guass_x[2] = {0.3333333333333330, 0.3333333333333330};
-    // float guass_w[1] = {1.0f};
-    // float3 src_norm = triangle_norm(src_v);
-    // float3 v_in_tri = local_to_global(guass_x[0], guass_x[1], src_v);
-    // result += 0.5 * guass_w[0] * src_jacobian * layer_potential(v_in_tri, trg, src_norm, k, type);
-    // return result;
 }
 
 }  // namespace pppm

@@ -40,7 +40,9 @@ void AudioAndManualTest(std::string configDir)
     SimpleJsonReader reader(configDir);
     auto &inputDir = reader.dirMap["inputDir"], &outputDir = reader.dirMap["outputDir"];
     CHECK_DIR(outputDir);
-
+    bool is_water = false;
+    CArr<float2> water_motion;
+    int water_motion_idx = 0;
     std::vector<std::pair<std::string, ObjectInfo::SoundType>> nativeSceneInfo;
     std::vector<std::any> aditionalParams;
     for (auto &info : reader.sceneInfoMap)
@@ -64,6 +66,28 @@ void AudioAndManualTest(std::string configDir)
         }
         else
             throw std::runtime_error("Unknown sound type: " + type);
+        if (info["name"] == "water")
+        {
+            is_water = true;
+            LOG("water detected");
+            std::ifstream f_motion(inputDir + "/water/motion.txt");
+            if (!f_motion.good())
+            {
+                LOG_ERROR("Fail to load water motion file.");
+                std::exit(EXIT_FAILURE);
+            }
+            std::string line;
+            while (getline(f_motion, line))
+            {
+                if (line.empty())
+                    continue;
+                std::istringstream iss(line);
+                float t, val, tmp;
+                iss >> t >> tmp >> tmp >> val >> tmp >> tmp >> tmp >> tmp;
+                water_motion.pushBack(make_float2(t, val));
+                // LOG("water motion: " << t << " " << val)
+            }
+        }
         nativeSceneInfo.emplace_back(std::move(info["name"]), nativeType);
     }
     // the last parameter is useless for collection with only audio and manual.
@@ -167,6 +191,14 @@ void AudioAndManualTest(std::string configDir)
         }
         else
             solver.update_grid_and_face(collection.surfaceAccs);
+        if (is_water)
+        {
+            while (water_motion_idx < water_motion.size() && water_motion[water_motion_idx].x < currTime)
+            {
+                water_motion_idx++;
+            }
+            solver.set_water_mute(water_motion[water_motion_idx].y);
+        }
         // SaveGridIf([](int frame_num) { return frame_num % 1 == 0; }, true, IMG_DIR, bar.get_progress(), solver.pg,
         //            1e-1);
         return;
@@ -195,7 +227,7 @@ void AudioAndManualTest(std::string configDir)
                     save_grid(solver.pg, IMG_DIR + "/" + std::to_string(j) + ".png", reader.numMap["debug_max_value"],
                               make_float3(reader.numMap["debug_x_idx"], reader.numMap["debug_y_idx"],
                                           reader.numMap["debug_z_idx"]));
-                // save_all_grid(solver.pg, IMG_DIR + "/" + std::to_string(j), reader.numMap["debug_max_value"]);
+                // save_all_grid(solver.pg, IMG_DIR + "/" + std::to_string(j) + "/", reader.numMap["debug_max_value"]);
                 result[mute_frame_num + j + 1] =
                     solver.pg.fdtd.grids[solver.pg.fdtd.t](to_cpu(check_coord)) * (1 - factor);
                 success = CheckNaN();

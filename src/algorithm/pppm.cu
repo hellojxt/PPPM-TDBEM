@@ -255,18 +255,22 @@ void PPPMSolver::export_dirichlet(std::string file_name)
     write_to_txt(file_name, current_dirichlet.cpu());
 }
 
-__global__ void set_mute_kernel(PPPMSolver solver)
+__global__ void set_mute_kernel(PPPMSolver solver, float z_max)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i < solver.dirichlet.size())
+    int x = threadIdx.x + blockIdx.x * blockDim.x;
+    int y = threadIdx.y + blockIdx.y * blockDim.y;
+    int z = threadIdx.z + blockIdx.z * blockDim.z;
+    if (x >= solver.res() || y >= solver.res() || z >= solver.res())
+        return;
+    if (solver.pg.getCenter(x, y, z + 2).z <= z_max)
     {
-        solver.dirichlet[i][solver.time_idx()] = 0;
+        solver.pg.fdtd.grids[solver.pg.fdtd.t](x, y, z) = 0;
     }
 }
 
-void PPPMSolver::set_mute()
+void PPPMSolver::set_water_mute(float z)
 {
-    cuExecute(dirichlet.size(), set_mute_kernel, *this);
+    cuExecute3D(dim3(res(), res(), res()), set_mute_kernel, *this, z);
 }
 
 }  // namespace pppm

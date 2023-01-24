@@ -77,9 +77,25 @@ __global__ void preprocess_image_data(GArr3D<float> in_data,
                 float2 pos_center = make_float2(x_data_idx * upsample_factor + upsample_factor / 2.0f,
                                                 y_data_idx * upsample_factor + upsample_factor / 2.0f);
                 float value = in_data(b, x / upsample_factor, y / upsample_factor);
+                if (x_data_idx > 0 && x_data_idx < in_data.rows - 1 && y_data_idx > 0 && y_data_idx < in_data.cols - 1)
+                {
+                    // linear interpolation
+                    float x_f_idx = ((float)x / upsample_factor - 0.5);
+                    float y_f_idx = ((float)y / upsample_factor - 0.5);
+                    x_data_idx = x_f_idx;
+                    y_data_idx = y_f_idx;
+                    float x_ratio = x_f_idx - x_data_idx;
+                    float y_ratio = y_f_idx - y_data_idx;
+                    float value1 = in_data(b, x_data_idx, y_data_idx);
+                    float value2 = in_data(b, x_data_idx + 1, y_data_idx);
+                    float value3 = in_data(b, x_data_idx, y_data_idx + 1);
+                    float value4 = in_data(b, x_data_idx + 1, y_data_idx + 1);
+                    value = (1 - x_ratio) * (1 - y_ratio) * value1 + x_ratio * (1 - y_ratio) * value2 +
+                            (1 - x_ratio) * y_ratio * value3 + x_ratio * y_ratio * value4;
+                }
                 uchar4 line_color = make_uchar4(255, 255, 255, 255);
                 uchar4 pixel_color = JetColor(value, -data_max, data_max);
-                float k = 3.5f;
+                float k = 2.0f;
                 pixel_color.x /= k;
                 pixel_color.y /= k;
                 pixel_color.z /= k;

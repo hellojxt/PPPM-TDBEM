@@ -79,7 +79,7 @@ def load_key_frames(scene, base_obj):
 
 
 if __name__ == '__main__':
-    ROOT_DIR = '/home/jxt/PPPM-TDBEM/dataset/bowl/output/pppm/mesh'
+    ROOT_DIR = '/home/jxt/PPPM-TDBEM/dataset/acoustic/bowl/output/mesh_sequence'
     file_list = glob(os.path.join(ROOT_DIR, '*.obj'))
     PREFIX = os.path.basename(file_list[0]).split('_')[0]
     file_list.sort(key=lambda x: int(
