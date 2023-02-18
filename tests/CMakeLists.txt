@@ -54,3 +54,6 @@ target_link_libraries(RigidBodyTest PRIVATE alglib utillib)
 
 add_executable(FreshCellTest FreshCellTest.cu)
 target_link_libraries(FreshCellTest PRIVATE uilib alglib utillib)
+
+add_executable(ErrorCorrectionTest ErrorCorrectionTest.cu)
+target_link_libraries(ErrorCorrectionTest PRIVATE uilib alglib utillib)
